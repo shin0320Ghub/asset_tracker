@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>資産通帳</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --navy:#1b2a4a;
+    --navy-deep:#131f38;
+    --paper:#f2ede4;
+    --paper-line:#e2d9c8;
+    --gold:#c9a227;
+    --green:#3b7a57;
+    --red:#b23a48;
+    --ink:#2a2f36;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--navy-deep);
+    background-image:
+      radial-gradient(circle at 20% 0%, rgba(201,162,39,0.08), transparent 40%),
+      radial-gradient(circle at 90% 100%, rgba(201,162,39,0.06), transparent 45%);
+    font-family:"Noto Sans JP",sans-serif;
+    color:var(--ink);
+    min-height:100vh;
+    padding:env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 24px) 0;
+  }
+  .app{
+    max-width:480px;
+    margin:0 auto;
+    padding:20px 16px 0 16px;
+  }
+  .brand{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    padding:4px 4px 18px 4px;
+  }
+  .brand h1{
+    font-family:"Shippori Mincho",serif;
+    font-weight:700;
+    font-size:22px;
+    color:var(--paper);
+    letter-spacing:.08em;
+    margin:0;
+  }
+  .brand .sub{
+    font-size:10px;
+    color:rgba(242,237,228,0.55);
+    letter-spacing:.15em;
+  }
+
+  /* Passbook card */
+  .passbook{
+    background:var(--paper);
+    border-radius:6px;
+    box-shadow:0 18px 40px rgba(0,0,0,0.35), 0 2px 0 rgba(0,0,0,0.06) inset;
+    position:relative;
+    overflow:hidden;
+    padding:24px 20px 20px 20px;
+  }
+  .passbook::before{
+    content:"";
+    position:absolute; top:0; left:0; right:0; height:6px;
+    background:linear-gradient(90deg,var(--navy),var(--gold) 50%,var(--navy));
+  }
+  .total-label{
+    font-size:11px;
+    letter-spacing:.2em;
+    color:#7a7263;
+    margin-bottom:2px;
+  }
+  .total-value{
+    font-family:"Shippori Mincho",serif;
+    font-weight:700;
+    font-size:34px;
+    line-height:1.15;
+    color:var(--navy);
+    display:flex;
+    align-items:baseline;
+    gap:4px;
+  }
+  .total-value .yen{font-size:18px; color:#9a8f76;}
+  .total-date{
+    font-size:11px;
+    color:#9a8f76;
+    margin-top:4px;
+  }
+
+  .stamp{
+    position:absolute;
+    top:18px; right:18px;
+    width:52px;height:52px;
+    border-radius:50%;
+    border:2px solid var(--red);
+    color:var(--red);
+    display:flex;align-items:center;justify-content:center;
+    font-family:"Shippori Mincho",serif;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.05em;
+    transform:rotate(-8deg);
+    opacity:.85;
+    text-align:center;
+    line-height:1.2;
+  }
+
+  .ledger-rule{
+    height:1px;
+    background:repeating-linear-gradient(90deg, var(--paper-line) 0 6px, transparent 6px 12px);
+    margin:18px 0;
+  }
+
+  /* Stats row */
+  .stats{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:8px;
+  }
+  .stat{
+    background:rgba(27,42,74,0.04);
+    border:1px solid var(--paper-line);
+    border-radius:6px;
+    padding:10px 8px;
+    text-align:center;
+  }
+  .stat .k{
+    font-size:10px;
+    color:#8a8371;
+    letter-spacing:.1em;
+    margin-bottom:6px;
+  }
+  .stat .v{
+    font-size:14px;
+    font-weight:700;
+    font-variant-numeric:tabular-nums;
+  }
+  .stat .p{
+    font-size:10px;
+    margin-top:2px;
+    font-variant-numeric:tabular-nums;
+  }
+  .up{color:var(--green);}
+  .down{color:var(--red);}
+  .flat{color:#8a8371;}
+
+  /* Input card */
+  .input-card{
+    background:var(--paper);
+    border-radius:6px;
+    margin-top:14px;
+    padding:16px 18px 18px 18px;
+    box-shadow:0 10px 24px rgba(0,0,0,0.28);
+  }
+  .input-card h2{
+    font-family:"Shippori Mincho",serif;
+    font-size:14px;
+    color:var(--navy);
+    margin:0 0 12px 0;
+    letter-spacing:.05em;
+  }
+  .row{display:flex; gap:8px;}
+  .field{flex:1; display:flex; flex-direction:column; gap:4px;}
+  .field label{font-size:10px; color:#8a8371; letter-spacing:.05em;}
+  .field input{
+    font-family:"Noto Sans JP",sans-serif;
+    font-size:15px;
+    padding:10px 10px;
+    border-radius:4px;
+    border:1px solid var(--paper-line);
+    background:#fff;
+    color:var(--ink);
+    width:100%;
+  }
+  .field input:focus{outline:2px solid var(--navy); outline-offset:1px;}
+  .save-btn{
+    margin-top:12px;
+    width:100%;
+    padding:12px;
+    border:none;
+    border-radius:4px;
+    background:var(--navy);
+    color:var(--paper);
+    font-size:14px;
+    font-weight:700;
+    letter-spacing:.1em;
+    font-family:"Noto Sans JP",sans-serif;
+  }
+  .save-btn:active{background:var(--navy-deep);}
+  .hint{font-size:10px; color:#8a8371; margin-top:8px; text-align:center;}
+
+  /* Chart card */
+  .chart-card{
+    background:var(--paper);
+    border-radius:6px;
+    margin-top:14px;
+    padding:16px 12px 8px 6px;
+    box-shadow:0 10px 24px rgba(0,0,0,0.28);
+  }
+  .chart-card h2{
+    font-family:"Shippori Mincho",serif;
+    font-size:14px;
+    color:var(--navy);
+    margin:0 0 8px 14px;
+    letter-spacing:.05em;
+  }
+  .range-toggle{
+    display:flex; gap:6px; margin:0 8px 10px 8px;
+  }
+  .range-toggle button{
+    flex:1;
+    padding:6px 0;
+    font-size:11px;
+    border-radius:4px;
+    border:1px solid var(--paper-line);
+    background:transparent;
+    color:#8a8371;
+    font-family:"Noto Sans JP",sans-serif;
+  }
+  .range-toggle button.active{
+    background:var(--navy);
+    border-color:var(--navy);
+    color:var(--paper);
+    font-weight:700;
+  }
+  canvas{max-height:220px;}
+
+  /* History */
+  .history-card{
+    background:var(--paper);
+    border-radius:6px;
+    margin-top:14px;
+    padding:14px 6px 6px 6px;
+    box-shadow:0 10px 24px rgba(0,0,0,0.28);
+  }
+  .history-card h2{
+    font-family:"Shippori Mincho",serif;
+    font-size:14px;
+    color:var(--navy);
+    margin:0 0 6px 16px;
+    letter-spacing:.05em;
+  }
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  th,td{padding:8px 10px; text-align:right;}
+  th{font-size:10px; color:#8a8371; font-weight:500; text-align:right;}
+  th:first-child, td:first-child{text-align:left;}
+  tbody tr{border-top:1px solid var(--paper-line);}
+  td.amt{font-variant-numeric:tabular-nums; font-weight:600; color:var(--navy);}
+  .del{
+    background:none; border:none; color:var(--red); font-size:12px; padding:4px 6px;
+  }
+  .empty{
+    text-align:center; padding:24px 0; color:#a49b87; font-size:12px;
+  }
+  footer{
+    text-align:center;
+    color:rgba(242,237,228,0.35);
+    font-size:10px;
+    margin-top:18px;
+    letter-spacing:.1em;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="brand">
+    <h1>資産通帳</h1>
+    <div class="sub">ASSET&nbsp;PASSBOOK</div>
+  </div>
+
+  <div class="passbook">
+    <div class="stamp" id="stamp">記帳<br>済</div>
+    <div class="total-label">総資産</div>
+    <div class="total-value"><span class="yen">¥</span><span id="totalValue">0</span></div>
+    <div class="total-date" id="totalDate">データがありません</div>
+
+    <div class="ledger-rule"></div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="k">前日比</div>
+        <div class="v" id="dayVal">—</div>
+        <div class="p" id="dayPct">—</div>
+      </div>
+      <div class="stat">
+        <div class="k">前月比</div>
+        <div class="v" id="monthVal">—</div>
+        <div class="p" id="monthPct">—</div>
+      </div>
+      <div class="stat">
+        <div class="k">前年比</div>
+        <div class="v" id="yearVal">—</div>
+        <div class="p" id="yearPct">—</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="input-card">
+    <h2>今日の資産総額を記帳</h2>
+    <div class="row">
+      <div class="field">
+        <label for="dateInput">日付</label>
+        <input type="date" id="dateInput">
+      </div>
+      <div class="field">
+        <label for="amountInput">金額（円）</label>
+        <input type="number" id="amountInput" inputmode="numeric" placeholder="例: 5000000">
+      </div>
+    </div>
+    <button class="save-btn" id="saveBtn">記帳する</button>
+    <div class="hint">同じ日付で記帳すると上書きされます</div>
+  </div>
+
+  <div class="chart-card">
+    <h2>推移グラフ</h2>
+    <div class="range-toggle" id="rangeToggle">
+      <button data-range="3m">3ヶ月</button>
+      <button data-range="6m">6ヶ月</button>
+      <button data-range="1y" class="active">1年</button>
+      <button data-range="all">全期間</button>
+    </div>
+    <canvas id="chart" height="220"></canvas>
+  </div>
+
+  <div class="history-card">
+    <h2>記帳履歴</h2>
+    <table>
+      <thead>
+        <tr><th>日付</th><th>金額</th><th></th></tr>
+      </thead>
+      <tbody id="historyBody"></tbody>
+    </table>
+    <div class="empty" id="emptyMsg" style="display:none;">まだ記帳がありません</div>
+  </div>
+
+  <footer>すべてのデータは端末内にのみ保存されます</footer>
+</div>
+
+<script>
+const STORAGE_KEY = 'asset-passbook-entries';
+let entries = [];
+let currentRange = '1y';
+let chart = null;
+
+function loadEntries(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    entries = raw ? JSON.parse(raw) : [];
+  }catch(e){ entries = []; }
+  entries.sort((a,b)=> a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+}
+function saveEntries(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+}
+function fmtYen(n){
+  return Math.round(n).toLocaleString('ja-JP');
+}
+function todayStr(){
+  const d = new Date();
+  const tz = d.getTimezoneOffset()*60000;
+  return new Date(d - tz).toISOString().slice(0,10);
+}
+function addDaysStr(dateStr, days){
+  const d = new Date(dateStr+'T00:00:00');
+  d.setDate(d.getDate()+days);
+  return d.toISOString().slice(0,10);
+}
+function addMonthsStr(dateStr, months){
+  const d = new Date(dateStr+'T00:00:00');
+  d.setMonth(d.getMonth()+months);
+  return d.toISOString().slice(0,10);
+}
+function addYearsStr(dateStr, years){
+  const d = new Date(dateStr+'T00:00:00');
+  d.setFullYear(d.getFullYear()+years);
+  return d.toISOString().slice(0,10);
+}
+// find entry on-or-before target date, closest to it
+function findOnOrBefore(targetDate){
+  let found = null;
+  for(const e of entries){
+    if(e.date <= targetDate){
+      if(!found || e.date > found.date) found = e;
+    }
+  }
+  return found;
+}
+
+function renderStat(elVal, elPct, latest, compare){
+  if(!compare){
+    elVal.textContent = '—';
+    elPct.textContent = 'データなし';
+    elVal.className = 'v flat';
+    return;
+  }
+  const diff = latest.amount - compare.amount;
+  const pct = compare.amount !== 0 ? (diff/compare.amount*100) : 0;
+  const sign = diff > 0 ? '+' : diff < 0 ? '' : '';
+  const cls = diff > 0 ? 'up' : diff < 0 ? 'down' : 'flat';
+  elVal.textContent = sign + fmtYen(diff);
+  elVal.className = 'v ' + cls;
+  elPct.textContent = (diff>0?'+':'') + pct.toFixed(1) + '%';
+  elPct.className = 'p ' + cls;
+}
+
+function render(){
+  const totalValue = document.getElementById('totalValue');
+  const totalDate = document.getElementById('totalDate');
+
+  if(entries.length === 0){
+    totalValue.textContent = '0';
+    totalDate.textContent = 'データがありません';
+    renderStat(document.getElementById('dayVal'), document.getElementById('dayPct'), null, null);
+    renderStat(document.getElementById('monthVal'), document.getElementById('monthPct'), null, null);
+    renderStat(document.getElementById('yearVal'), document.getElementById('yearPct'), null, null);
+  } else {
+    const latest = entries[entries.length-1];
+    totalValue.textContent = fmtYen(latest.amount);
+    totalDate.textContent = latest.date + ' 時点';
+
+    const dayCompare = findOnOrBefore(addDaysStr(latest.date, -1));
+    const monthCompare = findOnOrBefore(addMonthsStr(latest.date, -1));
+    const yearCompare = findOnOrBefore(addYearsStr(latest.date, -1));
+
+    renderStat(document.getElementById('dayVal'), document.getElementById('dayPct'), latest, dayCompare && dayCompare.date !== latest.date ? dayCompare : null);
+    renderStat(document.getElementById('monthVal'), document.getElementById('monthPct'), latest, monthCompare && monthCompare.date !== latest.date ? monthCompare : null);
+    renderStat(document.getElementById('yearVal'), document.getElementById('yearPct'), latest, yearCompare && yearCompare.date !== latest.date ? yearCompare : null);
+  }
+
+  renderHistory();
+  renderChart();
+}
+
+function renderHistory(){
+  const body = document.getElementById('historyBody');
+  const emptyMsg = document.getElementById('emptyMsg');
+  body.innerHTML = '';
+  if(entries.length === 0){
+    emptyMsg.style.display = 'block';
+    return;
+  }
+  emptyMsg.style.display = 'none';
+  const rev = [...entries].reverse();
+  for(const e of rev){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${e.date}</td><td class="amt">¥${fmtYen(e.amount)}</td><td><button class="del" data-date="${e.date}">削除</button></td>`;
+    body.appendChild(tr);
+  }
+  body.querySelectorAll('.del').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const d = btn.getAttribute('data-date');
+      entries = entries.filter(e=>e.date !== d);
+      saveEntries();
+      render();
+    });
+  });
+}
+
+function filteredForRange(){
+  if(entries.length === 0) return [];
+  if(currentRange === 'all') return entries;
+  const latestDate = entries[entries.length-1].date;
+  let cutoff;
+  if(currentRange === '3m') cutoff = addMonthsStr(latestDate, -3);
+  else if(currentRange === '6m') cutoff = addMonthsStr(latestDate, -6);
+  else cutoff = addYearsStr(latestDate, -1);
+  return entries.filter(e=> e.date >= cutoff);
+}
+
+function renderChart(){
+  const ctx = document.getElementById('chart');
+  const data = filteredForRange();
+  const labels = data.map(e=>e.date);
+  const values = data.map(e=>e.amount);
+
+  if(chart){ chart.destroy(); }
+  chart = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels,
+      datasets:[{
+        data: values,
+        borderColor:'#1b2a4a',
+        backgroundColor:'rgba(201,162,39,0.15)',
+        borderWidth:2,
+        pointRadius: values.length > 60 ? 0 : 2,
+        pointBackgroundColor:'#c9a227',
+        fill:true,
+        tension:0.25
+      }]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{ legend:{display:false},
+        tooltip:{
+          callbacks:{
+            label: (item)=> '¥' + fmtYen(item.parsed.y)
+          }
+        }
+      },
+      scales:{
+        x:{ ticks:{ maxTicksLimit:6, font:{size:10}, color:'#8a8371' }, grid:{ display:false } },
+        y:{ ticks:{ font:{size:10}, color:'#8a8371',
+              callback:(v)=> (v/10000).toLocaleString('ja-JP') + '万' },
+            grid:{ color:'#e2d9c8' } }
+      }
+    }
+  });
+}
+
+document.getElementById('saveBtn').addEventListener('click', ()=>{
+  const date = document.getElementById('dateInput').value;
+  const amountRaw = document.getElementById('amountInput').value;
+  if(!date || amountRaw === ''){
+    alert('日付と金額を入力してください');
+    return;
+  }
+  const amount = Number(amountRaw);
+  if(isNaN(amount)){
+    alert('金額は数値で入力してください');
+    return;
+  }
+  const idx = entries.findIndex(e=>e.date === date);
+  if(idx >= 0){ entries[idx].amount = amount; }
+  else{ entries.push({date, amount}); }
+  entries.sort((a,b)=> a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+  saveEntries();
+  document.getElementById('amountInput').value = '';
+  render();
+});
+
+document.getElementById('rangeToggle').addEventListener('click', (ev)=>{
+  const btn = ev.target.closest('button');
+  if(!btn) return;
+  currentRange = btn.getAttribute('data-range');
+  [...document.getElementById('rangeToggle').children].forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderChart();
+});
+
+document.getElementById('dateInput').value = todayStr();
+loadEntries();
+render();
+</script>
+</body>
+</html>
