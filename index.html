@@ -7,6 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
 <style>
   :root{
     --navy:#1b2a4a;
@@ -264,6 +266,60 @@
     margin-top:18px;
     letter-spacing:.1em;
   }
+
+  /* Sync card */
+  .sync-card{
+    background:var(--paper);
+    border-radius:6px;
+    margin-top:14px;
+    padding:14px 18px 16px 18px;
+    box-shadow:0 10px 24px rgba(0,0,0,0.28);
+  }
+  .sync-card h2{
+    font-family:"Shippori Mincho",serif;
+    font-size:14px;
+    color:var(--navy);
+    margin:0 0 10px 0;
+    letter-spacing:.05em;
+  }
+  .sync-status{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-size:11px;
+    color:#8a8371;
+    margin-bottom:10px;
+  }
+  .sync-dot{
+    width:8px;height:8px;border-radius:50%;
+    background:#b8ae95;
+    flex-shrink:0;
+  }
+  .sync-dot.on{background:var(--green);}
+  .sync-dot.off{background:var(--red);}
+  .sync-row{display:flex; gap:8px;}
+  .sync-row input{
+    flex:1;
+    font-family:"Noto Sans JP",sans-serif;
+    font-size:14px;
+    padding:10px 10px;
+    border-radius:4px;
+    border:1px solid var(--paper-line);
+    background:#fff;
+    color:var(--ink);
+  }
+  .sync-btn{
+    padding:0 16px;
+    border:none;
+    border-radius:4px;
+    background:var(--navy);
+    color:var(--paper);
+    font-size:13px;
+    font-weight:700;
+    font-family:"Noto Sans JP",sans-serif;
+  }
+  .sync-btn:active{background:var(--navy-deep);}
+  .sync-hint{font-size:10px; color:#8a8371; margin-top:8px; line-height:1.5;}
 </style>
 </head>
 <body>
@@ -299,6 +355,16 @@
         <div class="p" id="yearPct">—</div>
       </div>
     </div>
+  </div>
+
+  <div class="sync-card">
+    <h2>iPhone / iPad 同期</h2>
+    <div class="sync-status"><span class="sync-dot" id="syncDot"></span><span id="syncStatusText">未接続(この端末のみ)</span></div>
+    <div class="sync-row">
+      <input type="text" id="syncCodeInput" placeholder="同期コードを入力">
+      <button class="sync-btn" id="syncConnectBtn">接続</button>
+    </div>
+    <div class="sync-hint">同期コードは自分だけの合言葉です。iPhoneとiPadで同じコードを入力すると、記帳データが自動的に共有されます。</div>
   </div>
 
   <div class="input-card">
@@ -339,14 +405,29 @@
     <div class="empty" id="emptyMsg" style="display:none;">まだ記帳がありません</div>
   </div>
 
-  <footer>すべてのデータは端末内にのみ保存されます</footer>
+  <footer>同期未設定の場合、データは端末内にのみ保存されます</footer>
 </div>
 
 <script>
 const STORAGE_KEY = 'asset-passbook-entries';
+const SYNC_CODE_KEY = 'asset-passbook-sync-code';
+const firebaseConfig = {
+  apiKey: "AIzaSyBUQjfeamTm1gCWNiXhZcxyBIUiQSptvDs",
+  authDomain: "asset-tracker-b3fac.firebaseapp.com",
+  databaseURL: "https://asset-tracker-b3fac-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  projectId: "asset-tracker-b3fac",
+  storageBucket: "asset-tracker-b3fac.firebasestorage.app",
+  messagingSenderId: "36181399487",
+  appId: "1:36181399487:web:0ef48412b814d81aaa330a"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
 let entries = [];
 let currentRange = '1y';
 let chart = null;
+let syncCode = null;
+let entriesRef = null;
 
 function loadEntries(){
   try{
@@ -355,8 +436,37 @@ function loadEntries(){
   }catch(e){ entries = []; }
   entries.sort((a,b)=> a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
 }
-function saveEntries(){
+function saveLocalCache(){
   localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+}
+function saveEntries(){
+  // local-only path (used when sync is not connected)
+  saveLocalCache();
+}
+
+function setSyncStatus(connected, label){
+  const dot = document.getElementById('syncDot');
+  const text = document.getElementById('syncStatusText');
+  dot.className = 'sync-dot ' + (connected ? 'on' : 'off');
+  text.textContent = label;
+}
+
+function connectSync(code){
+  syncCode = code;
+  localStorage.setItem(SYNC_CODE_KEY, code);
+  document.getElementById('syncCodeInput').value = code;
+  setSyncStatus(true, '接続中…');
+  entriesRef = db.ref('syncData/' + code + '/entries');
+  entriesRef.on('value', (snapshot)=>{
+    const val = snapshot.val() || {};
+    entries = Object.keys(val).map(date => ({date, amount: val[date]}));
+    entries.sort((a,b)=> a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+    saveLocalCache();
+    setSyncStatus(true, '同期中(この端末と共有中)');
+    render();
+  }, (err)=>{
+    setSyncStatus(false, '同期エラー:接続を確認してください');
+  });
 }
 function fmtYen(n){
   return Math.round(n).toLocaleString('ja-JP');
@@ -455,9 +565,14 @@ function renderHistory(){
   body.querySelectorAll('.del').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const d = btn.getAttribute('data-date');
-      entries = entries.filter(e=>e.date !== d);
-      saveEntries();
-      render();
+      if(entriesRef){
+        entriesRef.child(d).remove();
+        // listener will update entries and re-render
+      } else {
+        entries = entries.filter(e=>e.date !== d);
+        saveEntries();
+        render();
+      }
     });
   });
 }
@@ -527,13 +642,27 @@ document.getElementById('saveBtn').addEventListener('click', ()=>{
     alert('金額は数値で入力してください');
     return;
   }
-  const idx = entries.findIndex(e=>e.date === date);
-  if(idx >= 0){ entries[idx].amount = amount; }
-  else{ entries.push({date, amount}); }
-  entries.sort((a,b)=> a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
-  saveEntries();
+  if(entriesRef){
+    entriesRef.child(date).set(amount);
+    // listener will update entries and re-render
+  } else {
+    const idx = entries.findIndex(e=>e.date === date);
+    if(idx >= 0){ entries[idx].amount = amount; }
+    else{ entries.push({date, amount}); }
+    entries.sort((a,b)=> a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+    saveEntries();
+    render();
+  }
   document.getElementById('amountInput').value = '';
-  render();
+});
+
+document.getElementById('syncConnectBtn').addEventListener('click', ()=>{
+  const code = document.getElementById('syncCodeInput').value.trim();
+  if(!code){
+    alert('同期コードを入力してください');
+    return;
+  }
+  connectSync(code);
 });
 
 document.getElementById('rangeToggle').addEventListener('click', (ev)=>{
@@ -548,6 +677,13 @@ document.getElementById('rangeToggle').addEventListener('click', (ev)=>{
 document.getElementById('dateInput').value = todayStr();
 loadEntries();
 render();
+
+const savedSyncCode = localStorage.getItem(SYNC_CODE_KEY);
+if(savedSyncCode){
+  connectSync(savedSyncCode);
+} else {
+  setSyncStatus(false, '未接続(この端末のみ)');
+}
 </script>
 </body>
 </html>
