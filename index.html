@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>資産通帳</title>
+<title>株評価損益</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
@@ -172,12 +172,16 @@
   .field input{
     font-family:"Noto Sans JP",sans-serif;
     font-size:15px;
-    padding:10px 10px;
+    height:46px;
+    padding:0 12px;
     border-radius:4px;
     border:1px solid var(--paper-line);
     background:#fff;
     color:var(--ink);
     width:100%;
+    line-height:normal;
+    -webkit-appearance:none;
+    appearance:none;
   }
   .field input:focus{outline:2px solid var(--navy); outline-offset:1px;}
   .save-btn{
@@ -252,7 +256,7 @@
   th{font-size:10px; color:#8a8371; font-weight:500; text-align:right;}
   th:first-child, td:first-child{text-align:left;}
   tbody tr{border-top:1px solid var(--paper-line);}
-  td.amt{font-variant-numeric:tabular-nums; font-weight:600; color:var(--navy);}
+  td.amt{font-variant-numeric:tabular-nums; font-weight:600;}
   .del{
     background:none; border:none; color:var(--red); font-size:12px; padding:4px 6px;
   }
@@ -320,19 +324,48 @@
   }
   .sync-btn:active{background:var(--navy-deep);}
   .sync-hint{font-size:10px; color:#8a8371; margin-top:8px; line-height:1.5;}
+
+  /* CSV export card */
+  .csv-card{
+    background:var(--paper);
+    border-radius:6px;
+    margin-top:14px;
+    padding:14px 18px 16px 18px;
+    box-shadow:0 10px 24px rgba(0,0,0,0.28);
+  }
+  .csv-card h2{
+    font-family:"Shippori Mincho",serif;
+    font-size:14px;
+    color:var(--navy);
+    margin:0 0 10px 0;
+    letter-spacing:.05em;
+  }
+  .csv-btn{
+    width:100%;
+    padding:11px;
+    border:1px solid var(--navy);
+    border-radius:4px;
+    background:transparent;
+    color:var(--navy);
+    font-size:13px;
+    font-weight:700;
+    letter-spacing:.05em;
+    font-family:"Noto Sans JP",sans-serif;
+  }
+  .csv-btn:active{background:rgba(27,42,74,0.08);}
 </style>
 </head>
 <body>
 <div class="app">
 
   <div class="brand">
-    <h1>資産通帳</h1>
-    <div class="sub">ASSET&nbsp;PASSBOOK</div>
+    <h1>株評価損益</h1>
+    <div class="sub">STOCK&nbsp;VALUATION&nbsp;P&amp;L</div>
   </div>
 
   <div class="passbook">
     <div class="stamp" id="stamp">記帳<br>済</div>
-    <div class="total-label">総資産</div>
+    <div class="total-label">評価損益</div>
     <div class="total-value"><span class="yen">¥</span><span id="totalValue">0</span></div>
     <div class="total-date" id="totalDate">データがありません</div>
 
@@ -358,19 +391,19 @@
   </div>
 
   <div class="input-card">
-    <h2>今日の資産総額を記帳</h2>
+    <h2>今日の評価損益を記帳</h2>
     <div class="row">
       <div class="field">
-        <label for="dateInput">日付</label>
+        <label for="dateInput">日付(平日のみ)</label>
         <input type="date" id="dateInput">
       </div>
       <div class="field">
-        <label for="amountInput">金額（円）</label>
-        <input type="number" id="amountInput" inputmode="numeric" placeholder="例: 5000000">
+        <label for="amountInput">評価損益（円）</label>
+        <input type="number" id="amountInput" inputmode="numeric" placeholder="例: -50000">
       </div>
     </div>
     <button class="save-btn" id="saveBtn">記帳する</button>
-    <div class="hint">同じ日付で記帳すると上書きされます</div>
+    <div class="hint">同じ日付で記帳すると上書きされます。土日は記帳できません(祝日はチェックされません)</div>
   </div>
 
   <div class="chart-card">
@@ -388,11 +421,17 @@
     <h2>記帳履歴</h2>
     <table>
       <thead>
-        <tr><th>日付</th><th>金額</th><th></th></tr>
+        <tr><th>日付</th><th>評価損益</th><th></th></tr>
       </thead>
       <tbody id="historyBody"></tbody>
     </table>
     <div class="empty" id="emptyMsg" style="display:none;">まだ記帳がありません</div>
+  </div>
+
+  <div class="csv-card">
+    <h2>データ書き出し</h2>
+    <button class="csv-btn" id="csvExportBtn">CSVを出力</button>
+    <div class="sync-hint">記帳履歴を日付・評価損益のCSVファイルとして書き出します</div>
   </div>
 
   <div class="sync-card">
@@ -469,7 +508,18 @@ function connectSync(code){
   });
 }
 function fmtYen(n){
-  return Math.round(n).toLocaleString('ja-JP');
+  const r = Math.round(n);
+  return r.toLocaleString('ja-JP');
+}
+function isWeekday(dateStr){
+  const d = new Date(dateStr+'T00:00:00');
+  const day = d.getDay();
+  return day !== 0 && day !== 6;
+}
+function lastWeekdayOnOrBefore(dateStr){
+  const d = new Date(dateStr+'T00:00:00');
+  while(d.getDay() === 0 || d.getDay() === 6){ d.setDate(d.getDate()-1); }
+  return d.toISOString().slice(0,10);
 }
 function todayStr(){
   const d = new Date();
@@ -525,6 +575,7 @@ function render(){
 
   if(entries.length === 0){
     totalValue.textContent = '0';
+    totalValue.className = '';
     totalDate.textContent = 'データがありません';
     renderStat(document.getElementById('dayVal'), document.getElementById('dayPct'), null, null);
     renderStat(document.getElementById('monthVal'), document.getElementById('monthPct'), null, null);
@@ -532,6 +583,7 @@ function render(){
   } else {
     const latest = entries[entries.length-1];
     totalValue.textContent = fmtYen(latest.amount);
+    totalValue.className = latest.amount > 0 ? 'up' : latest.amount < 0 ? 'down' : 'flat';
     totalDate.textContent = latest.date + ' 時点';
 
     const dayCompare = findOnOrBefore(addDaysStr(latest.date, -1));
@@ -559,7 +611,9 @@ function renderHistory(){
   const rev = [...entries].reverse();
   for(const e of rev){
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${e.date}</td><td class="amt">¥${fmtYen(e.amount)}</td><td><button class="del" data-date="${e.date}">削除</button></td>`;
+    const cls = e.amount > 0 ? 'up' : e.amount < 0 ? 'down' : 'flat';
+    const sign = e.amount > 0 ? '+' : '';
+    tr.innerHTML = `<td>${e.date}</td><td class="amt ${cls}">${sign}¥${fmtYen(e.amount)}</td><td><button class="del" data-date="${e.date}">削除</button></td>`;
     body.appendChild(tr);
   }
   body.querySelectorAll('.del').forEach(btn=>{
@@ -634,12 +688,16 @@ document.getElementById('saveBtn').addEventListener('click', ()=>{
   const date = document.getElementById('dateInput').value;
   const amountRaw = document.getElementById('amountInput').value;
   if(!date || amountRaw === ''){
-    alert('日付と金額を入力してください');
+    alert('日付と評価損益を入力してください');
+    return;
+  }
+  if(!isWeekday(date)){
+    alert('土日は記帳できません。平日(東証営業日)を選択してください。');
     return;
   }
   const amount = Number(amountRaw);
   if(isNaN(amount)){
-    alert('金額は数値で入力してください');
+    alert('評価損益は数値で入力してください');
     return;
   }
   if(entriesRef){
@@ -654,6 +712,26 @@ document.getElementById('saveBtn').addEventListener('click', ()=>{
     render();
   }
   document.getElementById('amountInput').value = '';
+});
+
+document.getElementById('csvExportBtn').addEventListener('click', ()=>{
+  if(entries.length === 0){
+    alert('書き出せる記帳データがありません');
+    return;
+  }
+  let csv = '\uFEFF' + '日付,評価損益\n';
+  for(const e of entries){
+    csv += `${e.date},${e.amount}\n`;
+  }
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '株評価損益_' + todayStr() + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 });
 
 document.getElementById('syncConnectBtn').addEventListener('click', ()=>{
@@ -674,7 +752,7 @@ document.getElementById('rangeToggle').addEventListener('click', (ev)=>{
   renderChart();
 });
 
-document.getElementById('dateInput').value = todayStr();
+document.getElementById('dateInput').value = lastWeekdayOnOrBefore(todayStr());
 loadEntries();
 render();
 
