@@ -541,7 +541,7 @@ function addYearsStr(dateStr, years){
   d.setFullYear(d.getFullYear()+years);
   return d.toISOString().slice(0,10);
 }
-// find entry on-or-before target date, closest to it
+// find entry on-or-before target date, closest to it (used for "previous entry" comparisons)
 function findOnOrBefore(targetDate){
   let found = null;
   for(const e of entries){
@@ -550,6 +550,35 @@ function findOnOrBefore(targetDate){
     }
   }
   return found;
+}
+// last recorded entry within a given "YYYY-MM" month (i.e. that month's month-end value)
+function lastEntryInMonth(monthKey){
+  let found = null;
+  for(const e of entries){
+    if(e.date.slice(0,7) === monthKey){
+      if(!found || e.date > found.date) found = e;
+    }
+  }
+  return found;
+}
+// last recorded entry within a given "YYYY" year (i.e. that year's year-end value)
+function lastEntryInYear(yearKey){
+  let found = null;
+  for(const e of entries){
+    if(e.date.slice(0,4) === yearKey){
+      if(!found || e.date > found.date) found = e;
+    }
+  }
+  return found;
+}
+function prevMonthKey(dateStr){
+  const d = new Date(dateStr+'T00:00:00');
+  d.setDate(1);
+  d.setMonth(d.getMonth()-1);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+function prevYearKey(dateStr){
+  return String(parseInt(dateStr.slice(0,4),10) - 1);
 }
 
 function renderStat(elVal, elPct, latest, compare){
@@ -587,12 +616,12 @@ function render(){
     totalDate.textContent = latest.date + ' 時点';
 
     const dayCompare = findOnOrBefore(addDaysStr(latest.date, -1));
-    const monthCompare = findOnOrBefore(addMonthsStr(latest.date, -1));
-    const yearCompare = findOnOrBefore(addYearsStr(latest.date, -1));
+    const monthCompare = lastEntryInMonth(prevMonthKey(latest.date));
+    const yearCompare = lastEntryInYear(prevYearKey(latest.date));
 
     renderStat(document.getElementById('dayVal'), document.getElementById('dayPct'), latest, dayCompare && dayCompare.date !== latest.date ? dayCompare : null);
-    renderStat(document.getElementById('monthVal'), document.getElementById('monthPct'), latest, monthCompare && monthCompare.date !== latest.date ? monthCompare : null);
-    renderStat(document.getElementById('yearVal'), document.getElementById('yearPct'), latest, yearCompare && yearCompare.date !== latest.date ? yearCompare : null);
+    renderStat(document.getElementById('monthVal'), document.getElementById('monthPct'), latest, monthCompare);
+    renderStat(document.getElementById('yearVal'), document.getElementById('yearPct'), latest, yearCompare);
   }
 
   renderHistory();
