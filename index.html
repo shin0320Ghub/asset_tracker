@@ -56,6 +56,15 @@
     color:rgba(242,237,228,0.55);
     letter-spacing:.15em;
   }
+  .version{
+    font-family:"Noto Sans JP",sans-serif;
+    font-weight:500;
+    font-size:10px;
+    color:var(--gold);
+    letter-spacing:.05em;
+    margin-left:8px;
+    vertical-align:middle;
+  }
 
   /* Passbook card */
   .passbook{
@@ -359,7 +368,7 @@
 <div class="app">
 
   <div class="brand">
-    <h1>株評価損益</h1>
+    <h1>株評価損益<span class="version">Ver1.0</span></h1>
     <div class="sub">STOCK&nbsp;VALUATION&nbsp;P&amp;L</div>
   </div>
 
@@ -519,27 +528,31 @@ function isWeekday(dateStr){
 function lastWeekdayOnOrBefore(dateStr){
   const d = new Date(dateStr+'T00:00:00');
   while(d.getDay() === 0 || d.getDay() === 6){ d.setDate(d.getDate()-1); }
-  return d.toISOString().slice(0,10);
+  return toLocalISO(d);
 }
 function todayStr(){
-  const d = new Date();
-  const tz = d.getTimezoneOffset()*60000;
-  return new Date(d - tz).toISOString().slice(0,10);
+  return toLocalISO(new Date());
+}
+function toLocalISO(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
 }
 function addDaysStr(dateStr, days){
   const d = new Date(dateStr+'T00:00:00');
   d.setDate(d.getDate()+days);
-  return d.toISOString().slice(0,10);
+  return toLocalISO(d);
 }
 function addMonthsStr(dateStr, months){
   const d = new Date(dateStr+'T00:00:00');
   d.setMonth(d.getMonth()+months);
-  return d.toISOString().slice(0,10);
+  return toLocalISO(d);
 }
 function addYearsStr(dateStr, years){
   const d = new Date(dateStr+'T00:00:00');
   d.setFullYear(d.getFullYear()+years);
-  return d.toISOString().slice(0,10);
+  return toLocalISO(d);
 }
 // find entry on-or-before target date, closest to it (used for "previous entry" comparisons)
 function findOnOrBefore(targetDate){
