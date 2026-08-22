@@ -37,6 +37,28 @@
     margin:0 auto;
     padding:20px 16px 0 16px;
   }
+
+  /* Tablet (iPad mini and larger) */
+  @media (min-width: 700px){
+    .app{ max-width:640px; padding-top:32px; }
+    .brand h1{ font-size:26px; }
+    .total-value{ font-size:40px; }
+    .total-label{ font-size:12px; }
+    canvas{ max-height:300px; }
+    .stat .v{ font-size:16px; }
+    .stat .p{ font-size:11px; }
+    .stat .k{ font-size:11px; }
+    .passbook, .input-card, .chart-card, .history-card, .csv-card, .sync-card{ padding-left:26px; padding-right:26px; }
+    .save-btn, .csv-btn, .sync-btn{ font-size:14px; padding:13px; }
+    table{ font-size:14px; }
+    .field input{ font-size:16px; height:50px; }
+  }
+
+  /* iPad landscape / wider */
+  @media (min-width: 1000px){
+    .app{ max-width:760px; }
+    canvas{ max-height:340px; }
+  }
   .brand{
     display:flex;
     align-items:baseline;
