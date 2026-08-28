@@ -142,6 +142,22 @@
     text-align:center;
     line-height:1.2;
   }
+  .record-badge{
+    position:absolute;
+    top:30px; right:78px;
+    background:var(--gold);
+    color:var(--navy-deep);
+    font-family:"Shippori Mincho",serif;
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:.05em;
+    padding:4px 9px;
+    border-radius:3px;
+    white-space:nowrap;
+    box-shadow:0 2px 6px rgba(0,0,0,0.25);
+    display:none;
+  }
+  .record-badge.show{ display:block; }
 
   .ledger-rule{
     height:1px;
@@ -396,6 +412,7 @@
 
   <div class="passbook">
     <div class="stamp" id="stamp">記帳<br>済</div>
+    <div class="record-badge" id="recordBadge">最高値</div>
     <div class="total-label">評価損益</div>
     <div class="total-value"><span class="yen">¥</span><span id="totalValue">0</span></div>
     <div class="total-date" id="totalDate">データがありません</div>
@@ -636,11 +653,13 @@ function renderStat(elVal, elPct, latest, compare){
 function render(){
   const totalValue = document.getElementById('totalValue');
   const totalDate = document.getElementById('totalDate');
+  const recordBadge = document.getElementById('recordBadge');
 
   if(entries.length === 0){
     totalValue.textContent = '0';
     totalValue.className = '';
     totalDate.textContent = 'データがありません';
+    recordBadge.classList.remove('show');
     renderStat(document.getElementById('dayVal'), document.getElementById('dayPct'), null, null);
     renderStat(document.getElementById('monthVal'), document.getElementById('monthPct'), null, null);
     renderStat(document.getElementById('yearVal'), document.getElementById('yearPct'), null, null);
@@ -649,6 +668,9 @@ function render(){
     totalValue.textContent = fmtYen(latest.amount);
     totalValue.className = latest.amount > 0 ? 'up' : latest.amount < 0 ? 'down' : 'flat';
     totalDate.textContent = latest.date + ' 時点';
+
+    const maxAmount = Math.max(...entries.map(e=>e.amount));
+    recordBadge.classList.toggle('show', latest.amount === maxAmount);
 
     const dayCompare = findOnOrBefore(addDaysStr(latest.date, -1));
     const monthCompare = lastEntryInMonth(prevMonthKey(latest.date));
