@@ -91,6 +91,8 @@
   .range-tabs button.active{background:var(--accent);color:#fff;border-color:var(--accent);}
   .close-x{position:absolute;right:16px;top:14px;font-size:20px;color:var(--sub);background:none;border:none;}
   .sheet-head{position:relative;}
+  .chart-close-x{top:2px;}
+  .chart-range-tabs{margin-top:22px;}
   .loading-line{font-size:11px;color:var(--sub);text-align:center;padding:6px;}
 </style>
 </head>
@@ -162,11 +164,11 @@
 <!-- グラフシート -->
 <div class="overlay" id="chartOverlay">
   <div class="sheet">
-    <div class="sheet-head">
+    <div class="sheet-head chart-sheet-head">
       <h2 id="chartTitle">株価推移</h2>
-      <button class="close-x" id="chartClose">✕</button>
+      <button class="close-x chart-close-x" id="chartClose">✕</button>
     </div>
-    <div class="range-tabs">
+    <div class="range-tabs chart-range-tabs">
       <button data-range="1m" class="active">1ヶ月</button>
       <button data-range="3m">3ヶ月</button>
       <button data-range="6m">6ヶ月</button>
