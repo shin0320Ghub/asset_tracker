@@ -98,7 +98,7 @@
 
 <header>
   <div class="title-row">
-    <h1>銘柄別評価損益 <span class="ver">Ver1.4</span></h1>
+    <h1>銘柄別評価損益 <span class="ver">Ver1.5</span></h1>
     <button class="refresh-btn" id="refreshAllBtn">株価更新</button>
   </div>
   <div class="summary">
@@ -127,6 +127,11 @@
       <label>銘柄コード（例: 7203）</label>
       <input type="text" id="inCode" inputmode="numeric" placeholder="7203">
       <div class="hint">日本株の証券コードを入力してください</div>
+    </div>
+    <div class="field">
+      <label>銘柄名（任意）</label>
+      <input type="text" id="inName" placeholder="例: トヨタ自動車">
+      <div class="hint">空欄の場合は銘柄コードを表示します</div>
     </div>
     <div class="field">
       <label>取得日</label>
@@ -205,8 +210,8 @@ const db = firebase.database();
 const holdingsRef = db.ref('stockPortfolio/holdings');
 const priceCacheRef = db.ref('stockPortfolio/priceCache');
 
-let holdings = {};      // id -> {code,date,shares,price,nisa}
-let priceCache = {};    // code -> {name, price, updatedAt}
+let holdings = {};      // id -> {code,name,date,shares,price,nisa}
+let priceCache = {};    // code -> {price, updatedAt, error}
 let editingId = null;
 let currentChartCode = null;
 let currentChartRange = '1m';
@@ -234,8 +239,9 @@ priceCacheRef.on('value', snap => {
 });
 
 /* ---------- stooq から株価取得 ----------
-  現在値・銘柄名: https://stooq.com/q/l/?s=CODE.jp&f=snd2t2ohlcv&e=csv
-  日足履歴      : https://stooq.com/q/d/l/?s=CODE.jp&i=d
+  現在値・日足履歴とも https://stooq.com/q/d/l/?s=CODE.jp&i=d の日足CSVを使用
+  （/q/l/ の即時株価エンドポイントは廃止されているため使用しない）。
+  最新行の終値を「現在の評価単価」として扱う。銘柄名は自動取得せず、登録時の手入力に依存。
 ------------------------------------------- */
 // GitHub Pages (静的サイト) から直接 stooq.com へ fetch すると
 // ブラウザのCORS制限でブロックされるため、CORSプロキシを経由する。
@@ -268,29 +274,28 @@ async function fetchViaProxies(targetUrl){
   throw new Error((lastErr ? lastErr.name + ': ' + lastErr.message : '不明なエラー'));
 }
 
-async function fetchQuote(code){
-  const text = await fetchViaProxies(`https://stooq.com/q/l/?s=${code}.jp&f=snd2t2ohlcv&e=csv`);
-  const lines = text.trim().split('\n');
-  if(lines.length < 2) throw new Error('データなし（コード:' + code + '）');
-  const cols = lines[1].split(',');
-  // Symbol,Name,Date,Time,Open,High,Low,Close,Volume
-  if(!cols[0] || cols[0].toUpperCase() === 'N/D') throw new Error('銘柄コードが見つかりません: ' + code);
-  const name = cols[1] && cols[1] !== 'N/D' ? cols[1] : code;
-  const close = parseFloat(cols[7]);
-  return { name, price: isNaN(close) ? null : close };
-}
-
 async function fetchHistory(code){
   const text = await fetchViaProxies(`https://stooq.com/q/d/l/?s=${code}.jp&i=d`);
   const lines = text.trim().split('\n');
+  if(lines[0] && lines[0].toLowerCase().indexOf('date') === -1 && lines.length < 2){
+    throw new Error('銘柄コードが見つかりません: ' + code);
+  }
   const rows = [];
   for(let i=1;i<lines.length;i++){
     const c = lines[i].split(',');
     if(c.length < 5) continue;
-    rows.push({ date: c[0], close: parseFloat(c[4]) });
+    const close = parseFloat(c[4]);
+    if(isNaN(close)) continue;
+    rows.push({ date: c[0], close });
   }
   if(rows.length === 0) throw new Error('履歴データなし（コード:' + code + '）');
   return rows;
+}
+
+async function fetchQuote(code){
+  const rows = await fetchHistory(code);
+  const last = rows[rows.length - 1];
+  return { price: last.close };
 }
 
 async function refreshAllPrices(){
@@ -301,7 +306,7 @@ async function refreshAllPrices(){
   for(const code of codes){
     try{
       const q = await fetchQuote(code);
-      await priceCacheRef.child(code).set({ name: q.name, price: q.price, updatedAt: Date.now(), error: null });
+      await priceCacheRef.child(code).update({ price: q.price, updatedAt: Date.now(), error: null });
     }catch(e){
       console.error('quote fetch failed', code, e);
       errors.push(code + ': ' + e.message);
@@ -336,7 +341,8 @@ function render(){
     const lots = byCode[code];
     const cache = priceCache[code] || {};
     const curPrice = cache.price;
-    const name = cache.name || code;
+    const lotWithName = lots.find(l => l.name && l.name.trim() !== '');
+    const name = lotWithName ? lotWithName.name : code;
     const fetchFailed = !!cache.error && (curPrice === null || curPrice === undefined);
     const shares = lots.reduce((s,l)=>s+Number(l.shares),0);
     const cost = lots.reduce((s,l)=>s+Number(l.shares)*Number(l.price),0);
@@ -420,12 +426,14 @@ function openEdit(id){
   if(id){
     const h = holdings[id];
     document.getElementById('inCode').value = h.code;
+    document.getElementById('inName').value = h.name || '';
     document.getElementById('inDate').value = h.date;
     document.getElementById('inShares').value = h.shares;
     document.getElementById('inPrice').value = h.price;
     document.getElementById('inNisa').value = h.nisa || 'no';
   } else {
     document.getElementById('inCode').value = '';
+    document.getElementById('inName').value = '';
     document.getElementById('inDate').value = new Date().toISOString().slice(0,10);
     document.getElementById('inShares').value = '';
     document.getElementById('inPrice').value = '';
@@ -437,6 +445,7 @@ function closeEdit(){ editOverlay.classList.remove('show'); editingId = null; }
 
 document.getElementById('editSave').onclick = async () => {
   const code = document.getElementById('inCode').value.trim();
+  const name = document.getElementById('inName').value.trim();
   const date = document.getElementById('inDate').value.trim();
   const sharesStr = document.getElementById('inShares').value.trim();
   const priceStr = document.getElementById('inPrice').value.trim();
@@ -453,7 +462,7 @@ document.getElementById('editSave').onclick = async () => {
   }
   const shares = Number(sharesStr);
   const price = Number(priceStr);
-  const data = { code, date, shares, price, nisa };
+  const data = { code, name, date, shares, price, nisa };
   if(editingId){
     await holdingsRef.child(editingId).set(data);
   } else {
@@ -463,8 +472,11 @@ document.getElementById('editSave').onclick = async () => {
   // 新規銘柄なら価格取得
   try{
     const q = await fetchQuote(code);
-    await priceCacheRef.child(code).set({ name: q.name, price: q.price, updatedAt: Date.now() });
-  }catch(e){ console.error(e); }
+    await priceCacheRef.child(code).update({ price: q.price, updatedAt: Date.now(), error: null });
+  }catch(e){
+    console.error(e);
+    await priceCacheRef.child(code).update({ error: e.message, updatedAt: Date.now() });
+  }
 };
 
 /* ---------- グラフシート ---------- */
@@ -484,8 +496,9 @@ async function openChart(code){
   currentChartRange = '1m';
   document.querySelectorAll('.range-tabs button').forEach(b=>b.classList.remove('active'));
   document.querySelector('.range-tabs button[data-range="1m"]').classList.add('active');
-  const cache = priceCache[code] || {};
-  document.getElementById('chartTitle').textContent = (cache.name || code) + ' (' + code + ')';
+  const lotWithName = Object.values(holdings).find(l => l.code === code && l.name && l.name.trim() !== '');
+  const displayName = lotWithName ? lotWithName.name : code;
+  document.getElementById('chartTitle').textContent = displayName + ' (' + code + ')';
   chartOverlay.classList.add('show');
   document.getElementById('chartLoading').style.display = 'block';
   try{
