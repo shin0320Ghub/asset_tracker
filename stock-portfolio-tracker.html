@@ -98,7 +98,7 @@
 
 <header>
   <div class="title-row">
-    <h1>銘柄別評価損益 <span class="ver">Ver1.8</span></h1>
+    <h1>銘柄別評価損益 <span class="ver">Ver1.9</span></h1>
     <button class="refresh-btn" id="refreshAllBtn">株価更新</button>
   </div>
   <div class="summary">
@@ -359,7 +359,8 @@ function render(){
   let totalValue = 0, totalCost = 0;
   list.innerHTML = '';
 
-  Object.keys(byCode).sort().forEach(code => {
+  // 先に各銘柄の集計値を計算
+  const summaries = Object.keys(byCode).map(code => {
     const lots = byCode[code];
     const cache = priceCache[code] || {};
     const curPrice = cache.price;
@@ -372,7 +373,16 @@ function render(){
     const profit = value!==null ? value - cost : null;
     if(value!==null) totalValue += value;
     totalCost += cost;
+    return { code, lots, name, curPrice, fetchFailed, shares, cost, value, profit };
+  });
 
+  // 株数の多い順、同数なら評価額の多い順
+  summaries.sort((a,b) => {
+    if(b.shares !== a.shares) return b.shares - a.shares;
+    return (b.value||0) - (a.value||0);
+  });
+
+  summaries.forEach(({ code, lots, name, curPrice, fetchFailed, shares, value, profit }) => {
     const div = document.createElement('div');
     div.className = 'holding';
     const nisaAny = lots.some(l=>l.nisa==='yes');
@@ -392,7 +402,7 @@ function render(){
       </div>
       <div class="h-grid">
         <div>株数 <b>${shares.toLocaleString('ja-JP')}</b></div>
-        <div>利益額 <b class="h-profit ${profit>0?'pos':profit<0?'neg':''}">${profit===null?'-':(profit>=0?'+':'')+yen(profit)}</b></div>
+        <div>利益額 <b class="h-profit ${profit>0?'pos':profit<0?'neg':''}">${profit===null?'-':yen(profit)}</b></div>
       </div>
       <div class="h-actions">
         <button class="editL" data-code="${code}">明細を編集</button>
@@ -406,7 +416,7 @@ function render(){
   document.getElementById('sumCost').textContent = yen(totalCost);
   const sp = document.getElementById('sumProfit');
   const totalProfit = totalValue - totalCost;
-  sp.textContent = (totalProfit>=0?'+':'') + yen(totalProfit);
+  sp.textContent = yen(totalProfit);
   sp.className = 'value ' + (totalProfit>0?'pos':totalProfit<0?'neg':'');
 
   // イベント付与
