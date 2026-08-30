@@ -98,7 +98,7 @@
 
 <header>
   <div class="title-row">
-    <h1>銘柄別評価損益 <span class="ver">Ver1.7</span></h1>
+    <h1>銘柄別評価損益 <span class="ver">Ver1.8</span></h1>
     <button class="refresh-btn" id="refreshAllBtn">株価更新</button>
   </div>
   <div class="summary">
@@ -238,10 +238,11 @@ priceCacheRef.on('value', snap => {
   render();
 });
 
-/* ---------- stooq から株価取得 ----------
-  現在値・日足履歴とも https://stooq.com/q/d/l/?s=CODE.jp&i=d の日足CSVを使用
-  （/q/l/ の即時株価エンドポイントは廃止されているため使用しない）。
-  最新行の終値を「現在の評価単価」として扱う。銘柄名は自動取得せず、登録時の手入力に依存。
+/* ---------- Yahoo!ファイナンスから株価取得 ----------
+  https://query1.finance.yahoo.com/v8/finance/chart/CODE.T?range=2y&interval=1d
+  を1回呼ぶだけで、現在値(meta.regularMarketPrice)・日足終値・簡易銘柄名(英語表記)を取得できる。
+  （stooqは自動アクセスへのボット対策JS認証が入り取得不能になったため使用しない）
+  銘柄名は手入力があればそれを優先し、なければYahoo側の名称、それも無ければコードを表示。
 ------------------------------------------- */
 // GitHub Pages (静的サイト) から直接 stooq.com へ fetch すると
 // ブラウザのCORS制限でブロックされるため、CORSプロキシを経由する。
@@ -274,31 +275,49 @@ async function fetchViaProxies(targetUrl){
   throw new Error((lastErr ? lastErr.name + ': ' + lastErr.message : '不明なエラー'));
 }
 
-async function fetchHistory(code){
-  const text = await fetchViaProxies(`https://stooq.com/q/d/l/?s=${code}.jp&i=d`);
+async function fetchYahoo(code){
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${code}.T?range=2y&interval=1d`;
+  const text = await fetchViaProxies(url);
   const trimmed = text.trim();
-  const titleMatch = trimmed.match(/<title[^>]*>([^<]*)<\/title>/i);
-  const rawSnippet = titleMatch ? ('ページタイトル: ' + titleMatch[1].trim()) : trimmed.slice(0, 80).replace(/\s+/g, ' ');
-  const lines = trimmed.split('\n');
-  if(lines[0] && lines[0].toLowerCase().indexOf('date') === -1 && lines.length < 2){
-    throw new Error('銘柄コードが見つかりません（応答: ' + rawSnippet + '）');
+  let json;
+  try{
+    json = JSON.parse(trimmed);
+  }catch(e){
+    const titleMatch = trimmed.match(/<title[^>]*>([^<]*)<\/title>/i);
+    const snippet = titleMatch ? ('ページタイトル: ' + titleMatch[1].trim()) : trimmed.slice(0, 80).replace(/\s+/g, ' ');
+    throw new Error('データ形式エラー（応答: ' + snippet + '）');
   }
-  const rows = [];
-  for(let i=1;i<lines.length;i++){
-    const c = lines[i].split(',');
-    if(c.length < 5) continue;
-    const close = parseFloat(c[4]);
-    if(isNaN(close)) continue;
-    rows.push({ date: c[0], close });
+  const result = json && json.chart && json.chart.result && json.chart.result[0];
+  if(!result){
+    const errMsg = json && json.chart && json.chart.error && json.chart.error.description;
+    throw new Error('銘柄コードが見つかりません' + (errMsg ? '（' + errMsg + '）' : ''));
   }
-  if(rows.length === 0) throw new Error('履歴データなし（応答: ' + rawSnippet + '）');
-  return rows;
+  const meta = result.meta || {};
+  const timestamps = result.timestamp || [];
+  const closeArr = (result.indicators && result.indicators.quote && result.indicators.quote[0] && result.indicators.quote[0].close) || [];
+  const history = [];
+  for(let i=0;i<timestamps.length;i++){
+    const c = closeArr[i];
+    if(c === null || c === undefined || isNaN(c)) continue;
+    const d = new Date(timestamps[i] * 1000);
+    history.push({ date: d.toISOString().slice(0,10), close: c });
+  }
+  if(history.length === 0) throw new Error('履歴データが空です（コード:' + code + '）');
+  const price = (meta.regularMarketPrice !== undefined && meta.regularMarketPrice !== null)
+    ? meta.regularMarketPrice
+    : history[history.length - 1].close;
+  const name = meta.longName || meta.shortName || null;
+  return { name, price, history };
+}
+
+async function fetchHistory(code){
+  const y = await fetchYahoo(code);
+  return y.history;
 }
 
 async function fetchQuote(code){
-  const rows = await fetchHistory(code);
-  const last = rows[rows.length - 1];
-  return { price: last.close };
+  const y = await fetchYahoo(code);
+  return { price: y.price, name: y.name };
 }
 
 async function refreshAllPrices(){
@@ -309,7 +328,7 @@ async function refreshAllPrices(){
   for(const code of codes){
     try{
       const q = await fetchQuote(code);
-      await priceCacheRef.child(code).update({ price: q.price, updatedAt: Date.now(), error: null });
+      await priceCacheRef.child(code).update({ price: q.price, autoName: q.name, updatedAt: Date.now(), error: null });
     }catch(e){
       console.error('quote fetch failed', code, e);
       errors.push(code + ': ' + e.message);
@@ -345,7 +364,7 @@ function render(){
     const cache = priceCache[code] || {};
     const curPrice = cache.price;
     const lotWithName = lots.find(l => l.name && l.name.trim() !== '');
-    const name = lotWithName ? lotWithName.name : code;
+    const name = lotWithName ? lotWithName.name : (cache.autoName || code);
     const fetchFailed = !!cache.error && (curPrice === null || curPrice === undefined);
     const shares = lots.reduce((s,l)=>s+Number(l.shares),0);
     const cost = lots.reduce((s,l)=>s+Number(l.shares)*Number(l.price),0);
@@ -500,7 +519,8 @@ async function openChart(code){
   document.querySelectorAll('.range-tabs button').forEach(b=>b.classList.remove('active'));
   document.querySelector('.range-tabs button[data-range="1m"]').classList.add('active');
   const lotWithName = Object.values(holdings).find(l => l.code === code && l.name && l.name.trim() !== '');
-  const displayName = lotWithName ? lotWithName.name : code;
+  const cache = priceCache[code] || {};
+  const displayName = lotWithName ? lotWithName.name : (cache.autoName || code);
   document.getElementById('chartTitle').textContent = displayName + ' (' + code + ')';
   chartOverlay.classList.add('show');
   document.getElementById('chartLoading').style.display = 'block';
