@@ -98,7 +98,7 @@
 
 <header>
   <div class="title-row">
-    <h1>銘柄別評価損益 <span class="ver">Ver1.3</span></h1>
+    <h1>銘柄別評価損益 <span class="ver">Ver1.4</span></h1>
     <button class="refresh-btn" id="refreshAllBtn">株価更新</button>
   </div>
   <div class="summary">
@@ -240,7 +240,10 @@ priceCacheRef.on('value', snap => {
 // GitHub Pages (静的サイト) から直接 stooq.com へ fetch すると
 // ブラウザのCORS制限でブロックされるため、CORSプロキシを経由する。
 // 1つのプロキシが不安定なこともあるため、複数を順に試す。
+const GAS_PROXY_URL = 'https://script.google.com/macros/s/AKfycbxZX6moLnPZ2KKvfnnQT125tmk7Djr5HQQGC_lNvb2jykMMhL0SiVnDMFCCFDpPiZen6Q/exec';
+
 const CORS_PROXIES = [
+  url => `${GAS_PROXY_URL}?url=${encodeURIComponent(url)}`,
   url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
   url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
   url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
