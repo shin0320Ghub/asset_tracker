@@ -143,8 +143,8 @@
     <div class="field">
       <label>NISA区分</label>
       <select id="inNisa">
-        <option value="no">NISAではない（課税口座）</option>
         <option value="yes">NISA口座</option>
+        <option value="no">NISAではない（課税口座）</option>
       </select>
     </div>
     <div class="btn-row">
@@ -237,9 +237,16 @@ priceCacheRef.on('value', snap => {
   現在値・銘柄名: https://stooq.com/q/l/?s=CODE.jp&f=snd2t2ohlcv&e=csv
   日足履歴      : https://stooq.com/q/d/l/?s=CODE.jp&i=d
 ------------------------------------------- */
+// GitHub Pages (静的サイト) から直接 stooq.com へ fetch すると
+// ブラウザのCORS制限でブロックされるため、CORSプロキシを経由する
+function withCorsProxy(url){
+  return `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+}
+
 async function fetchQuote(code){
-  const url = `https://stooq.com/q/l/?s=${code}.jp&f=snd2t2ohlcv&e=csv`;
+  const url = withCorsProxy(`https://stooq.com/q/l/?s=${code}.jp&f=snd2t2ohlcv&e=csv`);
   const res = await fetch(url);
+  if(!res.ok) throw new Error('network error: ' + res.status);
   const text = await res.text();
   const lines = text.trim().split('\n');
   if(lines.length < 2) throw new Error('no data');
@@ -251,8 +258,9 @@ async function fetchQuote(code){
 }
 
 async function fetchHistory(code){
-  const url = `https://stooq.com/q/d/l/?s=${code}.jp&i=d`;
+  const url = withCorsProxy(`https://stooq.com/q/d/l/?s=${code}.jp&i=d`);
   const res = await fetch(url);
+  if(!res.ok) throw new Error('network error: ' + res.status);
   const text = await res.text();
   const lines = text.trim().split('\n');
   const rows = [];
@@ -396,14 +404,23 @@ function closeEdit(){ editOverlay.classList.remove('show'); editingId = null; }
 
 document.getElementById('editSave').onclick = async () => {
   const code = document.getElementById('inCode').value.trim();
-  const date = document.getElementById('inDate').value;
-  const shares = document.getElementById('inShares').value;
-  const price = document.getElementById('inPrice').value;
+  const date = document.getElementById('inDate').value.trim();
+  const sharesStr = document.getElementById('inShares').value.trim();
+  const priceStr = document.getElementById('inPrice').value.trim();
   const nisa = document.getElementById('inNisa').value;
-  if(!code || !date || !shares || !price){
-    alert('すべての項目を入力してください'); return;
+
+  const missing = [];
+  if(code === '') missing.push('銘柄コード');
+  if(date === '') missing.push('取得日');
+  if(sharesStr === '' || isNaN(Number(sharesStr))) missing.push('取得株数');
+  if(priceStr === '' || isNaN(Number(priceStr))) missing.push('取得単価');
+  if(missing.length){
+    alert('次の項目を入力してください: ' + missing.join('、'));
+    return;
   }
-  const data = { code, date, shares: Number(shares), price: Number(price), nisa };
+  const shares = Number(sharesStr);
+  const price = Number(priceStr);
+  const data = { code, date, shares, price, nisa };
   if(editingId){
     await holdingsRef.child(editingId).set(data);
   } else {
