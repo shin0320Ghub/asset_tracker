@@ -8,7 +8,7 @@
 <title>銘柄別評価損益</title>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.3/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <style>
   :root{
     --bg:#0f1115;
@@ -98,7 +98,7 @@
 
 <header>
   <div class="title-row">
-    <h1>銘柄別評価損益 <span class="ver">Ver2.0</span></h1>
+    <h1>銘柄別評価損益 <span class="ver">Ver2.1</span></h1>
     <button class="refresh-btn" id="refreshAllBtn">株価更新</button>
   </div>
   <div class="summary">
@@ -534,6 +534,10 @@ async function openChart(code){
   document.getElementById('chartTitle').textContent = displayName + ' (' + code + ')';
   chartOverlay.classList.add('show');
   document.getElementById('chartLoading').style.display = 'block';
+  if(typeof Chart === 'undefined'){
+    document.getElementById('chartLoading').textContent = 'グラフ描画ライブラリの読み込みに失敗しました。通信環境を確認し、画面を再読み込みしてください。';
+    return;
+  }
   try{
     const rows = await fetchHistory(code);
     window.__histCache = window.__histCache || {};
