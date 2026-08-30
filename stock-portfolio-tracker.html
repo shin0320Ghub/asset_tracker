@@ -98,7 +98,7 @@
 
 <header>
   <div class="title-row">
-    <h1>銘柄別評価損益 <span class="ver">Ver1.2</span></h1>
+    <h1>銘柄別評価損益 <span class="ver">Ver1.3</span></h1>
     <button class="refresh-btn" id="refreshAllBtn">株価更新</button>
   </div>
   <div class="summary">
@@ -241,6 +241,7 @@ priceCacheRef.on('value', snap => {
 // ブラウザのCORS制限でブロックされるため、CORSプロキシを経由する。
 // 1つのプロキシが不安定なこともあるため、複数を順に試す。
 const CORS_PROXIES = [
+  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
   url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
   url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
   url => `https://thingproxy.freeboard.io/fetch/${url}`
@@ -249,18 +250,19 @@ const CORS_PROXIES = [
 async function fetchViaProxies(targetUrl){
   let lastErr = null;
   for(const buildUrl of CORS_PROXIES){
+    const proxyUrl = buildUrl(targetUrl);
     try{
-      const res = await fetch(buildUrl(targetUrl), { cache: 'no-store' });
+      const res = await fetch(proxyUrl, { cache: 'no-store' });
       if(!res.ok) throw new Error('HTTP ' + res.status);
       const text = await res.text();
       if(!text || text.trim().length === 0) throw new Error('空のレスポンス');
       return text;
     }catch(e){
       lastErr = e;
-      console.warn('proxy failed:', buildUrl(targetUrl), e.message);
+      console.warn('proxy failed:', proxyUrl, e.name + ': ' + e.message);
     }
   }
-  throw new Error('全ての経路で取得失敗: ' + (lastErr ? lastErr.message : '不明なエラー'));
+  throw new Error((lastErr ? lastErr.name + ': ' + lastErr.message : '不明なエラー'));
 }
 
 async function fetchQuote(code){
