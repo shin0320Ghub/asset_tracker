@@ -98,7 +98,7 @@
 
 <header>
   <div class="title-row">
-    <h1>銘柄別評価損益 <span class="ver">Ver1.1</span></h1>
+    <h1>銘柄別評価損益 <span class="ver">Ver1.2</span></h1>
     <button class="refresh-btn" id="refreshAllBtn">株価更新</button>
   </div>
   <div class="summary">
@@ -238,30 +238,45 @@ priceCacheRef.on('value', snap => {
   日足履歴      : https://stooq.com/q/d/l/?s=CODE.jp&i=d
 ------------------------------------------- */
 // GitHub Pages (静的サイト) から直接 stooq.com へ fetch すると
-// ブラウザのCORS制限でブロックされるため、CORSプロキシを経由する
-function withCorsProxy(url){
-  return `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+// ブラウザのCORS制限でブロックされるため、CORSプロキシを経由する。
+// 1つのプロキシが不安定なこともあるため、複数を順に試す。
+const CORS_PROXIES = [
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+  url => `https://thingproxy.freeboard.io/fetch/${url}`
+];
+
+async function fetchViaProxies(targetUrl){
+  let lastErr = null;
+  for(const buildUrl of CORS_PROXIES){
+    try{
+      const res = await fetch(buildUrl(targetUrl), { cache: 'no-store' });
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      const text = await res.text();
+      if(!text || text.trim().length === 0) throw new Error('空のレスポンス');
+      return text;
+    }catch(e){
+      lastErr = e;
+      console.warn('proxy failed:', buildUrl(targetUrl), e.message);
+    }
+  }
+  throw new Error('全ての経路で取得失敗: ' + (lastErr ? lastErr.message : '不明なエラー'));
 }
 
 async function fetchQuote(code){
-  const url = withCorsProxy(`https://stooq.com/q/l/?s=${code}.jp&f=snd2t2ohlcv&e=csv`);
-  const res = await fetch(url);
-  if(!res.ok) throw new Error('network error: ' + res.status);
-  const text = await res.text();
+  const text = await fetchViaProxies(`https://stooq.com/q/l/?s=${code}.jp&f=snd2t2ohlcv&e=csv`);
   const lines = text.trim().split('\n');
-  if(lines.length < 2) throw new Error('no data');
+  if(lines.length < 2) throw new Error('データなし（コード:' + code + '）');
   const cols = lines[1].split(',');
   // Symbol,Name,Date,Time,Open,High,Low,Close,Volume
+  if(!cols[0] || cols[0].toUpperCase() === 'N/D') throw new Error('銘柄コードが見つかりません: ' + code);
   const name = cols[1] && cols[1] !== 'N/D' ? cols[1] : code;
   const close = parseFloat(cols[7]);
   return { name, price: isNaN(close) ? null : close };
 }
 
 async function fetchHistory(code){
-  const url = withCorsProxy(`https://stooq.com/q/d/l/?s=${code}.jp&i=d`);
-  const res = await fetch(url);
-  if(!res.ok) throw new Error('network error: ' + res.status);
-  const text = await res.text();
+  const text = await fetchViaProxies(`https://stooq.com/q/d/l/?s=${code}.jp&i=d`);
   const lines = text.trim().split('\n');
   const rows = [];
   for(let i=1;i<lines.length;i++){
@@ -269,21 +284,30 @@ async function fetchHistory(code){
     if(c.length < 5) continue;
     rows.push({ date: c[0], close: parseFloat(c[4]) });
   }
+  if(rows.length === 0) throw new Error('履歴データなし（コード:' + code + '）');
   return rows;
 }
 
 async function refreshAllPrices(){
   const codes = [...new Set(Object.values(holdings).map(h => h.code))];
+  if(codes.length === 0){ setStatus(true, '同期済み（iPhone / iPad 共通）'); return; }
   setStatus(true, '株価を更新中...');
+  const errors = [];
   for(const code of codes){
     try{
       const q = await fetchQuote(code);
-      await priceCacheRef.child(code).set({ name: q.name, price: q.price, updatedAt: Date.now() });
+      await priceCacheRef.child(code).set({ name: q.name, price: q.price, updatedAt: Date.now(), error: null });
     }catch(e){
       console.error('quote fetch failed', code, e);
+      errors.push(code + ': ' + e.message);
+      await priceCacheRef.child(code).update({ error: e.message, updatedAt: Date.now() });
     }
   }
-  setStatus(true, '同期済み（iPhone / iPad 共通）');
+  if(errors.length){
+    setStatus(false, '一部の株価取得に失敗: ' + errors.join(' / '));
+  } else {
+    setStatus(true, '同期済み（iPhone / iPad 共通）');
+  }
 }
 
 /* ---------- 集計・描画 ---------- */
@@ -308,6 +332,7 @@ function render(){
     const cache = priceCache[code] || {};
     const curPrice = cache.price;
     const name = cache.name || code;
+    const fetchFailed = !!cache.error && (curPrice === null || curPrice === undefined);
     const shares = lots.reduce((s,l)=>s+Number(l.shares),0);
     const cost = lots.reduce((s,l)=>s+Number(l.shares)*Number(l.price),0);
     const value = curPrice!==null && curPrice!==undefined ? curPrice*shares : null;
@@ -318,6 +343,9 @@ function render(){
     const div = document.createElement('div');
     div.className = 'holding';
     const nisaAny = lots.some(l=>l.nisa==='yes');
+    const priceLabel = curPrice!==null && curPrice!==undefined
+      ? yen(curPrice)+' /株'
+      : (fetchFailed ? '取得失敗' : '取得中');
     div.innerHTML = `
       <div class="h-top">
         <div>
@@ -325,7 +353,7 @@ function render(){
           <div class="h-code">${code}</div>
         </div>
         <div class="h-right">
-          <div class="h-price">${curPrice!==null&&curPrice!==undefined ? yen(curPrice)+' /株' : '取得中'}</div>
+          <div class="h-price" style="${fetchFailed?'color:var(--red);':''}">${priceLabel}</div>
           <div class="h-value">${yen(value)}</div>
         </div>
       </div>
