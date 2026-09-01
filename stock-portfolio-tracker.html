@@ -50,12 +50,12 @@
     border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle;}
   .h-right{text-align:right;}
   .h-price{font-size:13px;color:var(--sub);}
+  .h-price-dod{font-size:11px;margin-top:1px;}
   .h-value{font-size:16px;font-weight:700;}
   .h-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-top:8px;
     font-size:12px;color:var(--sub);border-top:1px dashed var(--border);padding-top:6px;}
   .h-grid b{color:var(--text);font-weight:600;}
   .h-profit{font-weight:700;}
-  .h-dod-row{grid-column:1 / 3;}
   .pos{color:var(--green);}
   .neg{color:var(--red);}
   .h-actions{display:flex;gap:14px;margin-top:6px;justify-content:flex-end;}
@@ -104,7 +104,7 @@
 
 <header>
   <div class="title-row">
-    <h1>銘柄別評価損益 <span class="ver">Ver2.3</span></h1>
+    <h1>銘柄別評価損益 <span class="ver">Ver2.5</span></h1>
     <div class="header-right">
       <span class="high-badge" id="highBadge" style="display:none;">最高値</span>
       <button class="refresh-btn" id="refreshAllBtn">株価更新</button>
@@ -403,15 +403,15 @@ function render(){
     if(value!==null) totalValue += value;
     totalCost += cost;
 
-    // 前日比（利益額ベース）: 前営業日の終値で計算した利益額との差
     const prevClose = cache.previousClose;
-    let dodAmount = null, dodRate = null;
+
+    // 一株当たり単価の前日比（金額・率）
+    let priceDodAmount = null, priceDodRate = null;
     if(curPrice!==null && curPrice!==undefined && prevClose!==null && prevClose!==undefined){
-      const profitYesterday = (prevClose * shares) - cost;
-      dodAmount = profit - profitYesterday;
-      dodRate = profitYesterday !== 0 ? (dodAmount / Math.abs(profitYesterday)) * 100 : null;
+      priceDodAmount = curPrice - prevClose;
+      priceDodRate = prevClose !== 0 ? (priceDodAmount / prevClose) * 100 : null;
     }
-    return { code, lots, name, curPrice, fetchFailed, shares, cost, value, profit, dodAmount, dodRate };
+    return { code, lots, name, curPrice, fetchFailed, shares, cost, value, profit, priceDodAmount, priceDodRate };
   });
 
   // 株数の多い順、同数なら評価額の多い順
@@ -420,15 +420,16 @@ function render(){
     return (b.value||0) - (a.value||0);
   });
 
-  summaries.forEach(({ code, lots, name, curPrice, fetchFailed, shares, value, profit, dodAmount, dodRate }) => {
+  summaries.forEach(({ code, lots, name, curPrice, fetchFailed, shares, value, profit, priceDodAmount, priceDodRate }) => {
     const div = document.createElement('div');
     div.className = 'holding';
     const nisaAny = lots.some(l=>l.nisa==='yes');
     const priceLabel = curPrice!==null && curPrice!==undefined
       ? yen(curPrice)+' /株'
       : (fetchFailed ? '取得失敗' : '取得中');
-    const dodClass = dodAmount>0 ? 'pos' : dodAmount<0 ? 'neg' : '';
-    const dodText = dodAmount===null ? '-' : yen(dodAmount) + '（' + (dodRate===null ? '-' : dodRate.toFixed(1) + '%') + '）';
+    const priceDodClass = priceDodAmount>0 ? 'pos' : priceDodAmount<0 ? 'neg' : '';
+    const priceDodText = priceDodAmount===null ? '' :
+      '<div class="h-price-dod ' + priceDodClass + '">前日比 ' + yen(priceDodAmount) + '（' + (priceDodRate===null ? '-' : priceDodRate.toFixed(1) + '%') + '）</div>';
     div.innerHTML = `
       <div class="h-top">
         <div>
@@ -437,13 +438,13 @@ function render(){
         </div>
         <div class="h-right">
           <div class="h-price" style="${fetchFailed?'color:var(--red);':''}">${priceLabel}</div>
+          ${priceDodText}
           <div class="h-value">${yen(value)}</div>
         </div>
       </div>
       <div class="h-grid">
         <div>株数 <b>${shares.toLocaleString('ja-JP')}</b></div>
         <div>利益額 <b class="h-profit ${profit>0?'pos':profit<0?'neg':''}">${profit===null?'-':yen(profit)}</b></div>
-        <div class="h-dod-row">前日比 <b class="h-profit ${dodClass}">${dodText}</b></div>
       </div>
       <div class="h-actions">
         <button class="editL" data-code="${code}">明細を編集</button>
