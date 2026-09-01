@@ -55,6 +55,7 @@
     font-size:12px;color:var(--sub);border-top:1px dashed var(--border);padding-top:6px;}
   .h-grid b{color:var(--text);font-weight:600;}
   .h-profit{font-weight:700;}
+  .h-dod-row{grid-column:1 / 3;}
   .pos{color:var(--green);}
   .neg{color:var(--red);}
   .h-actions{display:flex;gap:14px;margin-top:6px;justify-content:flex-end;}
@@ -103,7 +104,7 @@
 
 <header>
   <div class="title-row">
-    <h1>銘柄別評価損益 <span class="ver">Ver2.2</span></h1>
+    <h1>銘柄別評価損益 <span class="ver">Ver2.3</span></h1>
     <div class="header-right">
       <span class="high-badge" id="highBadge" style="display:none;">最高値</span>
       <button class="refresh-btn" id="refreshAllBtn">株価更新</button>
@@ -322,8 +323,17 @@ async function fetchYahoo(code){
   const price = (meta.regularMarketPrice !== undefined && meta.regularMarketPrice !== null)
     ? meta.regularMarketPrice
     : history[history.length - 1].close;
+  // 前営業日の終値: Yahoo側のmetaにあればそれを優先し、無ければ履歴の最後から2番目を使う
+  let previousClose = null;
+  if(meta.previousClose !== undefined && meta.previousClose !== null){
+    previousClose = meta.previousClose;
+  } else if(meta.chartPreviousClose !== undefined && meta.chartPreviousClose !== null){
+    previousClose = meta.chartPreviousClose;
+  } else if(history.length >= 2){
+    previousClose = history[history.length - 2].close;
+  }
   const name = meta.longName || meta.shortName || null;
-  return { name, price, history };
+  return { name, price, previousClose, history };
 }
 
 async function fetchHistory(code){
@@ -333,7 +343,7 @@ async function fetchHistory(code){
 
 async function fetchQuote(code){
   const y = await fetchYahoo(code);
-  return { price: y.price, name: y.name };
+  return { price: y.price, name: y.name, previousClose: y.previousClose };
 }
 
 async function refreshAllPrices(){
@@ -344,7 +354,10 @@ async function refreshAllPrices(){
   for(const code of codes){
     try{
       const q = await fetchQuote(code);
-      await priceCacheRef.child(code).update({ price: q.price, autoName: q.name, updatedAt: Date.now(), error: null });
+      await priceCacheRef.child(code).update({
+        price: q.price, autoName: q.name, previousClose: q.previousClose,
+        updatedAt: Date.now(), error: null
+      });
     }catch(e){
       console.error('quote fetch failed', code, e);
       errors.push(code + ': ' + e.message);
@@ -389,7 +402,16 @@ function render(){
     const profit = value!==null ? value - cost : null;
     if(value!==null) totalValue += value;
     totalCost += cost;
-    return { code, lots, name, curPrice, fetchFailed, shares, cost, value, profit };
+
+    // 前日比（利益額ベース）: 前営業日の終値で計算した利益額との差
+    const prevClose = cache.previousClose;
+    let dodAmount = null, dodRate = null;
+    if(curPrice!==null && curPrice!==undefined && prevClose!==null && prevClose!==undefined){
+      const profitYesterday = (prevClose * shares) - cost;
+      dodAmount = profit - profitYesterday;
+      dodRate = profitYesterday !== 0 ? (dodAmount / Math.abs(profitYesterday)) * 100 : null;
+    }
+    return { code, lots, name, curPrice, fetchFailed, shares, cost, value, profit, dodAmount, dodRate };
   });
 
   // 株数の多い順、同数なら評価額の多い順
@@ -398,13 +420,15 @@ function render(){
     return (b.value||0) - (a.value||0);
   });
 
-  summaries.forEach(({ code, lots, name, curPrice, fetchFailed, shares, value, profit }) => {
+  summaries.forEach(({ code, lots, name, curPrice, fetchFailed, shares, value, profit, dodAmount, dodRate }) => {
     const div = document.createElement('div');
     div.className = 'holding';
     const nisaAny = lots.some(l=>l.nisa==='yes');
     const priceLabel = curPrice!==null && curPrice!==undefined
       ? yen(curPrice)+' /株'
       : (fetchFailed ? '取得失敗' : '取得中');
+    const dodClass = dodAmount>0 ? 'pos' : dodAmount<0 ? 'neg' : '';
+    const dodText = dodAmount===null ? '-' : yen(dodAmount) + '（' + (dodRate===null ? '-' : dodRate.toFixed(1) + '%') + '）';
     div.innerHTML = `
       <div class="h-top">
         <div>
@@ -419,6 +443,7 @@ function render(){
       <div class="h-grid">
         <div>株数 <b>${shares.toLocaleString('ja-JP')}</b></div>
         <div>利益額 <b class="h-profit ${profit>0?'pos':profit<0?'neg':''}">${profit===null?'-':yen(profit)}</b></div>
+        <div class="h-dod-row">前日比 <b class="h-profit ${dodClass}">${dodText}</b></div>
       </div>
       <div class="h-actions">
         <button class="editL" data-code="${code}">明細を編集</button>
@@ -535,7 +560,10 @@ document.getElementById('editSave').onclick = async () => {
   // 新規銘柄なら価格取得
   try{
     const q = await fetchQuote(code);
-    await priceCacheRef.child(code).update({ price: q.price, updatedAt: Date.now(), error: null });
+    await priceCacheRef.child(code).update({
+      price: q.price, autoName: q.name, previousClose: q.previousClose,
+      updatedAt: Date.now(), error: null
+    });
   }catch(e){
     console.error(e);
     await priceCacheRef.child(code).update({ error: e.message, updatedAt: Date.now() });
