@@ -106,7 +106,7 @@
 
 <header>
   <div class="title-row">
-    <h1>銘柄別評価損益 <span class="ver">Ver2.8</span></h1>
+    <h1>銘柄別評価損益 <span class="ver">Ver2.9</span></h1>
     <div class="header-right">
       <span class="high-badge" id="highBadge" style="display:none;">最高値</span>
       <button class="refresh-btn" id="refreshAllBtn">株価更新</button>
@@ -379,14 +379,31 @@ async function fetchDividendRate(code){
 
 const DIVIDEND_TAX_RATE = 0.20315; // 課税口座の配当課税(20.315%)。NISA口座は非課税として扱う。
 
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+// レート制限(Too Many Requests等)のときは少し待って1回だけ再試行する
+async function withRetryOnRateLimit(fn, label){
+  try{
+    return await fn();
+  }catch(e){
+    if(/too many requests/i.test(e.message) || /429/.test(e.message)){
+      console.warn(label + ': レート制限を検知、1.5秒待って再試行します');
+      await sleep(1500);
+      return await fn();
+    }
+    throw e;
+  }
+}
+
 async function refreshAllPrices(){
   const codes = [...new Set(Object.values(holdings).map(h => h.code))];
   if(codes.length === 0){ setStatus(true, '同期済み（iPhone / iPad 共通）'); return; }
   setStatus(true, '株価を更新中...');
   const errors = [];
-  for(const code of codes){
+  for(let i=0; i<codes.length; i++){
+    const code = codes[i];
     try{
-      const q = await fetchQuote(code);
+      const q = await withRetryOnRateLimit(() => fetchQuote(code), code + '(株価)');
       await priceCacheRef.child(code).update({
         price: q.price, autoName: q.name, previousClose: q.previousClose,
         updatedAt: Date.now(), error: null
@@ -396,13 +413,15 @@ async function refreshAllPrices(){
       errors.push(code + ': ' + e.message);
       await priceCacheRef.child(code).update({ error: e.message, updatedAt: Date.now() });
     }
+    await sleep(400); // Yahoo側のレート制限を避けるための間隔
     // 配当金は取得失敗しても株価取得自体は失敗扱いにしない
     try{
-      const dividendRate = await fetchDividendRate(code);
+      const dividendRate = await withRetryOnRateLimit(() => fetchDividendRate(code), code + '(配当)');
       await priceCacheRef.child(code).update({ dividendRate });
     }catch(e){
       console.warn('dividend fetch failed', code, e);
     }
+    if(i < codes.length - 1) await sleep(400); // 次の銘柄へ移る前にも間隔を空ける
   }
   if(errors.length){
     setStatus(false, '一部の株価取得に失敗: ' + errors.join(' / '));
@@ -642,7 +661,7 @@ document.getElementById('editSave').onclick = async () => {
   closeEdit();
   // 新規銘柄なら価格取得
   try{
-    const q = await fetchQuote(code);
+    const q = await withRetryOnRateLimit(() => fetchQuote(code), code + '(株価)');
     await priceCacheRef.child(code).update({
       price: q.price, autoName: q.name, previousClose: q.previousClose,
       updatedAt: Date.now(), error: null
@@ -651,8 +670,9 @@ document.getElementById('editSave').onclick = async () => {
     console.error(e);
     await priceCacheRef.child(code).update({ error: e.message, updatedAt: Date.now() });
   }
+  await sleep(400);
   try{
-    const dividendRate = await fetchDividendRate(code);
+    const dividendRate = await withRetryOnRateLimit(() => fetchDividendRate(code), code + '(配当)');
     await priceCacheRef.child(code).update({ dividendRate });
   }catch(e){
     console.warn('dividend fetch failed', code, e);
