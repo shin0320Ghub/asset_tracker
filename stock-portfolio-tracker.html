@@ -37,6 +37,7 @@
     padding:10px 14px;min-width:110px;flex:1;}
   .sum-card .label{font-size:11px;color:var(--sub);}
   .sum-card .value{font-size:16px;font-weight:700;margin-top:2px;}
+  .sum-card .sum-sub{font-size:11px;margin-top:2px;}
   main{padding:12px 16px 90px;}
   .sync-status{font-size:11px;color:var(--sub);text-align:right;margin:4px 2px 8px;}
   .sync-status.ok::before{content:"● ";color:var(--green);}
@@ -104,7 +105,7 @@
 
 <header>
   <div class="title-row">
-    <h1>銘柄別評価損益 <span class="ver">Ver2.6</span></h1>
+    <h1>銘柄別評価損益 <span class="ver">Ver2.7</span></h1>
     <div class="header-right">
       <span class="high-badge" id="highBadge" style="display:none;">最高値</span>
       <button class="refresh-btn" id="refreshAllBtn">株価更新</button>
@@ -113,7 +114,7 @@
   <div class="summary">
     <div class="sum-card"><div class="label">評価額合計</div><div class="value" id="sumValue">-</div></div>
     <div class="sum-card"><div class="label">取得額合計</div><div class="value" id="sumCost">-</div></div>
-    <div class="sum-card"><div class="label">評価損益</div><div class="value" id="sumProfit">-</div></div>
+    <div class="sum-card"><div class="label">評価損益額／前日比</div><div class="value" id="sumProfit">-</div><div class="sum-sub" id="sumProfitDod"></div></div>
   </div>
 </header>
 
@@ -394,6 +395,8 @@ function render(){
   });
 
   let totalValue = 0, totalCost = 0;
+  let totalValueYesterday = 0;
+  let canComputeTotalDod = true;
   list.innerHTML = '';
 
   // 先に各銘柄の集計値を計算
@@ -412,6 +415,15 @@ function render(){
     totalCost += cost;
 
     const prevClose = cache.previousClose;
+
+    // 合計の評価損益・前日比の計算用（すべての保有銘柄で前日終値が揃っている場合のみ算出）
+    if(value!==null){
+      if(prevClose!==null && prevClose!==undefined){
+        totalValueYesterday += prevClose * shares;
+      } else {
+        canComputeTotalDod = false;
+      }
+    }
 
     // 一株当たり単価の前日比（金額・率）
     let priceDodAmount = null, priceDodRate = null;
@@ -437,7 +449,7 @@ function render(){
       : (fetchFailed ? '取得失敗' : '取得中');
     const priceDodClass = priceDodAmount>0 ? 'pos' : priceDodAmount<0 ? 'neg' : '';
     const priceDodText = priceDodAmount===null ? '' :
-      '<div class="h-price-dod ' + priceDodClass + '">前日比 ' + yen(priceDodAmount) + '（' + (priceDodRate===null ? '-' : priceDodRate.toFixed(1) + '%') + '）</div>';
+      '<div class="h-price-dod ' + priceDodClass + '">前日比 ' + yen(priceDodAmount) + '（' + (priceDodRate===null ? '-' : priceDodRate.toFixed(2) + '%') + '）</div>';
     div.innerHTML = `
       <div class="h-top">
         <div>
@@ -468,6 +480,18 @@ function render(){
   const totalProfit = totalValue - totalCost;
   sp.textContent = yen(totalProfit);
   sp.className = 'value ' + (totalProfit>0?'pos':totalProfit<0?'neg':'');
+
+  const sumProfitDodEl = document.getElementById('sumProfitDod');
+  if(canComputeTotalDod && ids.length > 0){
+    const totalDiffAmount = totalValue - totalValueYesterday;
+    const totalProfitYesterday = totalValueYesterday - totalCost;
+    const totalDiffRate = totalProfitYesterday !== 0 ? (totalDiffAmount / Math.abs(totalProfitYesterday)) * 100 : null;
+    const dodClass = totalDiffAmount>0 ? 'pos' : totalDiffAmount<0 ? 'neg' : '';
+    sumProfitDodEl.className = 'sum-sub ' + dodClass;
+    sumProfitDodEl.textContent = '前日比 ' + yen(totalDiffAmount) + '（' + (totalDiffRate===null ? '-' : totalDiffRate.toFixed(2) + '%') + '）';
+  } else {
+    sumProfitDodEl.textContent = '';
+  }
 
   // 評価損益の最高値を記録・判定（銘柄が1件以上あるときのみ）
   const highBadge = document.getElementById('highBadge');
