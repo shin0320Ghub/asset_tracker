@@ -106,7 +106,7 @@
 
 <header>
   <div class="title-row">
-    <h1>銘柄別評価損益 <span class="ver">Ver2.9</span></h1>
+    <h1>銘柄別評価損益 <span class="ver">Ver3.0</span></h1>
     <div class="header-right">
       <span class="high-badge" id="highBadge" style="display:none;">最高値</span>
       <button class="refresh-btn" id="refreshAllBtn">株価更新</button>
@@ -296,7 +296,7 @@ async function fetchViaProxies(targetUrl){
 }
 
 async function fetchYahoo(code){
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${code}.T?range=2y&interval=1d`;
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${code}.T?range=2y&interval=1d&events=div`;
   const text = await fetchViaProxies(url);
   const trimmed = text.trim();
   let json;
@@ -344,7 +344,27 @@ async function fetchYahoo(code){
     previousClose = secondLastRow.close;
   }
   const name = meta.longName || meta.shortName || null;
-  return { name, price, previousClose, history };
+
+  // 配当金(1株あたり・年間): 直近365日以内に実際に支払われた配当の合計（税引き前）
+  let dividendPerShare = null;
+  const divEvents = result.events && result.events.dividends;
+  if(divEvents && typeof divEvents === 'object'){
+    const nowSec = Date.now() / 1000;
+    const oneYearSec = 365 * 24 * 60 * 60;
+    let sum = 0;
+    let found = false;
+    Object.values(divEvents).forEach(ev => {
+      if(ev && typeof ev.amount === 'number' && typeof ev.date === 'number'){
+        if(nowSec - ev.date <= oneYearSec){
+          sum += ev.amount;
+          found = true;
+        }
+      }
+    });
+    if(found) dividendPerShare = sum;
+  }
+
+  return { name, price, previousClose, dividendPerShare, history };
 }
 
 async function fetchHistory(code){
@@ -354,27 +374,7 @@ async function fetchHistory(code){
 
 async function fetchQuote(code){
   const y = await fetchYahoo(code);
-  return { price: y.price, name: y.name, previousClose: y.previousClose };
-}
-
-// 年間配当金(1株あたり・税引き前)を取得。配当がない銘柄はnullを返す。
-async function fetchDividendRate(code){
-  const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${code}.T?modules=summaryDetail`;
-  const text = await fetchViaProxies(url);
-  const trimmed = text.trim();
-  let json;
-  try{
-    json = JSON.parse(trimmed);
-  }catch(e){
-    throw new Error('配当データ形式エラー');
-  }
-  const result = json && json.quoteSummary && json.quoteSummary.result && json.quoteSummary.result[0];
-  if(!result) return null;
-  const sd = result.summaryDetail;
-  if(sd && sd.dividendRate && typeof sd.dividendRate.raw === 'number'){
-    return sd.dividendRate.raw;
-  }
-  return null; // 配当なし、または非公開
+  return { price: y.price, name: y.name, previousClose: y.previousClose, dividendPerShare: y.dividendPerShare };
 }
 
 const DIVIDEND_TAX_RATE = 0.20315; // 課税口座の配当課税(20.315%)。NISA口座は非課税として扱う。
@@ -406,6 +406,7 @@ async function refreshAllPrices(){
       const q = await withRetryOnRateLimit(() => fetchQuote(code), code + '(株価)');
       await priceCacheRef.child(code).update({
         price: q.price, autoName: q.name, previousClose: q.previousClose,
+        dividendRate: q.dividendPerShare,
         updatedAt: Date.now(), error: null
       });
     }catch(e){
@@ -413,15 +414,7 @@ async function refreshAllPrices(){
       errors.push(code + ': ' + e.message);
       await priceCacheRef.child(code).update({ error: e.message, updatedAt: Date.now() });
     }
-    await sleep(400); // Yahoo側のレート制限を避けるための間隔
-    // 配当金は取得失敗しても株価取得自体は失敗扱いにしない
-    try{
-      const dividendRate = await withRetryOnRateLimit(() => fetchDividendRate(code), code + '(配当)');
-      await priceCacheRef.child(code).update({ dividendRate });
-    }catch(e){
-      console.warn('dividend fetch failed', code, e);
-    }
-    if(i < codes.length - 1) await sleep(400); // 次の銘柄へ移る前にも間隔を空ける
+    if(i < codes.length - 1) await sleep(400); // 次の銘柄へ移る前に間隔を空ける（レート制限対策）
   }
   if(errors.length){
     setStatus(false, '一部の株価取得に失敗: ' + errors.join(' / '));
@@ -664,18 +657,12 @@ document.getElementById('editSave').onclick = async () => {
     const q = await withRetryOnRateLimit(() => fetchQuote(code), code + '(株価)');
     await priceCacheRef.child(code).update({
       price: q.price, autoName: q.name, previousClose: q.previousClose,
+      dividendRate: q.dividendPerShare,
       updatedAt: Date.now(), error: null
     });
   }catch(e){
     console.error(e);
     await priceCacheRef.child(code).update({ error: e.message, updatedAt: Date.now() });
-  }
-  await sleep(400);
-  try{
-    const dividendRate = await withRetryOnRateLimit(() => fetchDividendRate(code), code + '(配当)');
-    await priceCacheRef.child(code).update({ dividendRate });
-  }catch(e){
-    console.warn('dividend fetch failed', code, e);
   }
 };
 
