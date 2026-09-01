@@ -104,7 +104,7 @@
 
 <header>
   <div class="title-row">
-    <h1>銘柄別評価損益 <span class="ver">Ver2.5</span></h1>
+    <h1>銘柄別評価損益 <span class="ver">Ver2.6</span></h1>
     <div class="header-right">
       <span class="high-badge" id="highBadge" style="display:none;">最高値</span>
       <button class="refresh-btn" id="refreshAllBtn">株価更新</button>
@@ -323,14 +323,22 @@ async function fetchYahoo(code){
   const price = (meta.regularMarketPrice !== undefined && meta.regularMarketPrice !== null)
     ? meta.regularMarketPrice
     : history[history.length - 1].close;
-  // 前営業日の終値: Yahoo側のmetaにあればそれを優先し、無ければ履歴の最後から2番目を使う
+  // 前営業日の終値: chartPreviousCloseは「取得期間の開始日より前」の値で不正確なため使わない。
+  // regularMarketPreviousClose（あれば）を優先し、無ければ日足履歴の最後から2番目を使う。
+  // 履歴の最後の行が本日の速報値と同じ日付の場合はその1つ前を、
+  // 履歴の最後の行がまだ前営業日の確定値の場合はその行自体を「前日終値」として扱う。
   let previousClose = null;
-  if(meta.previousClose !== undefined && meta.previousClose !== null){
-    previousClose = meta.previousClose;
-  } else if(meta.chartPreviousClose !== undefined && meta.chartPreviousClose !== null){
-    previousClose = meta.chartPreviousClose;
-  } else if(history.length >= 2){
-    previousClose = history[history.length - 2].close;
+  const todayStr = new Date().toISOString().slice(0,10);
+  const lastRow = history[history.length - 1];
+  const secondLastRow = history.length >= 2 ? history[history.length - 2] : null;
+  if(meta.regularMarketPreviousClose !== undefined && meta.regularMarketPreviousClose !== null){
+    previousClose = meta.regularMarketPreviousClose;
+  } else if(lastRow && lastRow.date === todayStr && secondLastRow){
+    previousClose = secondLastRow.close;
+  } else if(lastRow){
+    previousClose = lastRow.close;
+  } else if(secondLastRow){
+    previousClose = secondLastRow.close;
   }
   const name = meta.longName || meta.shortName || null;
   return { name, price, previousClose, history };
