@@ -68,6 +68,9 @@
     display:flex;align-items:center;justify-content:center;}
   .refresh-btn{background:var(--card2);border:1px solid var(--border);color:var(--text);
     font-size:12px;padding:6px 10px;border-radius:8px;}
+  .header-right{display:flex;align-items:center;gap:8px;}
+  .high-badge{font-size:11px;font-weight:700;color:#1a1206;background:linear-gradient(135deg,#ffd76a,#ffb32e);
+    padding:4px 9px;border-radius:20px;letter-spacing:.5px;}
   /* Modal */
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:20;display:none;
     align-items:flex-end;justify-content:center;}
@@ -100,8 +103,11 @@
 
 <header>
   <div class="title-row">
-    <h1>銘柄別評価損益 <span class="ver">Ver2.1</span></h1>
-    <button class="refresh-btn" id="refreshAllBtn">株価更新</button>
+    <h1>銘柄別評価損益 <span class="ver">Ver2.2</span></h1>
+    <div class="header-right">
+      <span class="high-badge" id="highBadge" style="display:none;">最高値</span>
+      <button class="refresh-btn" id="refreshAllBtn">株価更新</button>
+    </div>
   </div>
   <div class="summary">
     <div class="sum-card"><div class="label">評価額合計</div><div class="value" id="sumValue">-</div></div>
@@ -211,9 +217,11 @@ const db = firebase.database();
 // 既存アプリ(dailyTotal等)と衝突しないよう専用ノードを使用
 const holdingsRef = db.ref('stockPortfolio/holdings');
 const priceCacheRef = db.ref('stockPortfolio/priceCache');
+const maxProfitRef = db.ref('stockPortfolio/maxTotalProfit');
 
 let holdings = {};      // id -> {code,name,date,shares,price,nisa}
 let priceCache = {};    // code -> {price, updatedAt, error}
+let maxTotalProfit = null; // これまでの評価損益の最高値（iPhone/iPad共通で記録）
 let editingId = null;
 let currentChartCode = null;
 let currentChartRange = '1m';
@@ -237,6 +245,12 @@ holdingsRef.on('value', snap => {
 
 priceCacheRef.on('value', snap => {
   priceCache = snap.val() || {};
+  render();
+});
+
+maxProfitRef.on('value', snap => {
+  const v = snap.val();
+  maxTotalProfit = (v && typeof v.value === 'number') ? v.value : null;
   render();
 });
 
@@ -420,6 +434,21 @@ function render(){
   const totalProfit = totalValue - totalCost;
   sp.textContent = yen(totalProfit);
   sp.className = 'value ' + (totalProfit>0?'pos':totalProfit<0?'neg':'');
+
+  // 評価損益の最高値を記録・判定（銘柄が1件以上あるときのみ）
+  const highBadge = document.getElementById('highBadge');
+  if(ids.length > 0){
+    if(maxTotalProfit === null || totalProfit > maxTotalProfit){
+      maxProfitRef.set({ value: totalProfit, updatedAt: Date.now() });
+      highBadge.style.display = 'inline-block';
+    } else if(totalProfit === maxTotalProfit){
+      highBadge.style.display = 'inline-block';
+    } else {
+      highBadge.style.display = 'none';
+    }
+  } else {
+    highBadge.style.display = 'none';
+  }
 
   // イベント付与
   list.querySelectorAll('.h-name').forEach(el=>{
