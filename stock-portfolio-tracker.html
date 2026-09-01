@@ -57,6 +57,7 @@
     font-size:12px;color:var(--sub);border-top:1px dashed var(--border);padding-top:6px;}
   .h-grid b{color:var(--text);font-weight:600;}
   .h-profit{font-weight:700;}
+  .h-dividend-row{grid-column:1 / 3;}
   .pos{color:var(--green);}
   .neg{color:var(--red);}
   .h-actions{display:flex;gap:14px;margin-top:6px;justify-content:flex-end;}
@@ -105,7 +106,7 @@
 
 <header>
   <div class="title-row">
-    <h1>銘柄別評価損益 <span class="ver">Ver2.7</span></h1>
+    <h1>銘柄別評価損益 <span class="ver">Ver2.8</span></h1>
     <div class="header-right">
       <span class="high-badge" id="highBadge" style="display:none;">最高値</span>
       <button class="refresh-btn" id="refreshAllBtn">株価更新</button>
@@ -115,6 +116,7 @@
     <div class="sum-card"><div class="label">評価額合計</div><div class="value" id="sumValue">-</div></div>
     <div class="sum-card"><div class="label">取得額合計</div><div class="value" id="sumCost">-</div></div>
     <div class="sum-card"><div class="label">評価損益額／前日比</div><div class="value" id="sumProfit">-</div><div class="sum-sub" id="sumProfitDod"></div></div>
+    <div class="sum-card"><div class="label">配当金合計(税引後)</div><div class="value" id="sumDividend">-</div></div>
   </div>
 </header>
 
@@ -355,6 +357,28 @@ async function fetchQuote(code){
   return { price: y.price, name: y.name, previousClose: y.previousClose };
 }
 
+// 年間配当金(1株あたり・税引き前)を取得。配当がない銘柄はnullを返す。
+async function fetchDividendRate(code){
+  const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${code}.T?modules=summaryDetail`;
+  const text = await fetchViaProxies(url);
+  const trimmed = text.trim();
+  let json;
+  try{
+    json = JSON.parse(trimmed);
+  }catch(e){
+    throw new Error('配当データ形式エラー');
+  }
+  const result = json && json.quoteSummary && json.quoteSummary.result && json.quoteSummary.result[0];
+  if(!result) return null;
+  const sd = result.summaryDetail;
+  if(sd && sd.dividendRate && typeof sd.dividendRate.raw === 'number'){
+    return sd.dividendRate.raw;
+  }
+  return null; // 配当なし、または非公開
+}
+
+const DIVIDEND_TAX_RATE = 0.20315; // 課税口座の配当課税(20.315%)。NISA口座は非課税として扱う。
+
 async function refreshAllPrices(){
   const codes = [...new Set(Object.values(holdings).map(h => h.code))];
   if(codes.length === 0){ setStatus(true, '同期済み（iPhone / iPad 共通）'); return; }
@@ -371,6 +395,13 @@ async function refreshAllPrices(){
       console.error('quote fetch failed', code, e);
       errors.push(code + ': ' + e.message);
       await priceCacheRef.child(code).update({ error: e.message, updatedAt: Date.now() });
+    }
+    // 配当金は取得失敗しても株価取得自体は失敗扱いにしない
+    try{
+      const dividendRate = await fetchDividendRate(code);
+      await priceCacheRef.child(code).update({ dividendRate });
+    }catch(e){
+      console.warn('dividend fetch failed', code, e);
     }
   }
   if(errors.length){
@@ -397,6 +428,8 @@ function render(){
   let totalValue = 0, totalCost = 0;
   let totalValueYesterday = 0;
   let canComputeTotalDod = true;
+  let totalDividendAfterTax = 0;
+  let hasAnyDividendData = false;
   list.innerHTML = '';
 
   // 先に各銘柄の集計値を計算
@@ -413,6 +446,19 @@ function render(){
     const profit = value!==null ? value - cost : null;
     if(value!==null) totalValue += value;
     totalCost += cost;
+
+    // 配当金（税引き後）: NISA口座のロットは非課税、課税口座のロットは20.315%課税
+    const dividendRate = cache.dividendRate;
+    let dividendAfterTax = null;
+    if(dividendRate !== null && dividendRate !== undefined){
+      dividendAfterTax = lots.reduce((sum, l) => {
+        const gross = dividendRate * Number(l.shares);
+        const net = (l.nisa === 'yes') ? gross : gross * (1 - DIVIDEND_TAX_RATE);
+        return sum + net;
+      }, 0);
+      totalDividendAfterTax += dividendAfterTax;
+      hasAnyDividendData = true;
+    }
 
     const prevClose = cache.previousClose;
 
@@ -431,7 +477,7 @@ function render(){
       priceDodAmount = curPrice - prevClose;
       priceDodRate = prevClose !== 0 ? (priceDodAmount / prevClose) * 100 : null;
     }
-    return { code, lots, name, curPrice, fetchFailed, shares, cost, value, profit, priceDodAmount, priceDodRate };
+    return { code, lots, name, curPrice, fetchFailed, shares, cost, value, profit, priceDodAmount, priceDodRate, dividendAfterTax };
   });
 
   // 株数の多い順、同数なら評価額の多い順
@@ -440,7 +486,7 @@ function render(){
     return (b.value||0) - (a.value||0);
   });
 
-  summaries.forEach(({ code, lots, name, curPrice, fetchFailed, shares, value, profit, priceDodAmount, priceDodRate }) => {
+  summaries.forEach(({ code, lots, name, curPrice, fetchFailed, shares, value, profit, priceDodAmount, priceDodRate, dividendAfterTax }) => {
     const div = document.createElement('div');
     div.className = 'holding';
     const nisaAny = lots.some(l=>l.nisa==='yes');
@@ -450,6 +496,7 @@ function render(){
     const priceDodClass = priceDodAmount>0 ? 'pos' : priceDodAmount<0 ? 'neg' : '';
     const priceDodText = priceDodAmount===null ? '' :
       '<div class="h-price-dod ' + priceDodClass + '">前日比 ' + yen(priceDodAmount) + '（' + (priceDodRate===null ? '-' : priceDodRate.toFixed(2) + '%') + '）</div>';
+    const dividendText = dividendAfterTax===null ? '-' : yen(dividendAfterTax);
     div.innerHTML = `
       <div class="h-top">
         <div>
@@ -465,6 +512,7 @@ function render(){
       <div class="h-grid">
         <div>株数 <b>${shares.toLocaleString('ja-JP')}</b></div>
         <div>利益額 <b class="h-profit ${profit>0?'pos':profit<0?'neg':''}">${profit===null?'-':yen(profit)}</b></div>
+        <div class="h-dividend-row">配当金(税引後) <b>${dividendText}</b></div>
       </div>
       <div class="h-actions">
         <button class="editL" data-code="${code}">明細を編集</button>
@@ -492,6 +540,8 @@ function render(){
   } else {
     sumProfitDodEl.textContent = '';
   }
+
+  document.getElementById('sumDividend').textContent = hasAnyDividendData ? yen(totalDividendAfterTax) : '-';
 
   // 評価損益の最高値を記録・判定（銘柄が1件以上あるときのみ）
   const highBadge = document.getElementById('highBadge');
@@ -600,6 +650,12 @@ document.getElementById('editSave').onclick = async () => {
   }catch(e){
     console.error(e);
     await priceCacheRef.child(code).update({ error: e.message, updatedAt: Date.now() });
+  }
+  try{
+    const dividendRate = await fetchDividendRate(code);
+    await priceCacheRef.child(code).update({ dividendRate });
+  }catch(e){
+    console.warn('dividend fetch failed', code, e);
   }
 };
 
