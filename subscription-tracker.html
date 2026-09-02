@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>サブスク帳</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: #EDEFE7;
+    --paper-line: #D9DCCF;
+    --card: #FBFCF9;
+    --ink: #1F2A24;
+    --ink-soft: #57604F;
+    --stamp: #B33A3A;
+    --stamp-soft: #E9D4CF;
+    --ledger: #4A6B5A;
+    --ledger-soft: #DCE6DD;
+    --gold: #B08A3E;
+    --radius: 4px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    background-image:
+      repeating-linear-gradient(180deg, transparent, transparent 39px, var(--paper-line) 40px);
+    color:var(--ink);
+    font-family:'IBM Plex Sans JP', sans-serif;
+    min-height:100vh;
+    padding-bottom:100px;
+  }
+  .wrap{
+    max-width:640px;
+    margin:0 auto;
+    padding:28px 18px 0;
+  }
+  header{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    margin-bottom:22px;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:10px;
+  }
+  h1{
+    font-family:'Source Serif 4', serif;
+    font-weight:700;
+    font-size:26px;
+    letter-spacing:.02em;
+    margin:0;
+  }
+  .sub-count{
+    font-size:12px;
+    color:var(--ink-soft);
+  }
+  .totals{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+    margin-bottom:24px;
+  }
+  .total-card{
+    background:var(--card);
+    border:1px solid var(--paper-line);
+    border-radius:var(--radius);
+    padding:16px 14px;
+    position:relative;
+    overflow:hidden;
+  }
+  .total-card::before{
+    content:'';
+    position:absolute;
+    top:0; left:0;
+    width:4px; height:100%;
+    background:var(--ledger);
+  }
+  .total-card.year::before{ background:var(--gold); }
+  .total-label{
+    font-size:12px;
+    color:var(--ink-soft);
+    margin-bottom:6px;
+  }
+  .total-value{
+    font-family:'Source Serif 4', serif;
+    font-weight:600;
+    font-size:26px;
+    line-height:1.1;
+    font-variant-numeric:tabular-nums;
+  }
+  .total-value span.yen{
+    font-size:15px;
+    margin-right:2px;
+    color:var(--ink-soft);
+  }
+  .section-title{
+    font-size:12px;
+    color:var(--ink-soft);
+    margin:0 0 10px 2px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .sort-select{
+    font-family:inherit;
+    font-size:12px;
+    color:var(--ink);
+    background:transparent;
+    border:none;
+    border-bottom:1px solid var(--paper-line);
+    padding:2px 0;
+  }
+  .list{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    margin-bottom:20px;
+  }
+  .item{
+    background:var(--card);
+    border:1px solid var(--paper-line);
+    border-radius:var(--radius);
+    padding:14px 14px;
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:10px;
+  }
+  .item.due-soon{
+    border-color:var(--stamp);
+  }
+  .item-main{ flex:1; min-width:0; }
+  .item-name{
+    font-weight:600;
+    font-size:16px;
+    margin-bottom:4px;
+    word-break:break-word;
+  }
+  .item-meta{
+    font-size:12px;
+    color:var(--ink-soft);
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 10px;
+    align-items:center;
+  }
+  .badge{
+    display:inline-block;
+    font-size:11px;
+    padding:1px 7px;
+    border-radius:10px;
+    background:var(--ledger-soft);
+    color:var(--ledger);
+    border:1px solid transparent;
+  }
+  .badge.year{ background:#F1E8D3; color:var(--gold); }
+  .badge.due{ background:var(--stamp-soft); color:var(--stamp); }
+  .item-memo{
+    font-size:12px;
+    color:var(--ink-soft);
+    margin-top:6px;
+    padding-top:6px;
+    border-top:1px dashed var(--paper-line);
+  }
+  .item-right{
+    text-align:right;
+    display:flex;
+    flex-direction:column;
+    align-items:flex-end;
+    gap:8px;
+  }
+  .item-amount{
+    font-family:'Source Serif 4', serif;
+    font-weight:600;
+    font-size:18px;
+    white-space:nowrap;
+  }
+  .item-actions{
+    display:flex;
+    gap:6px;
+  }
+  .icon-btn{
+    border:none;
+    background:none;
+    color:var(--ink-soft);
+    font-size:14px;
+    padding:4px 6px;
+    cursor:pointer;
+  }
+  .icon-btn:active{ color:var(--stamp); }
+  .empty{
+    text-align:center;
+    color:var(--ink-soft);
+    font-size:13px;
+    padding:40px 10px;
+    border:1px dashed var(--paper-line);
+    border-radius:var(--radius);
+  }
+  .fab{
+    position:fixed;
+    right:20px;
+    bottom:28px;
+    width:56px;
+    height:56px;
+    border-radius:50%;
+    background:var(--ink);
+    color:var(--paper);
+    border:none;
+    font-size:28px;
+    line-height:1;
+    box-shadow:0 4px 14px rgba(0,0,0,.25);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    z-index:20;
+  }
+  .fab:active{ transform:scale(.94); }
+  .sync-note{
+    text-align:center;
+    font-size:11px;
+    color:var(--ink-soft);
+    padding:6px 0 20px;
+  }
+  .sync-dot{
+    display:inline-block;
+    width:6px;height:6px;
+    border-radius:50%;
+    background:#8ba88c;
+    margin-right:5px;
+  }
+  .sync-dot.off{ background:var(--stamp); }
+
+  /* modal */
+  .overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(31,42,36,.45);
+    display:none;
+    align-items:flex-end;
+    justify-content:center;
+    z-index:30;
+  }
+  .overlay.open{ display:flex; }
+  .modal{
+    background:var(--paper);
+    width:100%;
+    max-width:640px;
+    border-radius:16px 16px 0 0;
+    padding:20px 20px calc(20px + env(safe-area-inset-bottom));
+    max-height:88vh;
+    overflow-y:auto;
+    box-shadow:0 -6px 24px rgba(0,0,0,.2);
+  }
+  .modal h2{
+    font-family:'Source Serif 4', serif;
+    font-size:19px;
+    margin:0 0 16px;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:8px;
+  }
+  .field{ margin-bottom:14px; }
+  .field label{
+    display:block;
+    font-size:12px;
+    color:var(--ink-soft);
+    margin-bottom:5px;
+  }
+  .field input, .field select, .field textarea{
+    width:100%;
+    font-family:inherit;
+    font-size:15px;
+    padding:10px 11px;
+    border:1px solid var(--paper-line);
+    border-radius:var(--radius);
+    background:var(--card);
+    color:var(--ink);
+  }
+  .field textarea{ resize:vertical; min-height:56px; }
+  .cycle-toggle{
+    display:flex;
+    gap:8px;
+  }
+  .cycle-toggle button{
+    flex:1;
+    padding:10px;
+    border:1px solid var(--paper-line);
+    background:var(--card);
+    border-radius:var(--radius);
+    font-family:inherit;
+    font-size:14px;
+    color:var(--ink-soft);
+    cursor:pointer;
+  }
+  .cycle-toggle button.active{
+    background:var(--ledger);
+    border-color:var(--ledger);
+    color:#fff;
+  }
+  .modal-actions{
+    display:flex;
+    gap:10px;
+    margin-top:6px;
+  }
+  .btn{
+    flex:1;
+    padding:13px;
+    border-radius:var(--radius);
+    border:none;
+    font-family:inherit;
+    font-size:15px;
+    font-weight:600;
+    cursor:pointer;
+  }
+  .btn-primary{ background:var(--ink); color:var(--paper); }
+  .btn-ghost{ background:transparent; color:var(--ink-soft); border:1px solid var(--paper-line); }
+  .btn-delete{ background:var(--stamp); color:#fff; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>サブスク帳</h1>
+      <div class="sub-count" id="subCount">0件登録中</div>
+    </div>
+  </header>
+
+  <div class="totals">
+    <div class="total-card month">
+      <div class="total-label">月計</div>
+      <div class="total-value"><span class="yen">¥</span><span id="monthTotal">0</span></div>
+    </div>
+    <div class="total-card year">
+      <div class="total-label">年計</div>
+      <div class="total-value"><span class="yen">¥</span><span id="yearTotal">0</span></div>
+    </div>
+  </div>
+
+  <div class="section-title">
+    <span>登録リスト</span>
+    <select class="sort-select" id="sortSelect">
+      <option value="date">次回課金日順</option>
+      <option value="amountDesc">金額が高い順</option>
+      <option value="name">名前順</option>
+    </select>
+  </div>
+
+  <div class="list" id="list"></div>
+  <div class="empty" id="emptyState" style="display:none;">まだ登録がありません。右下の＋から追加してください。</div>
+
+  <div class="sync-note"><span class="sync-dot" id="syncDot"></span><span id="syncText">同期状態を確認中…</span></div>
+</div>
+
+<button class="fab" id="openAdd" aria-label="追加">＋</button>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2 id="modalTitle">サブスクを追加</h2>
+    <input type="hidden" id="editId">
+    <div class="field">
+      <label>サービス名</label>
+      <input type="text" id="fName" placeholder="例：Netflix">
+    </div>
+    <div class="field">
+      <label>課金周期</label>
+      <div class="cycle-toggle">
+        <button type="button" id="cycleMonth" class="active">月次</button>
+        <button type="button" id="cycleYear">年次</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>金額（円）</label>
+      <input type="number" id="fAmount" placeholder="例：1490" inputmode="numeric">
+    </div>
+    <div class="field">
+      <label>次回課金日</label>
+      <input type="date" id="fDate">
+    </div>
+    <div class="field">
+      <label>解約予定・メモ（任意）</label>
+      <textarea id="fMemo" placeholder="例：来年3月に解約予定 / 家族プランで分担中"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="cancelBtn">キャンセル</button>
+      <button class="btn btn-primary" id="saveBtn">保存</button>
+    </div>
+    <div class="modal-actions" id="deleteRow" style="display:none;">
+      <button class="btn btn-delete" id="deleteBtn">この登録を削除</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getDatabase, ref, onValue, set, remove, push
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+// ▼▼▼ ここに自分の Firebase プロジェクトの設定を貼り付けてください ▼▼▼
+// Firebase コンソール > プロジェクトの設定 > マイアプリ > SDK の設定と構成 から取得できます
+const firebaseConfig = {
+  apiKey: "AIzaSyBUQjfeamTm1gCWNiXhZcxyBIUiQSptvDs",
+  authDomain: "asset-tracker-b3fac.firebaseapp.com",
+  databaseURL: "https://asset-tracker-b3fac-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "asset-tracker-b3fac",
+  storageBucket: "asset-tracker-b3fac.firebasestorage.app",
+  messagingSenderId: "36181399487",
+  appId: "1:36181399487:web:0ef48412b814d81aaa330a"
+};
+// ▲▲▲ ここまで ▲▲▲
+
+let db = null;
+let subsRef = null;
+let items = {};
+let firebaseReady = false;
+
+const syncDot = document.getElementById('syncDot');
+const syncText = document.getElementById('syncText');
+
+try{
+  if(firebaseConfig.apiKey === "YOUR_API_KEY"){
+    throw new Error("not configured");
+  }
+  const app = initializeApp(firebaseConfig);
+  db = getDatabase(app);
+  subsRef = ref(db, 'subscriptions');
+  firebaseReady = true;
+  syncText.textContent = 'iPhone / iPad 間で自動同期中';
+  onValue(subsRef, (snap) => {
+    items = snap.val() || {};
+    render();
+  }, (err) => {
+    syncDot.classList.add('off');
+    syncText.textContent = '同期エラー：' + err.message;
+  });
+}catch(e){
+  syncDot.classList.add('off');
+  syncText.textContent = 'Firebase未設定：この端末内のみに保存されます';
+  const local = localStorage.getItem('subs_local');
+  items = local ? JSON.parse(local) : {};
+  render();
+}
+
+function saveLocal(){
+  if(!firebaseReady){
+    localStorage.setItem('subs_local', JSON.stringify(items));
+  }
+}
+
+function formatYen(n){
+  return Math.round(n).toLocaleString('ja-JP');
+}
+
+function monthlyEquivalent(item){
+  return item.cycle === 'year' ? item.amount / 12 : item.amount;
+}
+function yearlyEquivalent(item){
+  return item.cycle === 'year' ? item.amount : item.amount * 12;
+}
+
+function daysUntil(dateStr){
+  if(!dateStr) return Infinity;
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const target = new Date(dateStr);
+  target.setHours(0,0,0,0);
+  return Math.round((target - today) / 86400000);
+}
+
+function nextOccurrence(dateStr, cycle){
+  // 表示上、過去日付なら次の周期に繰り上げて見せる
+  if(!dateStr) return null;
+  let d = new Date(dateStr);
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  d.setHours(0,0,0,0);
+  while(d < today){
+    if(cycle === 'year'){
+      d.setFullYear(d.getFullYear() + 1);
+    }else{
+      d.setMonth(d.getMonth() + 1);
+    }
+  }
+  return d;
+}
+
+function render(){
+  const list = document.getElementById('list');
+  const empty = document.getElementById('emptyState');
+  const ids = Object.keys(items);
+  document.getElementById('subCount').textContent = ids.length + '件登録中';
+
+  if(ids.length === 0){
+    list.innerHTML = '';
+    empty.style.display = 'block';
+    document.getElementById('monthTotal').textContent = '0';
+    document.getElementById('yearTotal').textContent = '0';
+    return;
+  }
+  empty.style.display = 'none';
+
+  let monthSum = 0, yearSum = 0;
+  ids.forEach(id => {
+    const it = items[id];
+    monthSum += monthlyEquivalent(it);
+    yearSum += yearlyEquivalent(it);
+  });
+  document.getElementById('monthTotal').textContent = formatYen(monthSum);
+  document.getElementById('yearTotal').textContent = formatYen(yearSum);
+
+  const sortMode = document.getElementById('sortSelect').value;
+  let sorted = ids.map(id => ({id, ...items[id]}));
+  if(sortMode === 'date'){
+    sorted.sort((a,b) => {
+      const na = nextOccurrence(a.nextDate, a.cycle);
+      const nb = nextOccurrence(b.nextDate, b.cycle);
+      if(!na && !nb) return 0;
+      if(!na) return 1;
+      if(!nb) return -1;
+      return na - nb;
+    });
+  }else if(sortMode === 'amountDesc'){
+    sorted.sort((a,b) => yearlyEquivalent(b) - yearlyEquivalent(a));
+  }else{
+    sorted.sort((a,b) => a.name.localeCompare(b.name, 'ja'));
+  }
+
+  list.innerHTML = sorted.map(it => {
+    const next = nextOccurrence(it.nextDate, it.cycle);
+    const todayMid = new Date(); todayMid.setHours(0,0,0,0);
+    const dleft = next ? Math.round((next - todayMid) / 86400000) : null;
+    const dueSoon = dleft !== null && dleft <= 3;
+    const dateLabel = it.nextDate ? formatDateJP(next || new Date(it.nextDate)) : '未設定';
+    return `
+      <div class="item ${dueSoon ? 'due-soon' : ''}" data-id="${it.id}">
+        <div class="item-main">
+          <div class="item-name">${escapeHtml(it.name)}</div>
+          <div class="item-meta">
+            <span class="badge ${it.cycle === 'year' ? 'year' : ''}">${it.cycle === 'year' ? '年次' : '月次'}</span>
+            <span>次回: ${dateLabel}</span>
+            ${dueSoon ? `<span class="badge due">${dleft <= 0 ? '本日' : dleft + '日後'}</span>` : ''}
+          </div>
+          ${it.memo ? `<div class="item-memo">${escapeHtml(it.memo)}</div>` : ''}
+        </div>
+        <div class="item-right">
+          <div class="item-amount">¥${formatYen(it.amount)}</div>
+          <div class="item-actions">
+            <button class="icon-btn edit-btn" data-id="${it.id}">編集</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  document.querySelectorAll('.edit-btn').forEach(btn => {
+    btn.addEventListener('click', () => openEdit(btn.dataset.id));
+  });
+}
+
+function formatDateJP(d){
+  return `${d.getMonth()+1}/${d.getDate()}`;
+}
+
+function escapeHtml(s){
+  return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+document.getElementById('sortSelect').addEventListener('change', render);
+
+// modal handling
+const overlay = document.getElementById('overlay');
+const openAdd = document.getElementById('openAdd');
+const cancelBtn = document.getElementById('cancelBtn');
+const saveBtn = document.getElementById('saveBtn');
+const deleteBtn = document.getElementById('deleteBtn');
+const deleteRow = document.getElementById('deleteRow');
+const cycleMonth = document.getElementById('cycleMonth');
+const cycleYear = document.getElementById('cycleYear');
+let currentCycle = 'month';
+
+function resetForm(){
+  document.getElementById('editId').value = '';
+  document.getElementById('fName').value = '';
+  document.getElementById('fAmount').value = '';
+  document.getElementById('fDate').value = '';
+  document.getElementById('fMemo').value = '';
+  currentCycle = 'month';
+  cycleMonth.classList.add('active');
+  cycleYear.classList.remove('active');
+  deleteRow.style.display = 'none';
+  document.getElementById('modalTitle').textContent = 'サブスクを追加';
+}
+
+function openEdit(id){
+  const it = items[id];
+  if(!it) return;
+  document.getElementById('editId').value = id;
+  document.getElementById('fName').value = it.name;
+  document.getElementById('fAmount').value = it.amount;
+  document.getElementById('fDate').value = it.nextDate || '';
+  document.getElementById('fMemo').value = it.memo || '';
+  currentCycle = it.cycle;
+  if(currentCycle === 'year'){
+    cycleYear.classList.add('active');
+    cycleMonth.classList.remove('active');
+  }else{
+    cycleMonth.classList.add('active');
+    cycleYear.classList.remove('active');
+  }
+  deleteRow.style.display = 'flex';
+  document.getElementById('modalTitle').textContent = 'サブスクを編集';
+  overlay.classList.add('open');
+}
+
+openAdd.addEventListener('click', () => {
+  resetForm();
+  overlay.classList.add('open');
+});
+cancelBtn.addEventListener('click', () => overlay.classList.remove('open'));
+overlay.addEventListener('click', (e) => { if(e.target === overlay) overlay.classList.remove('open'); });
+
+cycleMonth.addEventListener('click', () => {
+  currentCycle = 'month';
+  cycleMonth.classList.add('active');
+  cycleYear.classList.remove('active');
+});
+cycleYear.addEventListener('click', () => {
+  currentCycle = 'year';
+  cycleYear.classList.add('active');
+  cycleMonth.classList.remove('active');
+});
+
+saveBtn.addEventListener('click', () => {
+  const name = document.getElementById('fName').value.trim();
+  const amount = parseFloat(document.getElementById('fAmount').value);
+  const nextDate = document.getElementById('fDate').value;
+  const memo = document.getElementById('fMemo').value.trim();
+  const editId = document.getElementById('editId').value;
+
+  if(!name){ alert('サービス名を入力してください'); return; }
+  if(isNaN(amount) || amount < 0){ alert('金額を正しく入力してください'); return; }
+
+  const data = { name, amount, cycle: currentCycle, nextDate, memo };
+
+  if(firebaseReady){
+    if(editId){
+      set(ref(db, 'subscriptions/' + editId), data);
+    }else{
+      push(subsRef, data);
+    }
+  }else{
+    const id = editId || ('local_' + Date.now());
+    items[id] = data;
+    saveLocal();
+    render();
+  }
+  overlay.classList.remove('open');
+});
+
+deleteBtn.addEventListener('click', () => {
+  const editId = document.getElementById('editId').value;
+  if(!editId) return;
+  if(!confirm('この登録を削除しますか？')) return;
+  if(firebaseReady){
+    remove(ref(db, 'subscriptions/' + editId));
+  }else{
+    delete items[editId];
+    saveLocal();
+    render();
+  }
+  overlay.classList.remove('open');
+});
+
+render();
+</script>
+</body>
+</html>
