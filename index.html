@@ -387,7 +387,12 @@
     margin:0 0 10px 0;
     letter-spacing:.05em;
   }
+  .export-row{
+    display:flex;
+    gap:8px;
+  }
   .csv-btn{
+    flex:1;
     width:100%;
     padding:11px;
     border:1px solid var(--navy);
@@ -478,8 +483,11 @@
 
   <div class="csv-card">
     <h2>データ書き出し</h2>
-    <button class="csv-btn" id="csvExportBtn">CSVを出力</button>
-    <div class="sync-hint">記帳履歴を日付・評価損益のCSVファイルとして書き出します</div>
+    <div class="export-row">
+      <button class="csv-btn" id="csvExportBtn">CSVを出力</button>
+      <button class="csv-btn" id="jsonExportBtn">JSONを出力</button>
+    </div>
+    <div class="sync-hint">記帳履歴を日付・評価損益のCSVまたはJSONファイルとして書き出します</div>
   </div>
 
   <div class="sync-card">
@@ -814,6 +822,23 @@ document.getElementById('csvExportBtn').addEventListener('click', ()=>{
   const a = document.createElement('a');
   a.href = url;
   a.download = '株評価損益_' + todayStr() + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('jsonExportBtn').addEventListener('click', ()=>{
+  if(entries.length === 0){
+    alert('書き出せる記帳データがありません');
+    return;
+  }
+  const json = JSON.stringify(entries, null, 2);
+  const blob = new Blob([json], {type:'application/json;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '株評価損益_' + todayStr() + '.json';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
