@@ -34,10 +34,10 @@
   .ver{font-size:11px;color:var(--sub);}
   .summary{display:flex;gap:10px;margin-top:10px;overflow-x:auto;padding-bottom:2px;}
   .sum-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
-    padding:10px 14px;min-width:110px;flex:1;}
-  .sum-card .label{font-size:11px;color:var(--sub);}
-  .sum-card .value{font-size:16px;font-weight:700;margin-top:2px;}
-  .sum-card .sum-sub{font-size:11px;margin-top:2px;}
+    padding:10px 14px;flex:0 0 auto;white-space:nowrap;}
+  .sum-card .label{font-size:11px;color:var(--sub);white-space:nowrap;}
+  .sum-card .value{font-size:15px;font-weight:700;margin-top:2px;white-space:nowrap;}
+  .sum-card .sum-sub{font-size:11px;margin-top:2px;white-space:nowrap;}
   main{padding:12px 16px 90px;}
   .sync-status{font-size:11px;color:var(--sub);text-align:right;margin:4px 2px 8px;}
   .sync-status.ok::before{content:"● ";color:var(--green);}
@@ -72,6 +72,8 @@
   .refresh-btn{background:var(--card2);border:1px solid var(--border);color:var(--text);
     font-size:12px;padding:6px 10px;border-radius:8px;}
   .header-right{display:flex;align-items:center;gap:8px;}
+  .icon-btn{background:var(--card2);border:1px solid var(--border);color:var(--text);
+    font-size:14px;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0;}
   .high-badge{font-size:11px;font-weight:700;color:#1a1206;background:linear-gradient(135deg,#ffd76a,#ffb32e);
     padding:4px 9px;border-radius:20px;letter-spacing:.5px;}
   /* Modal */
@@ -106,9 +108,10 @@
 
 <header>
   <div class="title-row">
-    <h1>銘柄別評価損益 <span class="ver">Ver3.1</span></h1>
+    <h1>銘柄別評価損益 <span class="ver">Ver3.2</span></h1>
     <div class="header-right">
       <span class="high-badge" id="highBadge" style="display:none;">最高値</span>
+      <button class="icon-btn" id="backupBtn" title="バックアップ/復元">💾</button>
       <button class="refresh-btn" id="refreshAllBtn">株価更新</button>
     </div>
   </div>
@@ -189,6 +192,27 @@
       <div class="loading-line" id="chartLoading">読み込み中...</div>
       <canvas id="priceChart" height="220"></canvas>
     </div>
+  </div>
+</div>
+
+<!-- バックアップ/復元シート -->
+<div class="overlay" id="backupOverlay">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2>バックアップ / 復元</h2>
+      <button class="close-x" id="backupClose">✕</button>
+    </div>
+    <div class="field">
+      <div class="hint" style="margin-bottom:12px;">登録している銘柄・株価データをまとめてファイルに保存したり、保存したファイルから復元したりできます。</div>
+    </div>
+    <div class="btn-row" style="margin-top:0;">
+      <button class="btn-cancel" id="backupExportBtn">バックアップを書き出す</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn-cancel" id="backupImportBtn">バックアップから復元する</button>
+    </div>
+    <input type="file" id="restoreFileInput" accept="application/json,.json" style="display:none;">
+    <div class="hint" style="margin-top:10px;">※復元すると、現在このアプリに登録されているデータは上書きされます。</div>
   </div>
 </div>
 
@@ -746,6 +770,64 @@ function drawChartForCurrentCode(){
 }
 
 document.getElementById('refreshAllBtn').onclick = refreshAllPrices;
+
+/* ---------- バックアップ / 復元 ---------- */
+const backupOverlay = document.getElementById('backupOverlay');
+document.getElementById('backupBtn').onclick = () => backupOverlay.classList.add('show');
+document.getElementById('backupClose').onclick = () => backupOverlay.classList.remove('show');
+
+document.getElementById('backupExportBtn').onclick = () => {
+  const data = {
+    app: 'stock-portfolio-tracker',
+    exportedAt: new Date().toISOString(),
+    holdings: holdings,
+    priceCache: priceCache,
+    maxTotalProfit: maxTotalProfit
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const ts = new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = `stock-portfolio-backup-${ts}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+};
+
+document.getElementById('backupImportBtn').onclick = () => {
+  document.getElementById('restoreFileInput').click();
+};
+
+document.getElementById('restoreFileInput').onchange = async (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  try{
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if(!data || typeof data !== 'object' || typeof data.holdings !== 'object'){
+      alert('バックアップファイルの形式が正しくありません');
+      e.target.value = '';
+      return;
+    }
+    if(!confirm('現在のデータを上書きして復元します。よろしいですか？')){
+      e.target.value = '';
+      return;
+    }
+    await holdingsRef.set(data.holdings || {});
+    await priceCacheRef.set(data.priceCache || {});
+    if(typeof data.maxTotalProfit === 'number'){
+      await maxProfitRef.set({ value: data.maxTotalProfit, updatedAt: Date.now() });
+    }
+    alert('復元が完了しました');
+    backupOverlay.classList.remove('show');
+  }catch(err){
+    console.error('restore failed', err);
+    alert('復元に失敗しました: ' + err.message);
+  }
+  e.target.value = '';
+};
 
 // 初回ロード後に自動で1回価格更新
 setTimeout(()=>{ if(Object.keys(holdings).length) refreshAllPrices(); }, 1500);
