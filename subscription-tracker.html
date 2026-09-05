@@ -216,6 +216,8 @@
     cursor:pointer;
   }
   .icon-btn:active{ color:var(--stamp); }
+  .icon-btn.cancel-btn{ color:var(--stamp); }
+  .icon-btn.renew-btn{ color:var(--ledger); }
   .empty{
     text-align:center;
     color:var(--ink-soft);
@@ -450,8 +452,9 @@ const firebaseConfig = {
 /*
   定期コスト — バージョン履歴
   v1.0.0 (2026-09-05) カテゴリ機能を実装、アプリ名を「定期コスト」に変更しバージョン管理を開始
+  v1.1.0 (2026-09-05) 次回更新日の5日前からアラート表示に変更。各項目に「更新」（次回課金日を1周期進める）「解約」（確認後に削除）ボタンを追加
 */
-const APP_VERSION = 'v1.0.0';
+const APP_VERSION = 'v1.1.0';
 document.getElementById('versionBadge').textContent = APP_VERSION;
 
 let db = null;
@@ -665,7 +668,7 @@ function render(){
     const next = nextOccurrence(it.nextDate, it.cycle);
     const todayMid = new Date(); todayMid.setHours(0,0,0,0);
     const dleft = next ? Math.round((next - todayMid) / 86400000) : null;
-    const dueSoon = dleft !== null && dleft <= 3;
+    const dueSoon = dleft !== null && dleft <= 5;
     const dateLabel = it.nextDate ? formatDateJP(next || new Date(it.nextDate)) : '未設定';
     const cat = categoryOf(it.category);
     return `
@@ -683,6 +686,8 @@ function render(){
         <div class="item-right">
           <div class="item-amount">¥${formatYen(it.amount)}</div>
           <div class="item-actions">
+            <button class="icon-btn renew-btn" data-id="${it.id}">更新</button>
+            <button class="icon-btn cancel-btn" data-id="${it.id}">解約</button>
             <button class="icon-btn edit-btn" data-id="${it.id}">編集</button>
           </div>
         </div>
@@ -693,6 +698,50 @@ function render(){
   document.querySelectorAll('.edit-btn').forEach(btn => {
     btn.addEventListener('click', () => openEdit(btn.dataset.id));
   });
+  document.querySelectorAll('.renew-btn').forEach(btn => {
+    btn.addEventListener('click', () => renewItem(btn.dataset.id));
+  });
+  document.querySelectorAll('.cancel-btn').forEach(btn => {
+    btn.addEventListener('click', () => cancelItem(btn.dataset.id));
+  });
+}
+
+function renewItem(id){
+  const it = items[id];
+  if(!it) return;
+  const base = nextOccurrence(it.nextDate, it.cycle) || (() => { const t = new Date(); t.setHours(0,0,0,0); return t; })();
+  const d = new Date(base);
+  if(it.cycle === 'year'){
+    d.setFullYear(d.getFullYear() + 1);
+  }else{
+    d.setMonth(d.getMonth() + 1);
+  }
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const newDate = `${y}-${m}-${day}`;
+  const data = { name: it.name, category: it.category, amount: it.amount, cycle: it.cycle, nextDate: newDate, memo: it.memo || '' };
+
+  if(firebaseReady){
+    set(ref(db, 'subscriptions/' + id), data);
+  }else{
+    items[id] = data;
+    saveLocal();
+    render();
+  }
+}
+
+function cancelItem(id){
+  const it = items[id];
+  if(!it) return;
+  if(!confirm(`「${it.name}」を解約として削除しますか？この操作は取り消せません。`)) return;
+  if(firebaseReady){
+    remove(ref(db, 'subscriptions/' + id));
+  }else{
+    delete items[id];
+    saveLocal();
+    render();
+  }
 }
 
 function formatDateJP(d){
