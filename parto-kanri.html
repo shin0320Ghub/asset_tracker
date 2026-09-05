@@ -70,6 +70,17 @@
     font-size: 22px;
     margin: 6px 0 2px;
     letter-spacing: 0.04em;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .version-badge {
+    font-family: 'Roboto Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ink-soft);
+    letter-spacing: 0;
   }
 
   header.topbar p {
@@ -477,7 +488,7 @@
 
   <header class="topbar">
     <p>PART-TIME PAYROLL</p>
-    <h1>パート管理</h1>
+    <h1>パート管理 <span class="version-badge">v1.0.0</span></h1>
   </header>
 
   <main>
