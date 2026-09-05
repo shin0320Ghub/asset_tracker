@@ -106,7 +106,7 @@
 
 <header>
   <div class="title-row">
-    <h1>銘柄別評価損益 <span class="ver">Ver3.0</span></h1>
+    <h1>銘柄別評価損益 <span class="ver">Ver3.1</span></h1>
     <div class="header-right">
       <span class="high-badge" id="highBadge" style="display:none;">最高値</span>
       <button class="refresh-btn" id="refreshAllBtn">株価更新</button>
@@ -141,9 +141,9 @@
       <div class="hint">日本株の証券コードを入力してください</div>
     </div>
     <div class="field">
-      <label>銘柄名（任意）</label>
-      <input type="text" id="inName" placeholder="例: トヨタ自動車">
-      <div class="hint">空欄の場合は銘柄コードを表示します</div>
+      <label>銘柄名（自動取得・任意で上書き可）</label>
+      <input type="text" id="inName" placeholder="空欄でOK（自動で取得されます）">
+      <div class="hint">空欄で保存すると、銘柄コードから自動で銘柄名を取得します。表示名を変えたい場合だけ入力してください</div>
     </div>
     <div class="field">
       <label>取得日</label>
