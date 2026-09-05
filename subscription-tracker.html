@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>サブスク帳</title>
+<title>定期コスト</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -44,6 +44,19 @@
     margin-bottom:22px;
     border-bottom:2px solid var(--ink);
     padding-bottom:10px;
+  }
+  .title-row{
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+  }
+  .version-badge{
+    font-size:11px;
+    color:var(--ink-soft);
+    border:1px solid var(--paper-line);
+    border-radius:10px;
+    padding:1px 8px;
+    font-family:'IBM Plex Sans JP', sans-serif;
   }
   h1{
     font-family:'Source Serif 4', serif;
@@ -337,7 +350,10 @@
 <div class="wrap">
   <header>
     <div>
-      <h1>サブスク帳</h1>
+      <div class="title-row">
+        <h1>定期コスト</h1>
+        <span class="version-badge" id="versionBadge">v1.0.0</span>
+      </div>
       <div class="sub-count" id="subCount">0件登録中</div>
     </div>
   </header>
@@ -431,26 +447,87 @@ const firebaseConfig = {
 };
 // ▲▲▲ ここまで ▲▲▲
 
+/*
+  定期コスト — バージョン履歴
+  v1.0.0 (2026-09-05) カテゴリ機能を実装、アプリ名を「定期コスト」に変更しバージョン管理を開始
+*/
+const APP_VERSION = 'v1.0.0';
+document.getElementById('versionBadge').textContent = APP_VERSION;
+
 let db = null;
 let subsRef = null;
+let categoriesRef = null;
 let items = {};
 let firebaseReady = false;
 
-const CATEGORIES = [
-  { id: 'entertainment', label: 'エンタメ', color: '#B33A3A' },
-  { id: 'work',          label: '仕事・仕事道具', color: '#3A5FB3' },
-  { id: 'life',          label: '生活', color: '#4A6B5A' },
-  { id: 'comm',          label: '通信', color: '#B08A3E' },
-  { id: 'health',        label: '健康・フィットネス', color: '#7A4FA0' },
-  { id: 'cloud',         label: 'クラウド・ソフト', color: '#3A9DA8' },
-  { id: 'other',         label: 'その他', color: '#8A8F82' }
+const DEFAULT_CATEGORIES = [
+  { id: 'hobby',  label: '趣味・娯楽', color: '#B33A3A' },
+  { id: 'car',    label: '車',       color: '#3A5FB3' },
+  { id: 'tax',    label: '税金',     color: '#B08A3E' },
+  { id: 'health', label: '医療',     color: '#4A6B5A' },
+  { id: 'other',  label: 'その他',   color: '#8A8F82' }
 ];
+// 新規カテゴリ追加時に順番に割り当てる色パレット
+const COLOR_PALETTE = ['#7A4FA0','#3A9DA8','#C9743A','#5C7A9E','#9E5C7A','#6B8E4E','#A8763A','#4E6B8E'];
+
+let CATEGORIES = DEFAULT_CATEGORIES.slice();
+let categoriesReady = false;
+
 function categoryOf(id){
   return CATEGORIES.find(c => c.id === id) || CATEGORIES[CATEGORIES.length - 1];
 }
 
+function nextPaletteColor(){
+  const used = CATEGORIES.length - DEFAULT_CATEGORIES.length;
+  return COLOR_PALETTE[used % COLOR_PALETTE.length];
+}
+
+function slugify(label){
+  return 'cat_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+}
+
 const catSelect = document.getElementById('fCategory');
-catSelect.innerHTML = CATEGORIES.map(c => `<option value="${c.id}">${c.label}</option>`).join('');
+function renderCategoryOptions(selectedId){
+  const keep = selectedId || catSelect.value || 'other';
+  catSelect.innerHTML = CATEGORIES.map(c => `<option value="${c.id}">${c.label}</option>`).join('')
+    + `<option value="__add__">＋ 新しいカテゴリを追加…</option>`;
+  catSelect.value = CATEGORIES.some(c => c.id === keep) ? keep : 'other';
+}
+renderCategoryOptions();
+
+catSelect.addEventListener('change', () => {
+  if(catSelect.value === '__add__'){
+    const label = prompt('新しいカテゴリ名を入力してください');
+    if(label && label.trim()){
+      const newCat = { id: slugify(label), label: label.trim(), color: nextPaletteColor() };
+      CATEGORIES.push(newCat);
+      saveCategories();
+      renderCategoryOptions(newCat.id);
+    }else{
+      renderCategoryOptions('other');
+    }
+  }
+});
+
+function saveCategories(){
+  if(firebaseReady && categoriesRef){
+    const obj = {};
+    CATEGORIES.forEach(c => { obj[c.id] = { label: c.label, color: c.color }; });
+    set(categoriesRef, obj);
+  }else{
+    localStorage.setItem('categories_local', JSON.stringify(CATEGORIES));
+  }
+}
+
+function loadLocalCategories(){
+  const local = localStorage.getItem('categories_local');
+  if(local){
+    try{
+      const parsed = JSON.parse(local);
+      if(Array.isArray(parsed) && parsed.length) CATEGORIES = parsed;
+    }catch(e){}
+  }
+}
 
 const syncDot = document.getElementById('syncDot');
 const syncText = document.getElementById('syncText');
@@ -462,6 +539,7 @@ try{
   const app = initializeApp(firebaseConfig);
   db = getDatabase(app);
   subsRef = ref(db, 'subscriptions');
+  categoriesRef = ref(db, 'costCategories');
   firebaseReady = true;
   syncText.textContent = 'iPhone / iPad 間で自動同期中';
   onValue(subsRef, (snap) => {
@@ -471,11 +549,25 @@ try{
     syncDot.classList.add('off');
     syncText.textContent = '同期エラー：' + err.message;
   });
+  onValue(categoriesRef, (snap) => {
+    const val = snap.val();
+    if(val && Object.keys(val).length){
+      CATEGORIES = Object.keys(val).map(id => ({ id, label: val[id].label, color: val[id].color }));
+    }else{
+      // 初回：デフォルトカテゴリを書き込む
+      saveCategories();
+      CATEGORIES = DEFAULT_CATEGORIES.slice();
+    }
+    renderCategoryOptions();
+    render();
+  });
 }catch(e){
   syncDot.classList.add('off');
   syncText.textContent = 'Firebase未設定：この端末内のみに保存されます';
   const local = localStorage.getItem('subs_local');
   items = local ? JSON.parse(local) : {};
+  loadLocalCategories();
+  renderCategoryOptions();
   render();
 }
 
@@ -627,7 +719,7 @@ let currentCycle = 'month';
 function resetForm(){
   document.getElementById('editId').value = '';
   document.getElementById('fName').value = '';
-  document.getElementById('fCategory').value = 'other';
+  renderCategoryOptions('other');
   document.getElementById('fAmount').value = '';
   document.getElementById('fDate').value = '';
   document.getElementById('fMemo').value = '';
@@ -643,7 +735,7 @@ function openEdit(id){
   if(!it) return;
   document.getElementById('editId').value = id;
   document.getElementById('fName').value = it.name;
-  document.getElementById('fCategory').value = it.category || 'other';
+  renderCategoryOptions(it.category || 'other');
   document.getElementById('fAmount').value = it.amount;
   document.getElementById('fDate').value = it.nextDate || '';
   document.getElementById('fMemo').value = it.memo || '';
@@ -680,7 +772,7 @@ cycleYear.addEventListener('click', () => {
 
 saveBtn.addEventListener('click', () => {
   const name = document.getElementById('fName').value.trim();
-  const category = document.getElementById('fCategory').value;
+  const category = catSelect.value === '__add__' ? 'other' : catSelect.value;
   const amount = parseFloat(document.getElementById('fAmount').value);
   const nextDate = document.getElementById('fDate').value;
   const memo = document.getElementById('fMemo').value.trim();
