@@ -137,6 +137,19 @@
     font-size:16px;
     margin-bottom:4px;
     word-break:break-word;
+    display:flex;
+    align-items:center;
+    gap:7px;
+  }
+  .cat-dot{
+    display:inline-block;
+    width:9px;
+    height:9px;
+    border-radius:50%;
+    flex-shrink:0;
+  }
+  .badge.cat{
+    border:1px solid transparent;
   }
   .item-meta{
     font-size:12px;
@@ -346,6 +359,7 @@
       <option value="date">次回課金日順</option>
       <option value="amountDesc">金額が高い順</option>
       <option value="name">名前順</option>
+      <option value="category">カテゴリ順</option>
     </select>
   </div>
 
@@ -364,6 +378,10 @@
     <div class="field">
       <label>サービス名</label>
       <input type="text" id="fName" placeholder="例：Netflix">
+    </div>
+    <div class="field">
+      <label>カテゴリ</label>
+      <select id="fCategory"></select>
     </div>
     <div class="field">
       <label>課金周期</label>
@@ -417,6 +435,22 @@ let db = null;
 let subsRef = null;
 let items = {};
 let firebaseReady = false;
+
+const CATEGORIES = [
+  { id: 'entertainment', label: 'エンタメ', color: '#B33A3A' },
+  { id: 'work',          label: '仕事・仕事道具', color: '#3A5FB3' },
+  { id: 'life',          label: '生活', color: '#4A6B5A' },
+  { id: 'comm',          label: '通信', color: '#B08A3E' },
+  { id: 'health',        label: '健康・フィットネス', color: '#7A4FA0' },
+  { id: 'cloud',         label: 'クラウド・ソフト', color: '#3A9DA8' },
+  { id: 'other',         label: 'その他', color: '#8A8F82' }
+];
+function categoryOf(id){
+  return CATEGORIES.find(c => c.id === id) || CATEGORIES[CATEGORIES.length - 1];
+}
+
+const catSelect = document.getElementById('fCategory');
+catSelect.innerHTML = CATEGORIES.map(c => `<option value="${c.id}">${c.label}</option>`).join('');
 
 const syncDot = document.getElementById('syncDot');
 const syncText = document.getElementById('syncText');
@@ -525,6 +559,12 @@ function render(){
     });
   }else if(sortMode === 'amountDesc'){
     sorted.sort((a,b) => yearlyEquivalent(b) - yearlyEquivalent(a));
+  }else if(sortMode === 'category'){
+    sorted.sort((a,b) => {
+      const ia = CATEGORIES.findIndex(c => c.id === (a.category || 'other'));
+      const ib = CATEGORIES.findIndex(c => c.id === (b.category || 'other'));
+      return ia - ib || a.name.localeCompare(b.name, 'ja');
+    });
   }else{
     sorted.sort((a,b) => a.name.localeCompare(b.name, 'ja'));
   }
@@ -535,11 +575,13 @@ function render(){
     const dleft = next ? Math.round((next - todayMid) / 86400000) : null;
     const dueSoon = dleft !== null && dleft <= 3;
     const dateLabel = it.nextDate ? formatDateJP(next || new Date(it.nextDate)) : '未設定';
+    const cat = categoryOf(it.category);
     return `
       <div class="item ${dueSoon ? 'due-soon' : ''}" data-id="${it.id}">
         <div class="item-main">
-          <div class="item-name">${escapeHtml(it.name)}</div>
+          <div class="item-name"><span class="cat-dot" style="background:${cat.color}"></span>${escapeHtml(it.name)}</div>
           <div class="item-meta">
+            <span class="badge cat" style="color:${cat.color}; background:${cat.color}1A;">${cat.label}</span>
             <span class="badge ${it.cycle === 'year' ? 'year' : ''}">${it.cycle === 'year' ? '年次' : '月次'}</span>
             <span>次回: ${dateLabel}</span>
             ${dueSoon ? `<span class="badge due">${dleft <= 0 ? '本日' : dleft + '日後'}</span>` : ''}
@@ -585,6 +627,7 @@ let currentCycle = 'month';
 function resetForm(){
   document.getElementById('editId').value = '';
   document.getElementById('fName').value = '';
+  document.getElementById('fCategory').value = 'other';
   document.getElementById('fAmount').value = '';
   document.getElementById('fDate').value = '';
   document.getElementById('fMemo').value = '';
@@ -600,6 +643,7 @@ function openEdit(id){
   if(!it) return;
   document.getElementById('editId').value = id;
   document.getElementById('fName').value = it.name;
+  document.getElementById('fCategory').value = it.category || 'other';
   document.getElementById('fAmount').value = it.amount;
   document.getElementById('fDate').value = it.nextDate || '';
   document.getElementById('fMemo').value = it.memo || '';
@@ -636,6 +680,7 @@ cycleYear.addEventListener('click', () => {
 
 saveBtn.addEventListener('click', () => {
   const name = document.getElementById('fName').value.trim();
+  const category = document.getElementById('fCategory').value;
   const amount = parseFloat(document.getElementById('fAmount').value);
   const nextDate = document.getElementById('fDate').value;
   const memo = document.getElementById('fMemo').value.trim();
@@ -644,7 +689,7 @@ saveBtn.addEventListener('click', () => {
   if(!name){ alert('サービス名を入力してください'); return; }
   if(isNaN(amount) || amount < 0){ alert('金額を正しく入力してください'); return; }
 
-  const data = { name, amount, cycle: currentCycle, nextDate, memo };
+  const data = { name, category, amount, cycle: currentCycle, nextDate, memo };
 
   if(firebaseReady){
     if(editId){
