@@ -1,849 +1,891 @@
 <!DOCTYPE html>
 <html lang="ja">
-	<head>
-		<meta charset="UTF-8" />
-		<meta
-			name="viewport"
-			content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
-		/>
-		<meta name="apple-mobile-web-app-capable" content="yes" />
-		<meta
-			name="apple-mobile-web-app-status-bar-style"
-			content="black-translucent"
-		/>
-		<title>銘柄別評価損益（デモ版）</title>
-		<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-		<style>
-			:root{
-			  --bg:#0f1115;
-			  --card:#181b22;
-			  --card2:#1f2330;
-			  --border:#2a2f3a;
-			  --text:#e8eaf0;
-			  --sub:#8890a0;
-			  --accent:#4f8cff;
-			  --green:#3ecf8e;
-			  --red:#ff5c5c;
-			  --radius:14px;
-			}
-			*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
-			html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
-			  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;
-			  -webkit-font-smoothing:antialiased;}
-			body{padding:env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 16px) 0;}
-			header{padding:16px 16px 8px;position:sticky;top:0;background:var(--bg);z-index:5;
-			  border-bottom:1px solid var(--border);}
-			header .title-row{display:flex;align-items:center;justify-content:space-between;}
-			h1{font-size:18px;margin:0;font-weight:700;}
-			.ver{font-size:11px;color:var(--sub);}
-			.summary{display:flex;gap:10px;margin-top:10px;overflow-x:auto;padding-bottom:2px;}
-			.sum-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
-			  padding:10px 14px;min-width:110px;flex:1;}
-			.sum-card .label{font-size:11px;color:var(--sub);}
-			.sum-card .value{font-size:16px;font-weight:700;margin-top:2px;}
-			.sum-card .sum-sub{font-size:11px;margin-top:2px;}
-			main{padding:12px 16px 90px;}
-			.sync-status{font-size:11px;color:var(--sub);text-align:right;margin:4px 2px 8px;}
-			.sync-status.ok::before{content:"● ";color:var(--green);}
-			.sync-status.err::before{content:"● ";color:var(--red);}
-			.holding{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
-			  padding:10px 14px 6px;margin-bottom:8px;}
-			.h-top{display:flex;justify-content:space-between;align-items:flex-start;}
-			.h-name{font-weight:700;font-size:15px;color:var(--accent);text-decoration:none;cursor:pointer;}
-			.h-code{font-size:11px;color:var(--sub);margin-top:2px;}
-			.h-nisa{display:inline-block;font-size:10px;background:#2a4030;color:var(--green);
-			  border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle;}
-			.h-right{text-align:right;}
-			.h-price{font-size:13px;color:var(--sub);}
-			.h-price-dod{font-size:11px;margin-top:1px;}
-			.h-value{font-size:16px;font-weight:700;}
-			.h-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-top:8px;
-			  font-size:12px;color:var(--sub);border-top:1px dashed var(--border);padding-top:6px;}
-			.h-grid b{color:var(--text);font-weight:600;}
-			.h-profit{font-weight:700;}
-			.h-dividend-row{grid-column:1 / 3;}
-			.pos{color:var(--green);}
-			.neg{color:var(--red);}
-			.h-actions{display:flex;gap:14px;margin-top:6px;justify-content:flex-end;}
-			.h-actions button{background:none;border:none;color:var(--sub);
-			  padding:2px 0;font-size:11px;}
-			.h-actions button.del{color:var(--red);}
-			.empty{text-align:center;color:var(--sub);font-size:13px;padding:40px 20px;}
-			.fab{position:fixed;right:18px;bottom:calc(env(safe-area-inset-bottom) + 18px);
-			  width:56px;height:56px;border-radius:50%;background:var(--accent);color:#fff;
-			  font-size:28px;border:none;box-shadow:0 6px 16px rgba(79,140,255,.4);z-index:10;
-			  display:flex;align-items:center;justify-content:center;}
-			.refresh-btn{background:var(--card2);border:1px solid var(--border);color:var(--text);
-			  font-size:12px;padding:6px 10px;border-radius:8px;}
-			.header-right{display:flex;align-items:center;gap:8px;}
-			.high-badge{font-size:11px;font-weight:700;color:#1a1206;background:linear-gradient(135deg,#ffd76a,#ffb32e);
-			  padding:4px 9px;border-radius:20px;letter-spacing:.5px;}
-			/* Modal */
-			.overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:20;display:none;
-			  align-items:flex-end;justify-content:center;}
-			.overlay.show{display:flex;}
-			.sheet{background:var(--card);width:100%;max-width:520px;border-radius:18px 18px 0 0;
-			  padding:18px 18px calc(env(safe-area-inset-bottom) + 18px);max-height:88vh;overflow-y:auto;}
-			.sheet h2{margin:0 0 14px;font-size:16px;}
-			.field{margin-bottom:12px;}
-			.field label{display:block;font-size:12px;color:var(--sub);margin-bottom:5px;}
-			.field input, .field select{width:100%;background:var(--card2);border:1px solid var(--border);
-			  color:var(--text);padding:10px 12px;border-radius:10px;font-size:15px;}
-			.field .hint{font-size:11px;color:var(--sub);margin-top:4px;}
-			.btn-row{display:flex;gap:10px;margin-top:16px;}
-			.btn-row button{flex:1;padding:12px;border-radius:10px;border:none;font-size:14px;font-weight:600;}
-			.btn-cancel{background:var(--card2);color:var(--sub);}
-			.btn-save{background:var(--accent);color:#fff;}
-			.chart-wrap{background:var(--card2);border-radius:10px;padding:10px;margin-top:6px;}
-			.range-tabs{display:flex;gap:6px;margin-top:10px;}
-			.range-tabs button{flex:1;background:var(--card2);border:1px solid var(--border);
-			  color:var(--sub);padding:6px;border-radius:8px;font-size:12px;}
-			.range-tabs button.active{background:var(--accent);color:#fff;border-color:var(--accent);}
-			.close-x{position:absolute;right:16px;top:14px;font-size:20px;color:var(--sub);background:none;border:none;}
-			.sheet-head{position:relative;}
-			.chart-close-x{top:2px;}
-			.chart-range-tabs{margin-top:22px;}
-			.loading-line{font-size:11px;color:var(--sub);text-align:center;padding:6px;}
-		</style>
-	</head>
-	<body>
-		<header>
-			<div class="title-row">
-				<h1>銘柄別評価損益 <span class="ver">デモ版</span></h1>
-				<div class="header-right">
-					<span
-						class="high-badge"
-						id="highBadge"
-						style="display:none;"
-						>最高値</span
-					>
-					<button class="refresh-btn" id="refreshAllBtn">
-						株価更新
-					</button>
-				</div>
-			</div>
-			<div class="summary">
-				<div class="sum-card">
-					<div class="label">評価額合計</div>
-					<div class="value" id="sumValue">-</div>
-				</div>
-				<div class="sum-card">
-					<div class="label">取得額合計</div>
-					<div class="value" id="sumCost">-</div>
-				</div>
-				<div class="sum-card">
-					<div class="label">評価損益額／前日比</div>
-					<div class="value" id="sumProfit">-</div>
-					<div class="sum-sub" id="sumProfitDod"></div>
-				</div>
-				<div class="sum-card">
-					<div class="label">配当金合計(税引後)</div>
-					<div class="value" id="sumDividend">-</div>
-				</div>
-			</div>
-		</header>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>銘柄別評価損益（デモ版）</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0f1115;
+    --card:#181b22;
+    --card2:#1f2330;
+    --border:#2a2f3a;
+    --text:#e8eaf0;
+    --sub:#8890a0;
+    --accent:#4f8cff;
+    --green:#3ecf8e;
+    --red:#ff5c5c;
+    --radius:14px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;
+    -webkit-font-smoothing:antialiased;}
+  body{padding:env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 16px) 0;}
+  header{padding:16px 16px 8px;position:sticky;top:0;background:var(--bg);z-index:5;
+    border-bottom:1px solid var(--border);}
+  header .title-row{display:flex;align-items:center;justify-content:space-between;}
+  h1{font-size:18px;margin:0;font-weight:700;}
+  .ver{font-size:11px;color:var(--sub);}
+  .summary{display:flex;gap:10px;margin-top:10px;overflow-x:auto;padding-bottom:2px;}
+  .sum-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+    padding:10px 14px;min-width:110px;flex:1;}
+  .sum-card .label{font-size:11px;color:var(--sub);}
+  .sum-card .value{font-size:16px;font-weight:700;margin-top:2px;}
+  .sum-card .sum-sub{font-size:11px;margin-top:2px;}
+  main{padding:12px 16px 90px;}
+  .sync-status{font-size:11px;color:var(--sub);text-align:right;margin:4px 2px 8px;}
+  .sync-status.ok::before{content:"● ";color:var(--green);}
+  .sync-status.err::before{content:"● ";color:var(--red);}
+  .holding{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+    padding:10px 14px 6px;margin-bottom:8px;}
+  .h-top{display:flex;justify-content:space-between;align-items:flex-start;}
+  .h-name{font-weight:700;font-size:15px;color:var(--accent);text-decoration:none;cursor:pointer;}
+  .h-code{font-size:11px;color:var(--sub);margin-top:2px;}
+  .h-nisa{display:inline-block;font-size:10px;background:#2a4030;color:var(--green);
+    border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle;}
+  .h-right{text-align:right;}
+  .h-price{font-size:13px;color:var(--sub);}
+  .h-price-dod{font-size:11px;margin-top:1px;}
+  .h-value{font-size:16px;font-weight:700;}
+  .h-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-top:8px;
+    font-size:12px;color:var(--sub);border-top:1px dashed var(--border);padding-top:6px;}
+  .h-grid b{color:var(--text);font-weight:600;}
+  .h-profit{font-weight:700;}
+  .h-dividend-row{grid-column:1 / 3;}
+  .pos{color:var(--green);}
+  .neg{color:var(--red);}
+  .h-actions{display:flex;gap:14px;margin-top:6px;justify-content:flex-end;}
+  .h-actions button{background:none;border:none;color:var(--sub);
+    padding:2px 0;font-size:11px;}
+  .h-actions button.del{color:var(--red);}
+  .empty{text-align:center;color:var(--sub);font-size:13px;padding:40px 20px;}
+  .fab{position:fixed;right:18px;bottom:calc(env(safe-area-inset-bottom) + 18px);
+    width:56px;height:56px;border-radius:50%;background:var(--accent);color:#fff;
+    font-size:28px;border:none;box-shadow:0 6px 16px rgba(79,140,255,.4);z-index:10;
+    display:flex;align-items:center;justify-content:center;}
+  .refresh-btn{background:var(--card2);border:1px solid var(--border);color:var(--text);
+    font-size:12px;padding:6px 10px;border-radius:8px;}
+  .header-right{display:flex;align-items:center;gap:8px;}
+  .high-badge{font-size:11px;font-weight:700;color:#1a1206;background:linear-gradient(135deg,#ffd76a,#ffb32e);
+    padding:4px 9px;border-radius:20px;letter-spacing:.5px;}
+  /* Modal */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:20;display:none;
+    align-items:flex-end;justify-content:center;}
+  .overlay.show{display:flex;}
+  .sheet{background:var(--card);width:100%;max-width:520px;border-radius:18px 18px 0 0;
+    padding:18px 18px calc(env(safe-area-inset-bottom) + 18px);max-height:88vh;overflow-y:auto;}
+  .sheet h2{margin:0 0 14px;font-size:16px;}
+  .field{margin-bottom:12px;}
+  .field label{display:block;font-size:12px;color:var(--sub);margin-bottom:5px;}
+  .field input, .field select{width:100%;background:var(--card2);border:1px solid var(--border);
+    color:var(--text);padding:10px 12px;border-radius:10px;font-size:15px;}
+  .field .hint{font-size:11px;color:var(--sub);margin-top:4px;}
+  .btn-row{display:flex;gap:10px;margin-top:16px;}
+  .btn-row button{flex:1;padding:12px;border-radius:10px;border:none;font-size:14px;font-weight:600;}
+  .btn-cancel{background:var(--card2);color:var(--sub);}
+  .btn-save{background:var(--accent);color:#fff;}
+  .chart-wrap{background:var(--card2);border-radius:10px;padding:10px;margin-top:6px;}
+  .range-tabs{display:flex;gap:6px;margin-top:10px;}
+  .range-tabs button{flex:1;background:var(--card2);border:1px solid var(--border);
+    color:var(--sub);padding:6px;border-radius:8px;font-size:12px;}
+  .range-tabs button.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .close-x{position:absolute;right:16px;top:14px;font-size:20px;color:var(--sub);background:none;border:none;}
+  .sheet-head{position:relative;}
+  .chart-close-x{top:2px;}
+  .chart-range-tabs{margin-top:22px;}
+  .loading-line{font-size:11px;color:var(--sub);text-align:center;padding:6px;}
+  .backup-row{display:flex;gap:8px;justify-content:center;margin:8px 0 14px;}
+  .backup-btn{flex:1;max-width:220px;padding:8px 10px;font-size:12px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--sub);}
+  .backup-btn:active{background:#20242e;}
+</style>
+</head>
+<body>
 
-		<main>
-			<div class="sync-status" id="syncStatus">読み込み中...</div>
-			<div id="list"></div>
-			<div class="empty" id="emptyMsg" style="display:none;">
-				銘柄が登録されていません。右下の + から追加してください。
-			</div>
-		</main>
+<header>
+  <div class="title-row">
+    <h1>銘柄別評価損益 <span class="ver">デモ版</span></h1>
+    <div class="header-right">
+      <span class="high-badge" id="highBadge" style="display:none;">最高値</span>
+      <button class="refresh-btn" id="refreshAllBtn">株価更新</button>
+    </div>
+  </div>
+  <div class="summary">
+    <div class="sum-card"><div class="label">評価額合計</div><div class="value" id="sumValue">-</div></div>
+    <div class="sum-card"><div class="label">取得額合計</div><div class="value" id="sumCost">-</div></div>
+    <div class="sum-card"><div class="label">評価損益額／前日比</div><div class="value" id="sumProfit">-</div><div class="sum-sub" id="sumProfitDod"></div></div>
+    <div class="sum-card"><div class="label">配当金合計(税引後)</div><div class="value" id="sumDividend">-</div></div>
+  </div>
+</header>
 
-		<button class="fab" id="addBtn">＋</button>
+<main>
+  <div class="sync-status" id="syncStatus">読み込み中...</div>
+  <div class="backup-row">
+    <button class="backup-btn" id="backupBtn">データをバックアップ保存</button>
+    <button class="backup-btn" id="restoreBtn">バックアップから復元</button>
+    <input type="file" id="restoreFile" accept="application/json" style="display:none;">
+  </div>
+  <div id="list"></div>
+  <div class="empty" id="emptyMsg" style="display:none;">銘柄が登録されていません。右下の + から追加してください。</div>
+</main>
 
-		<!-- 登録/編集シート -->
-		<div class="overlay" id="editOverlay">
-			<div class="sheet">
-				<div class="sheet-head">
-					<h2 id="editTitle">銘柄を登録</h2>
-					<button class="close-x" id="editClose">✕</button>
-				</div>
-				<div class="field">
-					<label>銘柄コード（例: 7203）</label>
-					<input
-						type="text"
-						id="inCode"
-						inputmode="numeric"
-						placeholder="7203"
-					/>
-					<div class="hint">日本株の証券コードを入力してください</div>
-				</div>
-				<div class="field">
-					<label>銘柄名（任意）</label>
-					<input
-						type="text"
-						id="inName"
-						placeholder="例: トヨタ自動車"
-					/>
-					<div class="hint">空欄の場合は銘柄コードを表示します</div>
-				</div>
-				<div class="field">
-					<label>取得日</label>
-					<input type="date" id="inDate" />
-				</div>
-				<div class="field">
-					<label>取得株数</label>
-					<input
-						type="number"
-						id="inShares"
-						inputmode="numeric"
-						placeholder="100"
-					/>
-				</div>
-				<div class="field">
-					<label>取得単価（円）</label>
-					<input
-						type="number"
-						id="inPrice"
-						inputmode="decimal"
-						placeholder="2500"
-					/>
-				</div>
-				<div class="field">
-					<label>NISA区分</label>
-					<select id="inNisa">
-						<option value="yes">NISA口座</option>
-						<option value="no">NISAではない（課税口座）</option>
-					</select>
-				</div>
-				<div class="btn-row">
-					<button class="btn-cancel" id="editCancel">
-						キャンセル
-					</button>
-					<button class="btn-save" id="editSave">保存</button>
-				</div>
-			</div>
-		</div>
+<button class="fab" id="addBtn">＋</button>
 
-		<!-- グラフシート -->
-		<div class="overlay" id="chartOverlay">
-			<div class="sheet">
-				<div class="sheet-head chart-sheet-head">
-					<h2 id="chartTitle">株価推移</h2>
-					<button class="close-x chart-close-x" id="chartClose">
-						✕
-					</button>
-				</div>
-				<div class="range-tabs chart-range-tabs">
-					<button data-range="1m" class="active">1ヶ月</button>
-					<button data-range="3m">3ヶ月</button>
-					<button data-range="6m">6ヶ月</button>
-					<button data-range="1y">1年</button>
-					<button data-range="all">全期間</button>
-				</div>
-				<div class="chart-wrap">
-					<div class="loading-line" id="chartLoading">
-						読み込み中...
-					</div>
-					<canvas id="priceChart" height="220"></canvas>
-				</div>
-			</div>
-		</div>
+<!-- 登録/編集シート -->
+<div class="overlay" id="editOverlay">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2 id="editTitle">銘柄を登録</h2>
+      <button class="close-x" id="editClose">✕</button>
+    </div>
+    <div class="field">
+      <label>銘柄コード（例: 7203）</label>
+      <input type="text" id="inCode" inputmode="numeric" placeholder="7203">
+      <div class="hint">日本株の証券コードを入力してください</div>
+    </div>
+    <div class="field">
+      <label>銘柄名（任意）</label>
+      <input type="text" id="inName" placeholder="例: トヨタ自動車">
+      <div class="hint">空欄の場合は銘柄コードを表示します</div>
+    </div>
+    <div class="field">
+      <label>取得日</label>
+      <input type="date" id="inDate">
+    </div>
+    <div class="field">
+      <label>取得株数</label>
+      <input type="number" id="inShares" inputmode="numeric" placeholder="100">
+    </div>
+    <div class="field">
+      <label>取得単価（円）</label>
+      <input type="number" id="inPrice" inputmode="decimal" placeholder="2500">
+    </div>
+    <div class="field">
+      <label>NISA区分</label>
+      <select id="inNisa">
+        <option value="yes">NISA口座</option>
+        <option value="no">NISAではない（課税口座）</option>
+      </select>
+    </div>
+    <div class="btn-row">
+      <button class="btn-cancel" id="editCancel">キャンセル</button>
+      <button class="btn-save" id="editSave">保存</button>
+    </div>
+  </div>
+</div>
 
-		<script>
-			/* ===================== ローカル保存（この端末のみ） =====================
-			  デモ版のため、Firebase等の外部サービスは使わず、ブラウザのlocalStorageに
-			  データを保存する。他の端末とは同期されない（この端末・このブラウザのみ）。
-			  元のFirebase Realtime Database版と同じ呼び出し方
-			  （on/set/update/push/child/remove）で使えるよう、簡易的なローカル版の
-			  「ref」オブジェクトを用意し、以降のロジックは変更せずそのまま使う。
-			============================================================ */
-			class LocalRef {
-			  constructor(storageKey){
-			    this.storageKey = storageKey;
-			    this.listeners = [];
-			  }
-			  _load(){
-			    try{ return JSON.parse(localStorage.getItem(this.storageKey) || 'null'); }
-			    catch(e){ return null; }
-			  }
-			  _save(data){
-			    localStorage.setItem(this.storageKey, JSON.stringify(data));
-			    this._notify(data);
-			  }
-			  _notify(data){
-			    this.listeners.forEach(fn => fn({ val: () => data }));
-			  }
-			  on(event, cb){
-			    this.listeners.push(cb);
-			    cb({ val: () => this._load() });
-			  }
-			  set(value){
-			    this._save(value);
-			    return Promise.resolve();
-			  }
-			  update(patch){
-			    const data = this._load() || {};
-			    Object.keys(patch).forEach(k=>{
-			      if(patch[k] === null) delete data[k];
-			      else data[k] = patch[k];
-			    });
-			    this._save(data);
-			    return Promise.resolve();
-			  }
-			  push(value){
-			    const data = this._load() || {};
-			    const id = 'id_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,8);
-			    data[id] = value;
-			    this._save(data);
-			    return Promise.resolve({ key: id });
-			  }
-			  child(key){
-			    const parent = this;
-			    return {
-			      set(value){
-			        const data = parent._load() || {};
-			        data[key] = value;
-			        parent._save(data);
-			        return Promise.resolve();
-			      },
-			      update(patch){
-			        const data = parent._load() || {};
-			        data[key] = Object.assign({}, data[key] || {}, patch);
-			        parent._save(data);
-			        return Promise.resolve();
-			      },
-			      remove(){
-			        const data = parent._load() || {};
-			        delete data[key];
-			        parent._save(data);
-			        return Promise.resolve();
-			      }
-			    };
-			  }
-			}
-			const holdingsRef = new LocalRef('stockPortfolio_holdings');
-			const priceCacheRef = new LocalRef('stockPortfolio_priceCache');
-			const maxProfitRef = new LocalRef('stockPortfolio_maxTotalProfit');
+<!-- グラフシート -->
+<div class="overlay" id="chartOverlay">
+  <div class="sheet">
+    <div class="sheet-head chart-sheet-head">
+      <h2 id="chartTitle">株価推移</h2>
+      <button class="close-x chart-close-x" id="chartClose">✕</button>
+    </div>
+    <div class="range-tabs chart-range-tabs">
+      <button data-range="1m" class="active">1ヶ月</button>
+      <button data-range="3m">3ヶ月</button>
+      <button data-range="6m">6ヶ月</button>
+      <button data-range="1y">1年</button>
+      <button data-range="all">全期間</button>
+    </div>
+    <div class="chart-wrap">
+      <div class="loading-line" id="chartLoading">読み込み中...</div>
+      <canvas id="priceChart" height="220"></canvas>
+    </div>
+  </div>
+</div>
 
-			let holdings = {};      // id -> {code,name,date,shares,price,nisa}
-			let priceCache = {};    // code -> {price, updatedAt, error}
-			let maxTotalProfit = null; // これまでの評価損益の最高値（この端末のローカル保存）
-			let editingId = null;
-			let currentChartCode = null;
-			let currentChartRange = '1m';
-			let priceChart = null;
+<script>
+/* ===================== ローカル保存（この端末のみ） =====================
+  デモ版のため、Firebase等の外部サービスは使わず、ブラウザのlocalStorageに
+  データを保存する。他の端末とは同期されない（この端末・このブラウザのみ）。
+  元のFirebase Realtime Database版と同じ呼び出し方
+  （on/set/update/push/child/remove）で使えるよう、簡易的なローカル版の
+  「ref」オブジェクトを用意し、以降のロジックは変更せずそのまま使う。
+============================================================ */
+class LocalRef {
+  constructor(storageKey){
+    this.storageKey = storageKey;
+    this.listeners = [];
+  }
+  _load(){
+    try{ return JSON.parse(localStorage.getItem(this.storageKey) || 'null'); }
+    catch(e){ return null; }
+  }
+  _save(data){
+    localStorage.setItem(this.storageKey, JSON.stringify(data));
+    this._notify(data);
+  }
+  _notify(data){
+    this.listeners.forEach(fn => fn({ val: () => data }));
+  }
+  on(event, cb){
+    this.listeners.push(cb);
+    cb({ val: () => this._load() });
+  }
+  set(value){
+    this._save(value);
+    return Promise.resolve();
+  }
+  update(patch){
+    const data = this._load() || {};
+    Object.keys(patch).forEach(k=>{
+      if(patch[k] === null) delete data[k];
+      else data[k] = patch[k];
+    });
+    this._save(data);
+    return Promise.resolve();
+  }
+  push(value){
+    const data = this._load() || {};
+    const id = 'id_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,8);
+    data[id] = value;
+    this._save(data);
+    return Promise.resolve({ key: id });
+  }
+  child(key){
+    const parent = this;
+    return {
+      set(value){
+        const data = parent._load() || {};
+        data[key] = value;
+        parent._save(data);
+        return Promise.resolve();
+      },
+      update(patch){
+        const data = parent._load() || {};
+        data[key] = Object.assign({}, data[key] || {}, patch);
+        parent._save(data);
+        return Promise.resolve();
+      },
+      remove(){
+        const data = parent._load() || {};
+        delete data[key];
+        parent._save(data);
+        return Promise.resolve();
+      }
+    };
+  }
+}
+const holdingsRef = new LocalRef('stockPortfolio_holdings');
+const priceCacheRef = new LocalRef('stockPortfolio_priceCache');
+const maxProfitRef = new LocalRef('stockPortfolio_maxTotalProfit');
 
-			const yen = n => (n===null||n===undefined||isNaN(n)) ? '-' : '¥' + Math.round(n).toLocaleString('ja-JP');
-			const setStatus = (ok, msg) => {
-			  const el = document.getElementById('syncStatus');
-			  el.className = 'sync-status ' + (ok ? 'ok' : 'err');
-			  el.textContent = msg;
-			};
+/* ---------- バックアップ保存／復元 ----------
+  この版はブラウザのlocalStorageにのみデータを保存しているため、
+  ブラウザの履歴・データ消去、別ファイル名での再ダウンロード、
+  file://で開いた場合のブラウザ側の保存領域の扱いなどにより
+  データが失われることがある。保険として手動でJSONファイルに
+  書き出し・読み込みできるようにしておく。
+------------------------------------------------------------ */
+document.getElementById('backupBtn').onclick = () => {
+  const backup = {
+    type: 'stock-portfolio-tracker-backup',
+    savedAt: new Date().toISOString(),
+    holdings: holdingsRef._load() || {},
+    priceCache: priceCacheRef._load() || {},
+    maxTotalProfit: maxProfitRef._load() || null
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const ts = new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = `stock-portfolio-backup-${ts}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+};
 
-			/* ---------- ローカル保存の読み込み・監視 ---------- */
-			holdingsRef.on('value', snap => {
-			  holdings = snap.val() || {};
-			  render();
-			  setStatus(true, 'この端末に保存済み（デモ版・端末間同期なし）');
-			}, err => {
-			  setStatus(false, '読み込みエラー: ' + err.message);
-			});
+document.getElementById('restoreBtn').onclick = () => {
+  document.getElementById('restoreFile').click();
+};
+document.getElementById('restoreFile').onchange = (ev) => {
+  const file = ev.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const data = JSON.parse(reader.result);
+      if(!data || typeof data !== 'object' || !data.holdings){
+        alert('バックアップファイルの形式が正しくありません。');
+        return;
+      }
+      if(!confirm('現在のデータをこのバックアップファイルの内容で置き換えます。よろしいですか？')) return;
+      holdingsRef.set(data.holdings || {});
+      priceCacheRef.set(data.priceCache || {});
+      maxProfitRef.set(data.maxTotalProfit || null);
+      alert('復元しました。');
+    }catch(e){
+      alert('読み込みに失敗しました: ' + e.message);
+    }
+  };
+  reader.readAsText(file);
+  ev.target.value = '';
+};
 
-			priceCacheRef.on('value', snap => {
-			  priceCache = snap.val() || {};
-			  render();
-			});
+let holdings = {};      // id -> {code,name,date,shares,price,nisa}
+let priceCache = {};    // code -> {price, updatedAt, error}
+let maxTotalProfit = null; // これまでの評価損益の最高値（この端末のローカル保存）
+let editingId = null;
+let currentChartCode = null;
+let currentChartRange = '1m';
+let priceChart = null;
 
-			maxProfitRef.on('value', snap => {
-			  const v = snap.val();
-			  maxTotalProfit = (v && typeof v.value === 'number') ? v.value : null;
-			  render();
-			});
+const yen = n => (n===null||n===undefined||isNaN(n)) ? '-' : '¥' + Math.round(n).toLocaleString('ja-JP');
+const setStatus = (ok, msg) => {
+  const el = document.getElementById('syncStatus');
+  el.className = 'sync-status ' + (ok ? 'ok' : 'err');
+  el.textContent = msg;
+};
 
-			/* ---------- Yahoo!ファイナンスから株価取得 ----------
-			  https://query1.finance.yahoo.com/v8/finance/chart/CODE.T?range=2y&interval=1d
-			  を1回呼ぶだけで、現在値(meta.regularMarketPrice)・日足終値・簡易銘柄名(英語表記)を取得できる。
-			  （stooqは自動アクセスへのボット対策JS認証が入り取得不能になったため使用しない）
-			  銘柄名は手入力があればそれを優先し、なければYahoo側の名称、それも無ければコードを表示。
-			------------------------------------------- */
-			// GitHub Pages (静的サイト) から直接 stooq.com へ fetch すると
-			// ブラウザのCORS制限でブロックされるため、CORSプロキシを経由する。
-			// 1つのプロキシが不安定なこともあるため、複数を順に試す。
-			const GAS_PROXY_URL = 'https://script.google.com/macros/s/AKfycbxZX6moLnPZ2KKvfnnQT125tmk7Djr5HQQGC_lNvb2jykMMhL0SiVnDMFCCFDpPiZen6Q/exec';
+/* ---------- ローカル保存の読み込み・監視 ---------- */
+holdingsRef.on('value', snap => {
+  holdings = snap.val() || {};
+  render();
+  setStatus(true, 'この端末に保存済み（デモ版・端末間同期なし）');
+}, err => {
+  setStatus(false, '読み込みエラー: ' + err.message);
+});
 
-			const CORS_PROXIES = [
-			  url => `${GAS_PROXY_URL}?url=${encodeURIComponent(url)}`,
-			  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-			  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-			  url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
-			  url => `https://thingproxy.freeboard.io/fetch/${url}`
-			];
+priceCacheRef.on('value', snap => {
+  priceCache = snap.val() || {};
+  render();
+});
 
-			async function fetchViaProxies(targetUrl){
-			  let lastErr = null;
-			  for(const buildUrl of CORS_PROXIES){
-			    const proxyUrl = buildUrl(targetUrl);
-			    try{
-			      const res = await fetch(proxyUrl, { cache: 'no-store' });
-			      if(!res.ok) throw new Error('HTTP ' + res.status);
-			      const text = await res.text();
-			      if(!text || text.trim().length === 0) throw new Error('空のレスポンス');
-			      return text;
-			    }catch(e){
-			      lastErr = e;
-			      console.warn('proxy failed:', proxyUrl, e.name + ': ' + e.message);
-			    }
-			  }
-			  throw new Error((lastErr ? lastErr.name + ': ' + lastErr.message : '不明なエラー'));
-			}
+maxProfitRef.on('value', snap => {
+  const v = snap.val();
+  maxTotalProfit = (v && typeof v.value === 'number') ? v.value : null;
+  render();
+});
 
-			async function fetchYahoo(code){
-			  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${code}.T?range=2y&interval=1d&events=div`;
-			  const text = await fetchViaProxies(url);
-			  const trimmed = text.trim();
-			  let json;
-			  try{
-			    json = JSON.parse(trimmed);
-			  }catch(e){
-			    const titleMatch = trimmed.match(/<title[^>]*>([^<]*)<\/title>/i);
-			    const snippet = titleMatch ? ('ページタイトル: ' + titleMatch[1].trim()) : trimmed.slice(0, 80).replace(/\s+/g, ' ');
-			    throw new Error('データ形式エラー（応答: ' + snippet + '）');
-			  }
-			  const result = json && json.chart && json.chart.result && json.chart.result[0];
-			  if(!result){
-			    const errMsg = json && json.chart && json.chart.error && json.chart.error.description;
-			    throw new Error('銘柄コードが見つかりません' + (errMsg ? '（' + errMsg + '）' : ''));
-			  }
-			  const meta = result.meta || {};
-			  const timestamps = result.timestamp || [];
-			  const closeArr = (result.indicators && result.indicators.quote && result.indicators.quote[0] && result.indicators.quote[0].close) || [];
-			  const history = [];
-			  for(let i=0;i<timestamps.length;i++){
-			    const c = closeArr[i];
-			    if(c === null || c === undefined || isNaN(c)) continue;
-			    const d = new Date(timestamps[i] * 1000);
-			    history.push({ date: d.toISOString().slice(0,10), close: c });
-			  }
-			  if(history.length === 0) throw new Error('履歴データが空です（コード:' + code + '）');
-			  const price = (meta.regularMarketPrice !== undefined && meta.regularMarketPrice !== null)
-			    ? meta.regularMarketPrice
-			    : history[history.length - 1].close;
-			  // 前営業日の終値: chartPreviousCloseは「取得期間の開始日より前」の値で不正確なため使わない。
-			  // regularMarketPreviousClose（あれば）を優先し、無ければ日足履歴の最後から2番目を使う。
-			  // 履歴の最後の行が本日の速報値と同じ日付の場合はその1つ前を、
-			  // 履歴の最後の行がまだ前営業日の確定値の場合はその行自体を「前日終値」として扱う。
-			  let previousClose = null;
-			  const todayStr = new Date().toISOString().slice(0,10);
-			  const lastRow = history[history.length - 1];
-			  const secondLastRow = history.length >= 2 ? history[history.length - 2] : null;
-			  if(meta.regularMarketPreviousClose !== undefined && meta.regularMarketPreviousClose !== null){
-			    previousClose = meta.regularMarketPreviousClose;
-			  } else if(lastRow && lastRow.date === todayStr && secondLastRow){
-			    previousClose = secondLastRow.close;
-			  } else if(lastRow){
-			    previousClose = lastRow.close;
-			  } else if(secondLastRow){
-			    previousClose = secondLastRow.close;
-			  }
-			  const name = meta.longName || meta.shortName || null;
+/* ---------- Yahoo!ファイナンスから株価取得 ----------
+  https://query1.finance.yahoo.com/v8/finance/chart/CODE.T?range=2y&interval=1d
+  を1回呼ぶだけで、現在値(meta.regularMarketPrice)・日足終値・簡易銘柄名(英語表記)を取得できる。
+  （stooqは自動アクセスへのボット対策JS認証が入り取得不能になったため使用しない）
+  銘柄名は手入力があればそれを優先し、なければYahoo側の名称、それも無ければコードを表示。
+------------------------------------------- */
+// GitHub Pages (静的サイト) から直接 stooq.com へ fetch すると
+// ブラウザのCORS制限でブロックされるため、CORSプロキシを経由する。
+// 1つのプロキシが不安定なこともあるため、複数を順に試す。
+const GAS_PROXY_URL = 'https://script.google.com/macros/s/AKfycbxZX6moLnPZ2KKvfnnQT125tmk7Djr5HQQGC_lNvb2jykMMhL0SiVnDMFCCFDpPiZen6Q/exec';
 
-			  // 配当金(1株あたり・年間): 直近365日以内に実際に支払われた配当の合計（税引き前）
-			  let dividendPerShare = null;
-			  const divEvents = result.events && result.events.dividends;
-			  if(divEvents && typeof divEvents === 'object'){
-			    const nowSec = Date.now() / 1000;
-			    const oneYearSec = 365 * 24 * 60 * 60;
-			    let sum = 0;
-			    let found = false;
-			    Object.values(divEvents).forEach(ev => {
-			      if(ev && typeof ev.amount === 'number' && typeof ev.date === 'number'){
-			        if(nowSec - ev.date <= oneYearSec){
-			          sum += ev.amount;
-			          found = true;
-			        }
-			      }
-			    });
-			    if(found) dividendPerShare = sum;
-			  }
+const CORS_PROXIES = [
+  url => `${GAS_PROXY_URL}?url=${encodeURIComponent(url)}`,
+  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+  url => `https://thingproxy.freeboard.io/fetch/${url}`
+];
 
-			  return { name, price, previousClose, dividendPerShare, history };
-			}
+async function fetchViaProxies(targetUrl){
+  let lastErr = null;
+  for(const buildUrl of CORS_PROXIES){
+    const proxyUrl = buildUrl(targetUrl);
+    try{
+      const res = await fetch(proxyUrl, { cache: 'no-store' });
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      const text = await res.text();
+      if(!text || text.trim().length === 0) throw new Error('空のレスポンス');
+      return text;
+    }catch(e){
+      lastErr = e;
+      console.warn('proxy failed:', proxyUrl, e.name + ': ' + e.message);
+    }
+  }
+  throw new Error((lastErr ? lastErr.name + ': ' + lastErr.message : '不明なエラー'));
+}
 
-			async function fetchHistory(code){
-			  const y = await fetchYahoo(code);
-			  return y.history;
-			}
+async function fetchYahoo(code){
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${code}.T?range=2y&interval=1d&events=div`;
+  const text = await fetchViaProxies(url);
+  const trimmed = text.trim();
+  let json;
+  try{
+    json = JSON.parse(trimmed);
+  }catch(e){
+    const titleMatch = trimmed.match(/<title[^>]*>([^<]*)<\/title>/i);
+    const snippet = titleMatch ? ('ページタイトル: ' + titleMatch[1].trim()) : trimmed.slice(0, 80).replace(/\s+/g, ' ');
+    throw new Error('データ形式エラー（応答: ' + snippet + '）');
+  }
+  const result = json && json.chart && json.chart.result && json.chart.result[0];
+  if(!result){
+    const errMsg = json && json.chart && json.chart.error && json.chart.error.description;
+    throw new Error('銘柄コードが見つかりません' + (errMsg ? '（' + errMsg + '）' : ''));
+  }
+  const meta = result.meta || {};
+  const timestamps = result.timestamp || [];
+  const closeArr = (result.indicators && result.indicators.quote && result.indicators.quote[0] && result.indicators.quote[0].close) || [];
+  const history = [];
+  for(let i=0;i<timestamps.length;i++){
+    const c = closeArr[i];
+    if(c === null || c === undefined || isNaN(c)) continue;
+    const d = new Date(timestamps[i] * 1000);
+    history.push({ date: d.toISOString().slice(0,10), close: c });
+  }
+  if(history.length === 0) throw new Error('履歴データが空です（コード:' + code + '）');
+  const price = (meta.regularMarketPrice !== undefined && meta.regularMarketPrice !== null)
+    ? meta.regularMarketPrice
+    : history[history.length - 1].close;
+  // 前営業日の終値: chartPreviousCloseは「取得期間の開始日より前」の値で不正確なため使わない。
+  // regularMarketPreviousClose（あれば）を優先し、無ければ日足履歴の最後から2番目を使う。
+  // 履歴の最後の行が本日の速報値と同じ日付の場合はその1つ前を、
+  // 履歴の最後の行がまだ前営業日の確定値の場合はその行自体を「前日終値」として扱う。
+  let previousClose = null;
+  const todayStr = new Date().toISOString().slice(0,10);
+  const lastRow = history[history.length - 1];
+  const secondLastRow = history.length >= 2 ? history[history.length - 2] : null;
+  if(meta.regularMarketPreviousClose !== undefined && meta.regularMarketPreviousClose !== null){
+    previousClose = meta.regularMarketPreviousClose;
+  } else if(lastRow && lastRow.date === todayStr && secondLastRow){
+    previousClose = secondLastRow.close;
+  } else if(lastRow){
+    previousClose = lastRow.close;
+  } else if(secondLastRow){
+    previousClose = secondLastRow.close;
+  }
+  const name = meta.longName || meta.shortName || null;
 
-			async function fetchQuote(code){
-			  const y = await fetchYahoo(code);
-			  return { price: y.price, name: y.name, previousClose: y.previousClose, dividendPerShare: y.dividendPerShare };
-			}
+  // 配当金(1株あたり・年間): 直近365日以内に実際に支払われた配当の合計（税引き前）
+  let dividendPerShare = null;
+  const divEvents = result.events && result.events.dividends;
+  if(divEvents && typeof divEvents === 'object'){
+    const nowSec = Date.now() / 1000;
+    const oneYearSec = 365 * 24 * 60 * 60;
+    let sum = 0;
+    let found = false;
+    Object.values(divEvents).forEach(ev => {
+      if(ev && typeof ev.amount === 'number' && typeof ev.date === 'number'){
+        if(nowSec - ev.date <= oneYearSec){
+          sum += ev.amount;
+          found = true;
+        }
+      }
+    });
+    if(found) dividendPerShare = sum;
+  }
 
-			const DIVIDEND_TAX_RATE = 0.20315; // 課税口座の配当課税(20.315%)。NISA口座は非課税として扱う。
+  return { name, price, previousClose, dividendPerShare, history };
+}
 
-			const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+async function fetchHistory(code){
+  const y = await fetchYahoo(code);
+  return y.history;
+}
 
-			// レート制限(Too Many Requests等)のときは少し待って1回だけ再試行する
-			async function withRetryOnRateLimit(fn, label){
-			  try{
-			    return await fn();
-			  }catch(e){
-			    if(/too many requests/i.test(e.message) || /429/.test(e.message)){
-			      console.warn(label + ': レート制限を検知、1.5秒待って再試行します');
-			      await sleep(1500);
-			      return await fn();
-			    }
-			    throw e;
-			  }
-			}
+// 銘柄名の日本語表記をYahoo!ファイナンス(日本版)のページタイトルから取得する。
+// 例: "トヨタ自動車(株)【7203】：株価・株式情報（夜間PTS含む） - Yahoo!ファイナンス"
+//     → "トヨタ自動車(株)"
+async function fetchJapaneseName(code){
+  try{
+    const url = `https://finance.yahoo.co.jp/quote/${code}.T`;
+    const html = await fetchViaProxies(url);
+    const m = html.match(/<title>([^<]*)<\/title>/i);
+    if(!m) return null;
+    let title = m[1].replace(/\s*-\s*Yahoo!ファイナンス\s*$/,'');
+    const idx = title.indexOf('【');
+    if(idx > -1) title = title.slice(0, idx);
+    title = title.trim();
+    return title || null;
+  }catch(e){
+    return null;
+  }
+}
 
-			async function refreshAllPrices(){
-			  const codes = [...new Set(Object.values(holdings).map(h => h.code))];
-			  if(codes.length === 0){ setStatus(true, 'この端末に保存済み（デモ版・端末間同期なし）'); return; }
-			  setStatus(true, '株価を更新中...');
-			  const errors = [];
-			  for(let i=0; i<codes.length; i++){
-			    const code = codes[i];
-			    try{
-			      const q = await withRetryOnRateLimit(() => fetchQuote(code), code + '(株価)');
-			      await priceCacheRef.child(code).update({
-			        price: q.price, autoName: q.name, previousClose: q.previousClose,
-			        dividendRate: q.dividendPerShare,
-			        updatedAt: Date.now(), error: null
-			      });
-			    }catch(e){
-			      console.error('quote fetch failed', code, e);
-			      errors.push(code + ': ' + e.message);
-			      await priceCacheRef.child(code).update({ error: e.message, updatedAt: Date.now() });
-			    }
-			    if(i < codes.length - 1) await sleep(400); // 次の銘柄へ移る前に間隔を空ける（レート制限対策）
-			  }
-			  if(errors.length){
-			    setStatus(false, '一部の株価取得に失敗: ' + errors.join(' / '));
-			  } else {
-			    setStatus(true, 'この端末に保存済み（デモ版・端末間同期なし）');
-			  }
-			}
+async function fetchQuote(code){
+  const y = await fetchYahoo(code);
+  let name = y.name;
+  try{
+    const jaName = await fetchJapaneseName(code);
+    if(jaName) name = jaName;
+  }catch(e){
+    // 日本語名の取得に失敗した場合はYahoo Finance(米国版)の名称にフォールバック
+  }
+  return { price: y.price, name, previousClose: y.previousClose, dividendPerShare: y.dividendPerShare };
+}
 
-			/* ---------- 集計・描画 ---------- */
-			function render(){
-			  const list = document.getElementById('list');
-			  const ids = Object.keys(holdings);
-			  document.getElementById('emptyMsg').style.display = ids.length ? 'none' : 'block';
+const DIVIDEND_TAX_RATE = 0.20315; // 課税口座の配当課税(20.315%)。NISA口座は非課税として扱う。
 
-			  // 銘柄コードごとに集約（同一銘柄の複数取得もまとめて表示）
-			  const byCode = {};
-			  ids.forEach(id => {
-			    const h = holdings[id];
-			    if(!byCode[h.code]) byCode[h.code] = [];
-			    byCode[h.code].push({ id, ...h });
-			  });
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-			  let totalValue = 0, totalCost = 0;
-			  let totalValueYesterday = 0;
-			  let canComputeTotalDod = true;
-			  let totalDividendAfterTax = 0;
-			  let hasAnyDividendData = false;
-			  list.innerHTML = '';
+// レート制限(Too Many Requests等)のときは少し待って1回だけ再試行する
+async function withRetryOnRateLimit(fn, label){
+  try{
+    return await fn();
+  }catch(e){
+    if(/too many requests/i.test(e.message) || /429/.test(e.message)){
+      console.warn(label + ': レート制限を検知、1.5秒待って再試行します');
+      await sleep(1500);
+      return await fn();
+    }
+    throw e;
+  }
+}
 
-			  // 先に各銘柄の集計値を計算
-			  const summaries = Object.keys(byCode).map(code => {
-			    const lots = byCode[code];
-			    const cache = priceCache[code] || {};
-			    const curPrice = cache.price;
-			    const lotWithName = lots.find(l => l.name && l.name.trim() !== '');
-			    const name = lotWithName ? lotWithName.name : (cache.autoName || code);
-			    const fetchFailed = !!cache.error && (curPrice === null || curPrice === undefined);
-			    const shares = lots.reduce((s,l)=>s+Number(l.shares),0);
-			    const cost = lots.reduce((s,l)=>s+Number(l.shares)*Number(l.price),0);
-			    const value = curPrice!==null && curPrice!==undefined ? curPrice*shares : null;
-			    const profit = value!==null ? value - cost : null;
-			    if(value!==null) totalValue += value;
-			    totalCost += cost;
+async function refreshAllPrices(){
+  const codes = [...new Set(Object.values(holdings).map(h => h.code))];
+  if(codes.length === 0){ setStatus(true, 'この端末に保存済み（デモ版・端末間同期なし）'); return; }
+  setStatus(true, '株価を更新中...');
+  const errors = [];
+  for(let i=0; i<codes.length; i++){
+    const code = codes[i];
+    try{
+      const q = await withRetryOnRateLimit(() => fetchQuote(code), code + '(株価)');
+      await priceCacheRef.child(code).update({
+        price: q.price, autoName: q.name, previousClose: q.previousClose,
+        dividendRate: q.dividendPerShare,
+        updatedAt: Date.now(), error: null
+      });
+    }catch(e){
+      console.error('quote fetch failed', code, e);
+      errors.push(code + ': ' + e.message);
+      await priceCacheRef.child(code).update({ error: e.message, updatedAt: Date.now() });
+    }
+    if(i < codes.length - 1) await sleep(400); // 次の銘柄へ移る前に間隔を空ける（レート制限対策）
+  }
+  if(errors.length){
+    setStatus(false, '一部の株価取得に失敗: ' + errors.join(' / '));
+  } else {
+    setStatus(true, 'この端末に保存済み（デモ版・端末間同期なし）');
+  }
+}
 
-			    // 配当金（税引き後）: NISA口座のロットは非課税、課税口座のロットは20.315%課税
-			    const dividendRate = cache.dividendRate;
-			    let dividendAfterTax = null;
-			    if(dividendRate !== null && dividendRate !== undefined){
-			      dividendAfterTax = lots.reduce((sum, l) => {
-			        const gross = dividendRate * Number(l.shares);
-			        const net = (l.nisa === 'yes') ? gross : gross * (1 - DIVIDEND_TAX_RATE);
-			        return sum + net;
-			      }, 0);
-			      totalDividendAfterTax += dividendAfterTax;
-			      hasAnyDividendData = true;
-			    }
+/* ---------- 集計・描画 ---------- */
+function render(){
+  const list = document.getElementById('list');
+  const ids = Object.keys(holdings);
+  document.getElementById('emptyMsg').style.display = ids.length ? 'none' : 'block';
 
-			    const prevClose = cache.previousClose;
+  // 銘柄コードごとに集約（同一銘柄の複数取得もまとめて表示）
+  const byCode = {};
+  ids.forEach(id => {
+    const h = holdings[id];
+    if(!byCode[h.code]) byCode[h.code] = [];
+    byCode[h.code].push({ id, ...h });
+  });
 
-			    // 合計の評価損益・前日比の計算用（すべての保有銘柄で前日終値が揃っている場合のみ算出）
-			    if(value!==null){
-			      if(prevClose!==null && prevClose!==undefined){
-			        totalValueYesterday += prevClose * shares;
-			      } else {
-			        canComputeTotalDod = false;
-			      }
-			    }
+  let totalValue = 0, totalCost = 0;
+  let totalValueYesterday = 0;
+  let canComputeTotalDod = true;
+  let totalDividendAfterTax = 0;
+  let hasAnyDividendData = false;
+  list.innerHTML = '';
 
-			    // 一株当たり単価の前日比（金額・率）
-			    let priceDodAmount = null, priceDodRate = null;
-			    if(curPrice!==null && curPrice!==undefined && prevClose!==null && prevClose!==undefined){
-			      priceDodAmount = curPrice - prevClose;
-			      priceDodRate = prevClose !== 0 ? (priceDodAmount / prevClose) * 100 : null;
-			    }
-			    return { code, lots, name, curPrice, fetchFailed, shares, cost, value, profit, priceDodAmount, priceDodRate, dividendAfterTax };
-			  });
+  // 先に各銘柄の集計値を計算
+  const summaries = Object.keys(byCode).map(code => {
+    const lots = byCode[code];
+    const cache = priceCache[code] || {};
+    const curPrice = cache.price;
+    const lotWithName = lots.find(l => l.name && l.name.trim() !== '');
+    const name = lotWithName ? lotWithName.name : (cache.autoName || code);
+    const fetchFailed = !!cache.error && (curPrice === null || curPrice === undefined);
+    const shares = lots.reduce((s,l)=>s+Number(l.shares),0);
+    const cost = lots.reduce((s,l)=>s+Number(l.shares)*Number(l.price),0);
+    const value = curPrice!==null && curPrice!==undefined ? curPrice*shares : null;
+    const profit = value!==null ? value - cost : null;
+    if(value!==null) totalValue += value;
+    totalCost += cost;
 
-			  // 株数の多い順、同数なら評価額の多い順
-			  summaries.sort((a,b) => {
-			    if(b.shares !== a.shares) return b.shares - a.shares;
-			    return (b.value||0) - (a.value||0);
-			  });
+    // 配当金（税引き後）: NISA口座のロットは非課税、課税口座のロットは20.315%課税
+    const dividendRate = cache.dividendRate;
+    let dividendAfterTax = null;
+    if(dividendRate !== null && dividendRate !== undefined){
+      dividendAfterTax = lots.reduce((sum, l) => {
+        const gross = dividendRate * Number(l.shares);
+        const net = (l.nisa === 'yes') ? gross : gross * (1 - DIVIDEND_TAX_RATE);
+        return sum + net;
+      }, 0);
+      totalDividendAfterTax += dividendAfterTax;
+      hasAnyDividendData = true;
+    }
 
-			  summaries.forEach(({ code, lots, name, curPrice, fetchFailed, shares, value, profit, priceDodAmount, priceDodRate, dividendAfterTax }) => {
-			    const div = document.createElement('div');
-			    div.className = 'holding';
-			    const nisaAny = lots.some(l=>l.nisa==='yes');
-			    const priceLabel = curPrice!==null && curPrice!==undefined
-			      ? yen(curPrice)+' /株'
-			      : (fetchFailed ? '取得失敗' : '取得中');
-			    const priceDodClass = priceDodAmount>0 ? 'pos' : priceDodAmount<0 ? 'neg' : '';
-			    const priceDodText = priceDodAmount===null ? '' :
-			      '<div class="h-price-dod ' + priceDodClass + '">前日比 ' + yen(priceDodAmount) + '（' + (priceDodRate===null ? '-' : priceDodRate.toFixed(2) + '%') + '）</div>';
-			    const dividendText = dividendAfterTax===null ? '-' : yen(dividendAfterTax);
-			    div.innerHTML = `
-			      <div class="h-top">
-			        <div>
-			          <a class="h-name" data-code="${code}">${name}${nisaAny?'<span class="h-nisa">NISA</span>':''}</a>
-			          <div class="h-code">${code}</div>
-			        </div>
-			        <div class="h-right">
-			          <div class="h-price" style="${fetchFailed?'color:var(--red);':''}">${priceLabel}</div>
-			          ${priceDodText}
-			          <div class="h-value">${yen(value)}</div>
-			        </div>
-			      </div>
-			      <div class="h-grid">
-			        <div>株数 <b>${shares.toLocaleString('ja-JP')}</b></div>
-			        <div>利益額 <b class="h-profit ${profit>0?'pos':profit<0?'neg':''}">${profit===null?'-':yen(profit)}</b></div>
-			        <div class="h-dividend-row">配当金(税引後) <b>${dividendText}</b></div>
-			      </div>
-			      <div class="h-actions">
-			        <button class="editL" data-code="${code}">明細を編集</button>
-			        <button class="del" data-code="${code}">削除</button>
-			      </div>
-			    `;
-			    list.appendChild(div);
-			  });
+    const prevClose = cache.previousClose;
 
-			  document.getElementById('sumValue').textContent = yen(totalValue);
-			  document.getElementById('sumCost').textContent = yen(totalCost);
-			  const sp = document.getElementById('sumProfit');
-			  const totalProfit = totalValue - totalCost;
-			  sp.textContent = yen(totalProfit);
-			  sp.className = 'value ' + (totalProfit>0?'pos':totalProfit<0?'neg':'');
+    // 合計の評価損益・前日比の計算用（すべての保有銘柄で前日終値が揃っている場合のみ算出）
+    if(value!==null){
+      if(prevClose!==null && prevClose!==undefined){
+        totalValueYesterday += prevClose * shares;
+      } else {
+        canComputeTotalDod = false;
+      }
+    }
 
-			  const sumProfitDodEl = document.getElementById('sumProfitDod');
-			  if(canComputeTotalDod && ids.length > 0){
-			    const totalDiffAmount = totalValue - totalValueYesterday;
-			    const totalProfitYesterday = totalValueYesterday - totalCost;
-			    const totalDiffRate = totalProfitYesterday !== 0 ? (totalDiffAmount / Math.abs(totalProfitYesterday)) * 100 : null;
-			    const dodClass = totalDiffAmount>0 ? 'pos' : totalDiffAmount<0 ? 'neg' : '';
-			    sumProfitDodEl.className = 'sum-sub ' + dodClass;
-			    sumProfitDodEl.textContent = '前日比 ' + yen(totalDiffAmount) + '（' + (totalDiffRate===null ? '-' : totalDiffRate.toFixed(2) + '%') + '）';
-			  } else {
-			    sumProfitDodEl.textContent = '';
-			  }
+    // 一株当たり単価の前日比（金額・率）
+    let priceDodAmount = null, priceDodRate = null;
+    if(curPrice!==null && curPrice!==undefined && prevClose!==null && prevClose!==undefined){
+      priceDodAmount = curPrice - prevClose;
+      priceDodRate = prevClose !== 0 ? (priceDodAmount / prevClose) * 100 : null;
+    }
+    return { code, lots, name, curPrice, fetchFailed, shares, cost, value, profit, priceDodAmount, priceDodRate, dividendAfterTax };
+  });
 
-			  document.getElementById('sumDividend').textContent = hasAnyDividendData ? yen(totalDividendAfterTax) : '-';
+  // 株数の多い順、同数なら評価額の多い順
+  summaries.sort((a,b) => {
+    if(b.shares !== a.shares) return b.shares - a.shares;
+    return (b.value||0) - (a.value||0);
+  });
 
-			  // 評価損益の最高値を記録・判定（銘柄が1件以上あるときのみ）
-			  const highBadge = document.getElementById('highBadge');
-			  if(ids.length > 0){
-			    if(maxTotalProfit === null || totalProfit > maxTotalProfit){
-			      maxProfitRef.set({ value: totalProfit, updatedAt: Date.now() });
-			      highBadge.style.display = 'inline-block';
-			    } else if(totalProfit === maxTotalProfit){
-			      highBadge.style.display = 'inline-block';
-			    } else {
-			      highBadge.style.display = 'none';
-			    }
-			  } else {
-			    highBadge.style.display = 'none';
-			  }
+  summaries.forEach((summary) => {
+    try{
+      const { code, lots, name, curPrice, fetchFailed, shares, value, profit, priceDodAmount, priceDodRate, dividendAfterTax } = summary;
+      const div = document.createElement('div');
+      div.className = 'holding';
+      const nisaAny = lots.some(l=>l.nisa==='yes');
+      const priceLabel = curPrice!==null && curPrice!==undefined
+        ? yen(curPrice)+' /株'
+        : (fetchFailed ? '取得失敗' : '取得中');
+      const priceDodClass = priceDodAmount>0 ? 'pos' : priceDodAmount<0 ? 'neg' : '';
+      const priceDodText = priceDodAmount===null ? '' :
+        '<div class="h-price-dod ' + priceDodClass + '">前日比 ' + yen(priceDodAmount) + '（' + (priceDodRate===null ? '-' : priceDodRate.toFixed(2) + '%') + '）</div>';
+      const dividendText = dividendAfterTax===null ? '-' : yen(dividendAfterTax);
+      div.innerHTML = `
+        <div class="h-top">
+          <div>
+            <a class="h-name" data-code="${code}">${name}${nisaAny?'<span class="h-nisa">NISA</span>':''}</a>
+            <div class="h-code">${code}</div>
+          </div>
+          <div class="h-right">
+            <div class="h-price" style="${fetchFailed?'color:var(--red);':''}">${priceLabel}</div>
+            ${priceDodText}
+            <div class="h-value">${yen(value)}</div>
+          </div>
+        </div>
+        <div class="h-grid">
+          <div>株数 <b>${shares.toLocaleString('ja-JP')}</b></div>
+          <div>利益額 <b class="h-profit ${profit>0?'pos':profit<0?'neg':''}">${profit===null?'-':yen(profit)}</b></div>
+          <div class="h-dividend-row">配当金(税引後) <b>${dividendText}</b></div>
+        </div>
+        <div class="h-actions">
+          <button class="editL" data-code="${code}">明細を編集</button>
+          <button class="del" data-code="${code}">削除</button>
+        </div>
+      `;
+      list.appendChild(div);
+    }catch(e){
+      // 1銘柄分の描画に失敗しても、他の銘柄の表示は継続する
+      console.error('銘柄の描画に失敗しました:', summary && summary.code, e);
+    }
+  });
 
-			  // イベント付与
-			  list.querySelectorAll('.h-name').forEach(el=>{
-			    el.onclick = () => openChart(el.dataset.code);
-			  });
-			  list.querySelectorAll('.editL').forEach(el=>{
-			    el.onclick = () => openLotsEditor(el.dataset.code);
-			  });
-			  list.querySelectorAll('.del').forEach(el=>{
-			    el.onclick = () => deleteCode(el.dataset.code);
-			  });
-			}
+  document.getElementById('sumValue').textContent = yen(totalValue);
+  document.getElementById('sumCost').textContent = yen(totalCost);
+  const sp = document.getElementById('sumProfit');
+  const totalProfit = totalValue - totalCost;
+  sp.textContent = yen(totalProfit);
+  sp.className = 'value ' + (totalProfit>0?'pos':totalProfit<0?'neg':'');
 
-			function deleteCode(code){
-			  if(!confirm(code + ' の登録内容をすべて削除しますか？')) return;
-			  const updates = {};
-			  Object.keys(holdings).forEach(id=>{
-			    if(holdings[id].code === code) updates[id] = null;
-			  });
-			  holdingsRef.update(updates);
-			}
+  const sumProfitDodEl = document.getElementById('sumProfitDod');
+  if(canComputeTotalDod && ids.length > 0){
+    const totalDiffAmount = totalValue - totalValueYesterday;
+    const totalProfitYesterday = totalValueYesterday - totalCost;
+    const totalDiffRate = totalProfitYesterday !== 0 ? (totalDiffAmount / Math.abs(totalProfitYesterday)) * 100 : null;
+    const dodClass = totalDiffAmount>0 ? 'pos' : totalDiffAmount<0 ? 'neg' : '';
+    sumProfitDodEl.className = 'sum-sub ' + dodClass;
+    sumProfitDodEl.textContent = '前日比 ' + yen(totalDiffAmount) + '（' + (totalDiffRate===null ? '-' : totalDiffRate.toFixed(2) + '%') + '）';
+  } else {
+    sumProfitDodEl.textContent = '';
+  }
 
-			function openLotsEditor(code){
-			  // 複数取得ロットがある場合は、最初の1件を編集対象として開く簡易対応
-			  const id = Object.keys(holdings).find(id => holdings[id].code === code);
-			  if(id) openEdit(id);
-			}
+  document.getElementById('sumDividend').textContent = hasAnyDividendData ? yen(totalDividendAfterTax) : '-';
 
-			/* ---------- 登録/編集シート ---------- */
-			const editOverlay = document.getElementById('editOverlay');
-			document.getElementById('addBtn').onclick = () => openEdit(null);
-			document.getElementById('editClose').onclick = closeEdit;
-			document.getElementById('editCancel').onclick = closeEdit;
+  // 評価損益の最高値を記録・判定（銘柄が1件以上あるときのみ）
+  const highBadge = document.getElementById('highBadge');
+  if(ids.length > 0){
+    if(maxTotalProfit === null || totalProfit > maxTotalProfit){
+      maxProfitRef.set({ value: totalProfit, updatedAt: Date.now() });
+      highBadge.style.display = 'inline-block';
+    } else if(totalProfit === maxTotalProfit){
+      highBadge.style.display = 'inline-block';
+    } else {
+      highBadge.style.display = 'none';
+    }
+  } else {
+    highBadge.style.display = 'none';
+  }
 
-			function openEdit(id){
-			  editingId = id;
-			  document.getElementById('editTitle').textContent = id ? '銘柄を編集' : '銘柄を登録';
-			  if(id){
-			    const h = holdings[id];
-			    document.getElementById('inCode').value = h.code;
-			    document.getElementById('inName').value = h.name || '';
-			    document.getElementById('inDate').value = h.date;
-			    document.getElementById('inShares').value = h.shares;
-			    document.getElementById('inPrice').value = h.price;
-			    document.getElementById('inNisa').value = h.nisa || 'no';
-			  } else {
-			    document.getElementById('inCode').value = '';
-			    document.getElementById('inName').value = '';
-			    document.getElementById('inDate').value = new Date().toISOString().slice(0,10);
-			    document.getElementById('inShares').value = '';
-			    document.getElementById('inPrice').value = '';
-			    document.getElementById('inNisa').value = 'no';
-			  }
-			  editOverlay.classList.add('show');
-			}
-			function closeEdit(){ editOverlay.classList.remove('show'); editingId = null; }
+  // イベント付与
+  list.querySelectorAll('.h-name').forEach(el=>{
+    el.onclick = () => openChart(el.dataset.code);
+  });
+  list.querySelectorAll('.editL').forEach(el=>{
+    el.onclick = () => openLotsEditor(el.dataset.code);
+  });
+  list.querySelectorAll('.del').forEach(el=>{
+    el.onclick = () => deleteCode(el.dataset.code);
+  });
+}
 
-			document.getElementById('editSave').onclick = async () => {
-			  const code = document.getElementById('inCode').value.trim();
-			  const name = document.getElementById('inName').value.trim();
-			  const date = document.getElementById('inDate').value.trim();
-			  const sharesStr = document.getElementById('inShares').value.trim();
-			  const priceStr = document.getElementById('inPrice').value.trim();
-			  const nisa = document.getElementById('inNisa').value;
+function deleteCode(code){
+  if(!confirm(code + ' の登録内容をすべて削除しますか？')) return;
+  const updates = {};
+  Object.keys(holdings).forEach(id=>{
+    if(holdings[id].code === code) updates[id] = null;
+  });
+  holdingsRef.update(updates);
+}
 
-			  const missing = [];
-			  if(code === '') missing.push('銘柄コード');
-			  if(date === '') missing.push('取得日');
-			  if(sharesStr === '' || isNaN(Number(sharesStr))) missing.push('取得株数');
-			  if(priceStr === '' || isNaN(Number(priceStr))) missing.push('取得単価');
-			  if(missing.length){
-			    alert('次の項目を入力してください: ' + missing.join('、'));
-			    return;
-			  }
-			  const shares = Number(sharesStr);
-			  const price = Number(priceStr);
-			  const data = { code, name, date, shares, price, nisa };
-			  if(editingId){
-			    await holdingsRef.child(editingId).set(data);
-			  } else {
-			    await holdingsRef.push(data);
-			  }
-			  closeEdit();
-			  // 新規銘柄なら価格取得
-			  try{
-			    const q = await withRetryOnRateLimit(() => fetchQuote(code), code + '(株価)');
-			    await priceCacheRef.child(code).update({
-			      price: q.price, autoName: q.name, previousClose: q.previousClose,
-			      dividendRate: q.dividendPerShare,
-			      updatedAt: Date.now(), error: null
-			    });
-			  }catch(e){
-			    console.error(e);
-			    await priceCacheRef.child(code).update({ error: e.message, updatedAt: Date.now() });
-			  }
-			};
+function openLotsEditor(code){
+  // 複数取得ロットがある場合は、最初の1件を編集対象として開く簡易対応
+  const id = Object.keys(holdings).find(id => holdings[id].code === code);
+  if(id) openEdit(id);
+}
 
-			/* ---------- グラフシート ---------- */
-			const chartOverlay = document.getElementById('chartOverlay');
-			document.getElementById('chartClose').onclick = () => chartOverlay.classList.remove('show');
-			document.querySelectorAll('.range-tabs button').forEach(btn=>{
-			  btn.onclick = () => {
-			    document.querySelectorAll('.range-tabs button').forEach(b=>b.classList.remove('active'));
-			    btn.classList.add('active');
-			    currentChartRange = btn.dataset.range;
-			    drawChartForCurrentCode();
-			  };
-			});
+/* ---------- 登録/編集シート ---------- */
+const editOverlay = document.getElementById('editOverlay');
+document.getElementById('addBtn').onclick = () => openEdit(null);
+document.getElementById('editClose').onclick = closeEdit;
+document.getElementById('editCancel').onclick = closeEdit;
 
-			async function openChart(code){
-			  currentChartCode = code;
-			  currentChartRange = '1m';
-			  document.querySelectorAll('.range-tabs button').forEach(b=>b.classList.remove('active'));
-			  document.querySelector('.range-tabs button[data-range="1m"]').classList.add('active');
-			  const lotWithName = Object.values(holdings).find(l => l.code === code && l.name && l.name.trim() !== '');
-			  const cache = priceCache[code] || {};
-			  const displayName = lotWithName ? lotWithName.name : (cache.autoName || code);
-			  document.getElementById('chartTitle').textContent = displayName + ' (' + code + ')';
-			  chartOverlay.classList.add('show');
-			  document.getElementById('chartLoading').style.display = 'block';
-			  if(typeof Chart === 'undefined'){
-			    document.getElementById('chartLoading').textContent = 'グラフ描画ライブラリの読み込みに失敗しました。通信環境を確認し、画面を再読み込みしてください。';
-			    return;
-			  }
-			  try{
-			    const rows = await fetchHistory(code);
-			    window.__histCache = window.__histCache || {};
-			    window.__histCache[code] = rows;
-			    drawChartForCurrentCode();
-			  }catch(e){
-			    console.error('chart fetch failed', code, e);
-			    document.getElementById('chartLoading').textContent = '取得に失敗しました: ' + e.message;
-			  }
-			}
+function openEdit(id){
+  editingId = id;
+  document.getElementById('editTitle').textContent = id ? '銘柄を編集' : '銘柄を登録';
+  if(id){
+    const h = holdings[id];
+    document.getElementById('inCode').value = h.code;
+    document.getElementById('inName').value = h.name || '';
+    document.getElementById('inDate').value = h.date;
+    document.getElementById('inShares').value = h.shares;
+    document.getElementById('inPrice').value = h.price;
+    document.getElementById('inNisa').value = h.nisa || 'no';
+  } else {
+    document.getElementById('inCode').value = '';
+    document.getElementById('inName').value = '';
+    document.getElementById('inDate').value = new Date().toISOString().slice(0,10);
+    document.getElementById('inShares').value = '';
+    document.getElementById('inPrice').value = '';
+    document.getElementById('inNisa').value = 'no';
+  }
+  editOverlay.classList.add('show');
+}
+function closeEdit(){ editOverlay.classList.remove('show'); editingId = null; }
 
-			function drawChartForCurrentCode(){
-			  const rows = (window.__histCache && window.__histCache[currentChartCode]) || [];
-			  if(!rows.length) return;
-			  const now = new Date();
-			  let fromDate = null;
-			  if(currentChartRange==='1m') fromDate = new Date(now.getFullYear(), now.getMonth()-1, now.getDate());
-			  else if(currentChartRange==='3m') fromDate = new Date(now.getFullYear(), now.getMonth()-3, now.getDate());
-			  else if(currentChartRange==='6m') fromDate = new Date(now.getFullYear(), now.getMonth()-6, now.getDate());
-			  else if(currentChartRange==='1y') fromDate = new Date(now.getFullYear()-1, now.getMonth(), now.getDate());
+document.getElementById('editSave').onclick = async () => {
+  const code = document.getElementById('inCode').value.trim();
+  const name = document.getElementById('inName').value.trim();
+  const date = document.getElementById('inDate').value.trim();
+  const sharesStr = document.getElementById('inShares').value.trim();
+  const priceStr = document.getElementById('inPrice').value.trim();
+  const nisa = document.getElementById('inNisa').value;
 
-			  const filtered = fromDate ? rows.filter(r => new Date(r.date) >= fromDate) : rows;
-			  document.getElementById('chartLoading').style.display = 'none';
+  const missing = [];
+  if(code === '') missing.push('銘柄コード');
+  if(date === '') missing.push('取得日');
+  if(sharesStr === '' || isNaN(Number(sharesStr))) missing.push('取得株数');
+  if(priceStr === '' || isNaN(Number(priceStr))) missing.push('取得単価');
+  if(missing.length){
+    alert('次の項目を入力してください: ' + missing.join('、'));
+    return;
+  }
+  const shares = Number(sharesStr);
+  const price = Number(priceStr);
+  const data = { code, name, date, shares, price, nisa };
+  if(editingId){
+    await holdingsRef.child(editingId).set(data);
+  } else {
+    await holdingsRef.push(data);
+  }
+  closeEdit();
+  // 新規銘柄なら価格取得
+  try{
+    const q = await withRetryOnRateLimit(() => fetchQuote(code), code + '(株価)');
+    await priceCacheRef.child(code).update({
+      price: q.price, autoName: q.name, previousClose: q.previousClose,
+      dividendRate: q.dividendPerShare,
+      updatedAt: Date.now(), error: null
+    });
+  }catch(e){
+    console.error(e);
+    await priceCacheRef.child(code).update({ error: e.message, updatedAt: Date.now() });
+  }
+};
 
-			  const ctx = document.getElementById('priceChart').getContext('2d');
-			  if(priceChart) priceChart.destroy();
-			  priceChart = new Chart(ctx, {
-			    type: 'line',
-			    data: {
-			      labels: filtered.map(r=>r.date),
-			      datasets: [{
-			        label: '評価単価',
-			        data: filtered.map(r=>r.close),
-			        borderColor: '#4f8cff',
-			        backgroundColor: 'rgba(79,140,255,0.15)',
-			        fill: true,
-			        pointRadius: 0,
-			        borderWidth: 2,
-			        tension: 0.15
-			      }]
-			    },
-			    options: {
-			      responsive: true,
-			      plugins: { legend: { display: false } },
-			      scales: {
-			        x: { ticks: { color:'#8890a0', maxTicksLimit:6 }, grid:{ color:'#2a2f3a' } },
-			        y: { ticks: { color:'#8890a0' }, grid:{ color:'#2a2f3a' } }
-			      }
-			    }
-			  });
-			}
+/* ---------- グラフシート ---------- */
+const chartOverlay = document.getElementById('chartOverlay');
+document.getElementById('chartClose').onclick = () => chartOverlay.classList.remove('show');
+document.querySelectorAll('.range-tabs button').forEach(btn=>{
+  btn.onclick = () => {
+    document.querySelectorAll('.range-tabs button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    currentChartRange = btn.dataset.range;
+    drawChartForCurrentCode();
+  };
+});
 
-			document.getElementById('refreshAllBtn').onclick = refreshAllPrices;
+async function openChart(code){
+  currentChartCode = code;
+  currentChartRange = '1m';
+  document.querySelectorAll('.range-tabs button').forEach(b=>b.classList.remove('active'));
+  document.querySelector('.range-tabs button[data-range="1m"]').classList.add('active');
+  const lotWithName = Object.values(holdings).find(l => l.code === code && l.name && l.name.trim() !== '');
+  const cache = priceCache[code] || {};
+  const displayName = lotWithName ? lotWithName.name : (cache.autoName || code);
+  document.getElementById('chartTitle').textContent = displayName + ' (' + code + ')';
+  chartOverlay.classList.add('show');
+  document.getElementById('chartLoading').style.display = 'block';
+  if(typeof Chart === 'undefined'){
+    document.getElementById('chartLoading').textContent = 'グラフ描画ライブラリの読み込みに失敗しました。通信環境を確認し、画面を再読み込みしてください。';
+    return;
+  }
+  try{
+    const rows = await fetchHistory(code);
+    window.__histCache = window.__histCache || {};
+    window.__histCache[code] = rows;
+    drawChartForCurrentCode();
+  }catch(e){
+    console.error('chart fetch failed', code, e);
+    document.getElementById('chartLoading').textContent = '取得に失敗しました: ' + e.message;
+  }
+}
 
-			// 初回ロード後に自動で1回価格更新
-			setTimeout(()=>{ if(Object.keys(holdings).length) refreshAllPrices(); }, 1500);
-		</script>
-	</body>
+function drawChartForCurrentCode(){
+  const rows = (window.__histCache && window.__histCache[currentChartCode]) || [];
+  if(!rows.length) return;
+  const now = new Date();
+  let fromDate = null;
+  if(currentChartRange==='1m') fromDate = new Date(now.getFullYear(), now.getMonth()-1, now.getDate());
+  else if(currentChartRange==='3m') fromDate = new Date(now.getFullYear(), now.getMonth()-3, now.getDate());
+  else if(currentChartRange==='6m') fromDate = new Date(now.getFullYear(), now.getMonth()-6, now.getDate());
+  else if(currentChartRange==='1y') fromDate = new Date(now.getFullYear()-1, now.getMonth(), now.getDate());
+
+  const filtered = fromDate ? rows.filter(r => new Date(r.date) >= fromDate) : rows;
+  document.getElementById('chartLoading').style.display = 'none';
+
+  const ctx = document.getElementById('priceChart').getContext('2d');
+  if(priceChart) priceChart.destroy();
+  priceChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: filtered.map(r=>r.date),
+      datasets: [{
+        label: '評価単価',
+        data: filtered.map(r=>r.close),
+        borderColor: '#4f8cff',
+        backgroundColor: 'rgba(79,140,255,0.15)',
+        fill: true,
+        pointRadius: 0,
+        borderWidth: 2,
+        tension: 0.15
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color:'#8890a0', maxTicksLimit:6 }, grid:{ color:'#2a2f3a' } },
+        y: { ticks: { color:'#8890a0' }, grid:{ color:'#2a2f3a' } }
+      }
+    }
+  });
+}
+
+document.getElementById('refreshAllBtn').onclick = refreshAllPrices;
+
+// 初回ロード後に自動で1回価格更新
+setTimeout(()=>{ if(Object.keys(holdings).length) refreshAllPrices(); }, 1500);
+</script>
+</body>
 </html>
