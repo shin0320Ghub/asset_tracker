@@ -212,23 +212,6 @@
   @media (prefers-reduced-motion: reduce){
     .badge.due{ animation:none; }
   }
-  .alert-banner{
-    display:none;
-    align-items:center;
-    gap:10px;
-    background:var(--stamp);
-    color:#fff;
-    border-radius:var(--radius);
-    padding:12px 14px;
-    margin-bottom:18px;
-    font-size:13px;
-    font-weight:600;
-  }
-  .alert-banner.show{ display:flex; }
-  .alert-banner .alert-icon{
-    font-size:18px;
-    line-height:1;
-  }
   .item-memo{
     font-size:12px;
     color:var(--ink-soft);
@@ -417,11 +400,6 @@
     </div>
   </div>
 
-  <div class="alert-banner" id="alertBanner">
-    <span class="alert-icon">⚠</span>
-    <span id="alertBannerText"></span>
-  </div>
-
   <div class="section-title">
     <span>登録リスト</span>
     <select class="sort-select" id="sortSelect">
@@ -505,8 +483,9 @@ const firebaseConfig = {
   v1.0.0 (2026-09-05) カテゴリ機能を実装、アプリ名を「定期コスト」に変更しバージョン管理を開始
   v1.1.0 (2026-09-05) 次回更新日の5日前からアラート表示に変更。各項目に「更新」（次回課金日を1周期進める）「解約」（確認後に削除）ボタンを追加
   v1.1.1 (2026-09-05) アラート表示を強化：該当項目を赤背景+左帯で強調、バッジを点滅表示、画面上部に更新間近の一覧バナーを追加
+  v1.1.2 (2026-09-05) 画面上部の「もうすぐ更新」一覧バナーを削除。項目カード側の赤背景・点滅バッジによる強調表示のみに変更
 */
-const APP_VERSION = 'v1.1.1';
+const APP_VERSION = 'v1.1.2';
 document.getElementById('versionBadge').textContent = APP_VERSION;
 
 let db = null;
@@ -692,28 +671,6 @@ function render(){
   });
   document.getElementById('monthTotal').textContent = formatYen(monthSum);
   document.getElementById('yearTotal').textContent = formatYen(yearSum);
-
-  const dueSoonItems = ids
-    .map(id => ({ id, ...items[id] }))
-    .map(it => {
-      const next = nextOccurrence(it.nextDate, it.cycle);
-      const todayMid = new Date(); todayMid.setHours(0,0,0,0);
-      const dleft = next ? Math.round((next - todayMid) / 86400000) : null;
-      return { ...it, dleft };
-    })
-    .filter(it => it.dleft !== null && it.dleft <= 5)
-    .sort((a,b) => a.dleft - b.dleft);
-
-  const banner = document.getElementById('alertBanner');
-  if(dueSoonItems.length > 0){
-    const names = dueSoonItems.slice(0,3).map(it => it.name).join('、');
-    const more = dueSoonItems.length > 3 ? ` 他${dueSoonItems.length - 3}件` : '';
-    document.getElementById('alertBannerText').textContent =
-      `もうすぐ更新: ${names}${more}`;
-    banner.classList.add('show');
-  }else{
-    banner.classList.remove('show');
-  }
 
   const sortMode = document.getElementById('sortSelect').value;
   let sorted = ids.map(id => ({id, ...items[id]}));
