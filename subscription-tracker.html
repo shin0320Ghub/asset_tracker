@@ -484,8 +484,9 @@ const firebaseConfig = {
   v1.1.0 (2026-09-05) 次回更新日の5日前からアラート表示に変更。各項目に「更新」（次回課金日を1周期進める）「解約」（確認後に削除）ボタンを追加
   v1.1.1 (2026-09-05) アラート表示を強化：該当項目を赤背景+左帯で強調、バッジを点滅表示、画面上部に更新間近の一覧バナーを追加
   v1.1.2 (2026-09-05) 画面上部の「もうすぐ更新」一覧バナーを削除。項目カード側の赤背景・点滅バッジによる強調表示のみに変更
+  v1.1.3 (2026-09-05) 次回更新日が翌年以降の場合は年も含めて表示するように変更
 */
-const APP_VERSION = 'v1.1.2';
+const APP_VERSION = 'v1.1.3';
 document.getElementById('versionBadge').textContent = APP_VERSION;
 
 let db = null;
@@ -777,6 +778,10 @@ function cancelItem(id){
 }
 
 function formatDateJP(d){
+  const today = new Date();
+  if(d.getFullYear() !== today.getFullYear()){
+    return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
+  }
   return `${d.getMonth()+1}/${d.getDate()}`;
 }
 
