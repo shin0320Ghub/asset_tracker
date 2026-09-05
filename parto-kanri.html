@@ -163,10 +163,10 @@
     width: 100%;
     min-width: 0;
     max-width: 100%;
-    padding: 11px 8px;
+    padding: 12px 8px;
     border: 1px solid var(--line);
     border-radius: 8px;
-    font-size: 14px;
+    font-size: 15.5px;
     font-family: 'Roboto Mono', monospace;
     background: var(--surface);
     color: var(--ink);
@@ -183,8 +183,8 @@
   }
   input[type=date], input[type=time] {
     width: 90%;
-    font-size: 13px;
-    padding: 11px 6px;
+    font-size: 16.5px;
+    padding: 12px 6px;
   }
   #entryDate { width: 95%; }
   input[type=text] { font-family: inherit; }
@@ -196,13 +196,13 @@
     border: 1px dashed var(--line);
     border-radius: 8px;
     padding: 12px;
-    font-size: 13.5px;
+    font-size: 14.5px;
     color: var(--ink-soft);
     margin-bottom: 14px;
     line-height: 1.6;
   }
   #entryPreview.ready { color: var(--ink); border-color: var(--accent); }
-  #entryPreview strong { font-family: 'Roboto Mono', monospace; color: var(--accent); }
+  #entryPreview strong { font-family: 'Roboto Mono', monospace; color: var(--accent); font-size: 1.1em; }
 
   button {
     cursor: pointer;
@@ -241,11 +241,11 @@
   }
   .entry-row:last-child { border-bottom: none; }
   .entry-main { display: flex; flex-direction: column; gap: 2px; }
-  .entry-date { font-size: 12px; color: var(--ink-soft); font-family: 'Roboto Mono', monospace; }
+  .entry-date { font-size: 12.5px; color: var(--ink-soft); font-family: 'Roboto Mono', monospace; }
   .entry-job { font-size: 14.5px; font-weight: 700; }
-  .entry-time { font-size: 12.5px; color: var(--ink-soft); }
+  .entry-time { font-size: 13px; color: var(--ink-soft); }
   .entry-side { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
-  .entry-pay { font-family: 'Roboto Mono', monospace; font-weight: 700; font-size: 14.5px; }
+  .entry-pay { font-family: 'Roboto Mono', monospace; font-weight: 700; font-size: 15.5px; }
   .entry-actions button {
     background: none; border: none; color: var(--ink-soft);
     font-size: 12px; padding: 2px 4px; text-decoration: underline;
@@ -295,10 +295,10 @@
   .summary-hero .breakdown {
     display: flex;
     gap: 18px;
-    font-size: 12.5px;
+    font-size: 13.5px;
     color: var(--ink-soft);
   }
-  .summary-hero .breakdown b { color: var(--ink); font-family: 'Roboto Mono', monospace; }
+  .summary-hero .breakdown b { color: var(--ink); font-family: 'Roboto Mono', monospace; font-size: 14.5px; }
 
   .summary-row {
     display: flex;
@@ -306,7 +306,7 @@
     gap: 8px;
     padding: 9px 0;
     border-bottom: 1px solid var(--line);
-    font-size: 13.5px;
+    font-size: 14px;
   }
   .summary-row:last-child { border-bottom: none; }
   .summary-row .dot {
@@ -315,20 +315,20 @@
     flex-shrink: 0;
   }
   .summary-row .label { flex: 1; }
-  .summary-row .value { font-family: 'Roboto Mono', monospace; font-weight: 700; }
+  .summary-row .value { font-family: 'Roboto Mono', monospace; font-weight: 700; font-size: 14.5px; }
 
   /* ---- 年間テーブル ---- */
   table.annual-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 13px;
+    font-size: 13.5px;
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: var(--radius);
     overflow: hidden;
   }
   table.annual-table th, table.annual-table td {
-    padding: 9px 8px;
+    padding: 9px 6px;
     text-align: right;
     border-bottom: 1px solid var(--line);
     font-family: 'Roboto Mono', monospace;
@@ -341,7 +341,7 @@
     background: var(--bg);
     color: var(--ink-soft);
     font-weight: 500;
-    font-size: 11.5px;
+    font-size: 12px;
   }
   table.annual-table td.strong { font-weight: 700; }
   table.annual-table tfoot td {
@@ -360,7 +360,7 @@
   }
   #fuyoCard.warn { border-color: #C98A2B; }
   #fuyoCard.over { border-color: var(--alert); background: var(--alert-soft); }
-  #fuyoCard .fuyo-label { font-size: 12.5px; color: var(--ink-soft); }
+  #fuyoCard .fuyo-label { font-size: 13px; color: var(--ink-soft); }
   #fuyoCard .fuyo-figures {
     display: flex;
     justify-content: space-between;
@@ -373,7 +373,7 @@
     font-weight: 700;
   }
   #fuyoCard .fuyo-figures span:last-child {
-    font-size: 12px;
+    font-size: 13px;
     color: var(--ink-soft);
     font-family: 'Roboto Mono', monospace;
   }
@@ -395,7 +395,7 @@
   #fuyoRemaining {
     font-family: 'Roboto Mono', monospace;
     font-weight: 700;
-    font-size: 16px;
+    font-size: 18px;
   }
   #fuyoCard.over #fuyoRemaining { color: var(--alert); }
 
@@ -504,7 +504,7 @@
 
   <header class="topbar">
     <p>PART-TIME PAYROLL</p>
-    <h1>パート管理 <span class="version-badge">v1.0.2</span></h1>
+    <h1>パート管理 <span class="version-badge">v1.1.0</span></h1>
   </header>
 
   <main>
@@ -644,6 +644,17 @@
       <p class="muted" style="margin-top:10px;">
         扶養の上限額は勤務先の社会保険の基準（106万円／130万円など）や税法上の基準（103万円）によって異なります。ご自身の状況に合わせて数値を設定してください。
       </p>
+
+      <h2 class="section-title">データのバックアップと復元</h2>
+      <div class="card">
+        <p class="muted" style="margin-bottom:14px;">
+          機種変更やアプリの再インストールに備えて、登録したバイト先・勤務記録・設定をファイルに保存できます。保存したファイルから復元することもできます。
+        </p>
+        <button type="button" class="btn-primary" id="exportBtn">バックアップを保存する</button>
+        <button type="button" class="btn-ghost" id="importBtn">バックアップから復元する</button>
+        <input type="file" id="importFileInput" accept="application/json" style="display:none;">
+        <p class="muted" id="backupStatus" style="margin-top:10px; min-height:16px;"></p>
+      </div>
     </section>
 
   </main>
@@ -1228,6 +1239,52 @@ function saveFuyoSettings() {
   setTimeout(() => { btn.textContent = original; }, 1200);
 }
 
+/* ---------- 設定タブ：バックアップ / 復元 ---------- */
+function showBackupStatus(msg) {
+  const el = document.getElementById('backupStatus');
+  el.textContent = msg;
+  setTimeout(() => { if (el.textContent === msg) el.textContent = ''; }, 3000);
+}
+
+function exportData() {
+  const dataStr = JSON.stringify(state, null, 2);
+  const blob = new Blob([dataStr], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'parto-kanri-backup-' + todayStr() + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showBackupStatus('バックアップを保存しました');
+}
+
+function importDataFromFile(file) {
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    let parsed;
+    try {
+      parsed = JSON.parse(ev.target.result);
+    } catch (e) {
+      alert('ファイルの読み込みに失敗しました。バックアップファイル（JSON）を選択してください。');
+      return;
+    }
+    if (!parsed || !Array.isArray(parsed.jobs) || !Array.isArray(parsed.entries)) {
+      alert('このファイルはパート管理のバックアップ形式ではないようです。');
+      return;
+    }
+    if (!confirm('現在のデータを、選択したファイルの内容で上書きします。よろしいですか？')) return;
+    state = Object.assign(defaultData(), parsed);
+    if (!state.settings) state.settings = defaultData().settings;
+    saveData();
+    renderAll();
+    showBackupStatus('データを復元しました');
+  };
+  reader.onerror = () => alert('ファイルの読み込みに失敗しました。');
+  reader.readAsText(file);
+}
+
 /* ---------- 初期化 ---------- */
 function populateBreakOptions() {
   const sel = document.getElementById('entryBreak');
@@ -1267,6 +1324,16 @@ function init() {
   document.getElementById('jobFormCancelBtn').addEventListener('click', closeJobForm);
 
   document.getElementById('saveFuyoBtn').addEventListener('click', saveFuyoSettings);
+
+  document.getElementById('exportBtn').addEventListener('click', exportData);
+  document.getElementById('importBtn').addEventListener('click', () => {
+    document.getElementById('importFileInput').click();
+  });
+  document.getElementById('importFileInput').addEventListener('change', (ev) => {
+    const file = ev.target.files[0];
+    if (file) importDataFromFile(file);
+    ev.target.value = '';
+  });
 
   document.querySelectorAll('.navbtn').forEach(btn => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
