@@ -159,7 +159,7 @@
     color: var(--ink-soft);
     margin-bottom: 5px;
   }
-  input[type=date], input[type=time], input[type=number], input[type=text], input[type=month] {
+  input[type=date], input[type=time], input[type=number], input[type=text], input[type=month], select {
     width: 100%;
     min-width: 0;
     max-width: 100%;
@@ -171,11 +171,22 @@
     background: var(--surface);
     color: var(--ink);
   }
+  select {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M6 9l6 6 6-6' stroke='%23626E5E' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 16px;
+    padding-right: 30px;
+    width: 90%;
+  }
   input[type=date], input[type=time] {
     width: 90%;
     font-size: 13px;
     padding: 11px 6px;
   }
+  #entryDate { width: 95%; }
   input[type=text] { font-family: inherit; }
   .row2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
   .row2 .field { min-width: 0; }
@@ -493,7 +504,7 @@
 
   <header class="topbar">
     <p>PART-TIME PAYROLL</p>
-    <h1>パート管理 <span class="version-badge">v1.0.1</span></h1>
+    <h1>パート管理 <span class="version-badge">v1.0.2</span></h1>
   </header>
 
   <main>
@@ -528,7 +539,7 @@
         <div class="row2">
           <div class="field">
             <label for="entryBreak">休憩時間（分）</label>
-            <input type="number" id="entryBreak" value="0" min="0" step="5">
+            <select id="entryBreak"></select>
           </div>
         </div>
 
@@ -1218,12 +1229,26 @@ function saveFuyoSettings() {
 }
 
 /* ---------- 初期化 ---------- */
+function populateBreakOptions() {
+  const sel = document.getElementById('entryBreak');
+  sel.innerHTML = '';
+  for (let m = 0; m <= 90; m += 5) {
+    const opt = document.createElement('option');
+    opt.value = m;
+    opt.textContent = m + '分';
+    sel.appendChild(opt);
+  }
+  sel.value = '0';
+}
+
 function init() {
+  populateBreakOptions();
   document.getElementById('entryDate').value = todayStr();
   document.getElementById('entryForm').addEventListener('submit', submitEntry);
   document.getElementById('entryCancelBtn').addEventListener('click', resetEntryForm);
   ['entryStart', 'entryEnd', 'entryBreak'].forEach(id => {
     document.getElementById(id).addEventListener('input', updateEntryPreview);
+    document.getElementById(id).addEventListener('change', updateEntryPreview);
   });
 
   document.getElementById('monthPrevBtn').addEventListener('click', () => changeMonth(-1));
