@@ -482,12 +482,13 @@
   </div>
 
   <div class="csv-card">
-    <h2>データ書き出し</h2>
+    <h2>データ書き出し・取込</h2>
     <div class="export-row">
-      <button class="csv-btn" id="csvExportBtn">CSVを出力</button>
       <button class="csv-btn" id="jsonExportBtn">JSONを出力</button>
+      <button class="csv-btn" id="jsonImportBtn">JSONを取込</button>
     </div>
-    <div class="sync-hint">記帳履歴を日付・評価損益のCSVまたはJSONファイルとして書き出します</div>
+    <input type="file" id="jsonImportInput" accept=".json,application/json" style="display:none;">
+    <div class="sync-hint">記帳履歴をJSONファイルとして書き出し、または取り込みます</div>
   </div>
 
   <div class="sync-card">
@@ -808,26 +809,6 @@ document.getElementById('saveBtn').addEventListener('click', ()=>{
   document.getElementById('amountInput').value = '';
 });
 
-document.getElementById('csvExportBtn').addEventListener('click', ()=>{
-  if(entries.length === 0){
-    alert('書き出せる記帳データがありません');
-    return;
-  }
-  let csv = '\uFEFF' + '日付,評価損益\n';
-  for(const e of entries){
-    csv += `${e.date},${e.amount}\n`;
-  }
-  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = '株評価損益_' + todayStr() + '.csv';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-});
-
 document.getElementById('jsonExportBtn').addEventListener('click', ()=>{
   if(entries.length === 0){
     alert('書き出せる記帳データがありません');
@@ -843,6 +824,59 @@ document.getElementById('jsonExportBtn').addEventListener('click', ()=>{
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+});
+
+document.getElementById('jsonImportBtn').addEventListener('click', ()=>{
+  document.getElementById('jsonImportInput').click();
+});
+
+document.getElementById('jsonImportInput').addEventListener('change', (ev)=>{
+  const file = ev.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    let data;
+    try{
+      data = JSON.parse(reader.result);
+    }catch(e){
+      alert('JSONファイルの読み込みに失敗しました(形式が正しくありません)');
+      ev.target.value = '';
+      return;
+    }
+    if(!Array.isArray(data)){
+      alert('JSONファイルの形式が正しくありません(配列形式である必要があります)');
+      ev.target.value = '';
+      return;
+    }
+    const valid = data.filter(e => e && typeof e.date === 'string' && typeof e.amount === 'number');
+    if(valid.length === 0){
+      alert('取り込めるデータが見つかりませんでした');
+      ev.target.value = '';
+      return;
+    }
+    if(!confirm(valid.length + '件のデータを取り込みます。同じ日付のデータは上書きされます。よろしいですか?')){
+      ev.target.value = '';
+      return;
+    }
+    if(entriesRef){
+      for(const e of valid){
+        entriesRef.child(e.date).set(e.amount);
+      }
+      // listener will update entries and re-render
+    } else {
+      for(const e of valid){
+        const idx = entries.findIndex(x=>x.date === e.date);
+        if(idx >= 0){ entries[idx].amount = e.amount; }
+        else{ entries.push({date:e.date, amount:e.amount}); }
+      }
+      entries.sort((a,b)=> a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+      saveEntries();
+      render();
+    }
+    alert('取り込みが完了しました');
+    ev.target.value = '';
+  };
+  reader.readAsText(file);
 });
 
 document.getElementById('syncConnectBtn').addEventListener('click', ()=>{
