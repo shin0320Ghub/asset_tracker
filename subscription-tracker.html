@@ -485,8 +485,9 @@ const firebaseConfig = {
   v1.1.1 (2026-09-05) アラート表示を強化：該当項目を赤背景+左帯で強調、バッジを点滅表示、画面上部に更新間近の一覧バナーを追加
   v1.1.2 (2026-09-05) 画面上部の「もうすぐ更新」一覧バナーを削除。項目カード側の赤背景・点滅バッジによる強調表示のみに変更
   v1.1.3 (2026-09-05) 次回更新日が翌年以降の場合は年も含めて表示するように変更
+  v1.1.4 (2026-09-05) 更新ボタン押下時に確認ダイアログを表示するように変更（新しい次回課金日を提示して確認）
 */
-const APP_VERSION = 'v1.1.3';
+const APP_VERSION = 'v1.1.4';
 document.getElementById('versionBadge').textContent = APP_VERSION;
 
 let db = null;
@@ -749,6 +750,7 @@ function renewItem(id){
   }else{
     d.setMonth(d.getMonth() + 1);
   }
+  if(!confirm(`「${it.name}」の次回課金日を ${formatDateJP(d)} に更新しますか？`)) return;
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
