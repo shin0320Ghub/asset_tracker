@@ -171,8 +171,13 @@
     background: var(--surface);
     color: var(--ink);
   }
+  input[type=date], input[type=time] {
+    width: 90%;
+    font-size: 13px;
+    padding: 11px 6px;
+  }
   input[type=text] { font-family: inherit; }
-  .row2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+  .row2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
   .row2 .field { min-width: 0; }
 
   #entryPreview {
@@ -488,7 +493,7 @@
 
   <header class="topbar">
     <p>PART-TIME PAYROLL</p>
-    <h1>パート管理 <span class="version-badge">v1.0.0</span></h1>
+    <h1>パート管理 <span class="version-badge">v1.0.1</span></h1>
   </header>
 
   <main>
