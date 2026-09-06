@@ -665,6 +665,12 @@ function averageOf(key, source){
   if(vals.length===0) return 0;
   return Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
 }
+function computeMonthlyNetFromEntries(){
+  // 収支入力の記録から、月あたりの平均収支差額（収入合計－支出合計）を算出
+  if(state.entries.length===0) return 0;
+  const nets = state.entries.map(e => sumFields(e.income, INCOME_FIELDS) - sumFields(e.expenses, EXPENSE_FIELDS));
+  return Math.round(nets.reduce((a,b)=>a+b,0)/nets.length);
+}
 
 function renderSimTab(){
   const main = document.getElementById('tab-content');
@@ -682,6 +688,7 @@ function renderSimTab(){
   const annual = pensionAnnual(s.pensionBase65, s.startAge);
   const pensionMonthly = Math.round(annual/12);
   const startDate = addYears(s.birthDate, s.startAge);
+  const preNet = computeMonthlyNetFromEntries();
 
   const si = state.simInputs;
   const defSalary = si.salary != null ? si.salary : 0;
@@ -694,6 +701,8 @@ function renderSimTab(){
       <div class="stat-line"><span>年金月額</span><span class="v">${yen(pensionMonthly)}</span></div>
       <div class="stat-line"><span>シミュレーション終了</span><span class="v">${s.simEndAge}歳まで</span></div>
       <div class="stat-line"><span>毎月の利用可能額（目標）</span><span class="v">${yen(s.monthlyBudget)}</span></div>
+      <div class="stat-line"><span>現在の収支（月平均）</span><span class="v">${preNet>=0?'+':''}${yen(preNet)}</span></div>
+      <div class="field-note">受給開始日までは、収支入力の記録から算出した上記の月平均差額を毎月貯蓄額へ加算してシミュレーションします。</div>
     </div>
 
     <div class="card">
@@ -738,24 +747,35 @@ function runSimulation(){
   const expenseTotal = Object.values(expenses).reduce((a,b)=>a+b,0);
   const incomeMonthly = salary + pensionMonthly + dividend;
   const netMonthly = incomeMonthly - expenseTotal;
-  const shortfall = s.monthlyBudget - netMonthly; // > 0 なら資産を取り崩す
+  const shortfall = s.monthlyBudget - netMonthly; // 受給開始後：> 0 なら資産を取り崩す
+
+  const preNetMonthly = computeMonthlyNetFromEntries(); // 受給開始前：現在の収支入力の月平均差額
 
   let savings = state.assets.savings;
   let investment = state.assets.investment;
 
-  const startDate = addYears(s.birthDate, s.startAge);
+  const startDate = addYears(s.birthDate, s.startAge); // 年金受給開始日
   const endDate = addYears(s.birthDate, s.simEndAge);
 
-  const points = []; // {date, age, balance}
-  let cursor = new Date(startDate);
+  const today = new Date();
+  today.setDate(1);
+
+  const points = []; // {date, balance}
+  let cursor = new Date(today < startDate ? today : startDate);
   let depletedAt = null;
 
   points.push({date:new Date(cursor), balance: savings+investment});
 
   let guardMonths = 0;
-  while(cursor < endDate && guardMonths < 1200){
+  while(cursor < endDate && guardMonths < 2400){
     guardMonths++;
-    if(shortfall > 0){
+    const inPensionPhase = cursor >= startDate;
+
+    if(!inPensionPhase){
+      // 年金受給開始日まで：現在の収支の差額を貯蓄額へ加算（マイナス収支ならその分減額）
+      savings += preNetMonthly;
+      if(savings < 0) savings = 0;
+    } else if(shortfall > 0){
       if(savings >= shortfall){
         savings -= shortfall;
       } else {
@@ -767,15 +787,18 @@ function runSimulation(){
           investment = 0;
           depletedAt = new Date(cursor);
           depletedAt.setMonth(depletedAt.getMonth()+1);
+          cursor.setMonth(cursor.getMonth()+1);
+          points.push({date:new Date(cursor), balance: savings+investment});
           break;
         }
       }
     } else {
       savings += (-shortfall);
     }
+
     cursor.setMonth(cursor.getMonth()+1);
-    // 年に一度だけ記録（グラフを軽量化）
-    if(cursor.getMonth() === startDate.getMonth() || depletedAt){
+    // 12ヶ月に一度だけ記録（グラフを軽量化）
+    if(guardMonths % 12 === 0){
       points.push({date:new Date(cursor), balance: savings+investment});
     }
   }
@@ -838,12 +861,12 @@ function drawChart(points, birthDate){
   const holder = document.getElementById('chart-holder');
   if(points.length < 2){ holder.innerHTML = '<div class="empty">データが不足しています</div>'; return; }
 
-  const W = 600, H = 220, padR = 12, padT = 12, padB = 28;
+  const W = 600, H = 240, padR = 16, padT = 16, padB = 36;
   const maxVal = Math.max(...points.map(p=>p.balance), 1);
   const minVal = 0;
   const topLabel = yenCompact(maxVal);
   // ラベルの文字数に応じて左余白を可変にし、はみ出し（見切れ）を防ぐ
-  const padL = Math.max(54, topLabel.length * 8 + 14);
+  const padL = Math.max(64, topLabel.length * 11 + 18);
 
   const xForIndex = i => padL + (i/(points.length-1)) * (W-padL-padR);
   const yForVal = v => H - padB - ((v-minVal)/(maxVal-minVal || 1)) * (H-padT-padB);
@@ -855,11 +878,11 @@ function drawChart(points, birthDate){
   const labelIdxs = [0, Math.floor((points.length-1)/2), points.length-1];
   const xLabels = labelIdxs.map(i=>{
     const age = ageAt(birthDate, points[i].date);
-    return `<text x="${xForIndex(i)}" y="${H-8}" font-size="10" fill="#5B6B78" text-anchor="middle">${age}歳</text>`;
+    return `<text x="${xForIndex(i)}" y="${H-12}" font-size="15" fill="#5B6B78" text-anchor="middle">${age}歳</text>`;
   }).join('');
 
-  const yTop = `<text x="${padL-8}" y="${padT+10}" font-size="10" fill="#5B6B78" text-anchor="end">${topLabel}</text>`;
-  const yBottom = `<text x="${padL-8}" y="${H-padB}" font-size="10" fill="#5B6B78" text-anchor="end">¥0</text>`;
+  const yTop = `<text x="${padL-10}" y="${padT+14}" font-size="15" fill="#5B6B78" text-anchor="end">${topLabel}</text>`;
+  const yBottom = `<text x="${padL-10}" y="${H-padB}" font-size="15" fill="#5B6B78" text-anchor="end">¥0</text>`;
 
   holder.innerHTML = `
     <svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
