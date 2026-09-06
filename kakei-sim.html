@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="家計シミュレーター">
+<meta name="theme-color" content="#1B2A38">
+<title>家計・年金シミュレーター</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@600;700&family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F4F1E8;
+    --card:#FFFFFF;
+    --ink:#1B2A38;
+    --ink-soft:#5B6B78;
+    --line:#E3DED0;
+    --gold:#9A7B2E;
+    --gold-soft:#F1E9D2;
+    --teal:#2E5266;
+    --teal-soft:#E3EDF0;
+    --red:#A6503B;
+    --red-soft:#F5E6E0;
+    --radius-card: 14px;
+    --radius-pill: 999px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Noto Sans JP',-apple-system,BlinkMacSystemFont,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  h1,h2,h3{
+    font-family:'Zen Old Mincho', serif;
+    font-weight:700;
+    margin:0;
+    letter-spacing:.02em;
+  }
+  #app{max-width:520px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;}
+
+  header{
+    padding:22px 20px 16px;
+    background:var(--ink);
+    color:#F4F1E8;
+    position:relative;
+  }
+  header h1{font-size:20px;color:#F4F1E8;}
+  header .sub{font-size:12px;color:#B9C4CC;margin-top:4px;}
+  header .summary{
+    display:flex;gap:10px;margin-top:16px;
+  }
+  header .summary .box{
+    flex:1;background:rgba(255,255,255,.07);
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:var(--radius-card);
+    padding:10px 12px;
+  }
+  header .summary .box .label{font-size:11px;color:#9FB0BB;}
+  header .summary .box .val{font-size:16px;font-weight:600;margin-top:2px;font-variant-numeric:tabular-nums;}
+  header .sync-status{font-size:11px;color:#9FB0BB;margin-top:10px;}
+  header .sync-status.ok{color:#9FD6B5;}
+  header .sync-status.error{color:#E3A98E;}
+
+  main{flex:1;padding:16px 16px 90px;}
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius-card);
+    padding:16px;
+    margin-bottom:14px;
+  }
+  .card h2{font-size:16px;margin-bottom:12px;color:var(--ink);}
+  .card h2 .sec-note{font-family:'Noto Sans JP',sans-serif;font-weight:400;font-size:12px;color:var(--ink-soft);margin-left:6px;}
+
+  label{display:block;font-size:12.5px;color:var(--ink-soft);margin:10px 0 4px;}
+  label:first-child{margin-top:0;}
+  input[type=number],input[type=date],input[type=month],input[type=text],select,textarea{
+    width:100%;
+    padding:10px 11px;
+    font-size:15px;
+    border:1px solid var(--line);
+    border-radius:10px;
+    background:#FCFBF8;
+    color:var(--ink);
+    font-family:inherit;
+  }
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--teal);outline-offset:1px;}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px;}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 8px;}
+
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:100%;
+    padding:12px;
+    margin-top:14px;
+    background:var(--teal);
+    color:#fff;
+    border:none;
+    border-radius:var(--radius-pill);
+    font-size:15px;font-weight:600;
+    font-family:inherit;
+    cursor:pointer;
+  }
+  .btn.secondary{background:transparent;color:var(--teal);border:1.5px solid var(--teal);}
+  .btn.gold{background:var(--gold);}
+  .btn.small{width:auto;padding:7px 14px;font-size:13px;margin-top:0;}
+  .btn.danger{background:var(--red);}
+
+  .row-flex{display:flex;gap:8px;}
+  .row-flex .btn{margin-top:8px;}
+
+  .entry-item, .hist-item{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:11px 0;border-bottom:1px solid var(--line);
+  }
+  .entry-item:last-child, .hist-item:last-child{border-bottom:none;}
+  .entry-item .meta{font-size:13.5px;font-weight:600;}
+  .entry-item .sub{font-size:11.5px;color:var(--ink-soft);margin-top:2px;}
+  .entry-item .figs{text-align:right;font-variant-numeric:tabular-nums;}
+  .entry-item .figs .net.pos{color:var(--teal);}
+  .entry-item .figs .net.neg{color:var(--red);}
+  .entry-item .acts{display:flex;gap:6px;margin-left:10px;}
+  .icon-btn{
+    background:none;border:none;color:var(--ink-soft);font-size:16px;padding:4px 6px;cursor:pointer;
+  }
+
+  .pill-select{display:flex;gap:8px;margin-top:4px;}
+  .pill-select button{
+    flex:1;padding:10px 4px;border-radius:var(--radius-pill);
+    border:1.5px solid var(--line);background:#FCFBF8;color:var(--ink-soft);
+    font-size:13.5px;font-family:inherit;cursor:pointer;
+  }
+  .pill-select button.active{
+    background:var(--teal);border-color:var(--teal);color:#fff;font-weight:600;
+  }
+
+  .stat-line{display:flex;justify-content:space-between;padding:7px 0;font-size:14px;border-bottom:1px dashed var(--line);}
+  .stat-line:last-child{border-bottom:none;}
+  .stat-line .v{font-weight:600;font-variant-numeric:tabular-nums;}
+
+  .result-banner{
+    border-radius:var(--radius-card);
+    padding:16px;
+    margin-bottom:14px;
+  }
+  .result-banner.ok{background:var(--teal-soft);border:1px solid #C6D9DF;}
+  .result-banner.warn{background:var(--red-soft);border:1px solid #E7CCC2;}
+  .result-banner .headline{font-size:17px;font-weight:700;font-family:'Zen Old Mincho',serif;}
+  .result-banner .detail{font-size:13px;color:var(--ink-soft);margin-top:6px;line-height:1.6;}
+
+  .empty{color:var(--ink-soft);font-size:13.5px;padding:14px 2px;text-align:center;}
+
+  nav#bottom-nav{
+    position:fixed;bottom:0;left:0;right:0;
+    max-width:520px;margin:0 auto;
+    background:#fff;border-top:1px solid var(--line);
+    display:flex;
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  nav#bottom-nav button{
+    flex:1;background:none;border:none;padding:10px 4px 8px;
+    display:flex;flex-direction:column;align-items:center;gap:3px;
+    color:var(--ink-soft);font-family:inherit;font-size:11px;cursor:pointer;
+  }
+  nav#bottom-nav button .ic{font-size:19px;line-height:1;}
+  nav#bottom-nav button.active{color:var(--teal);font-weight:600;}
+
+  .field-note{font-size:11px;color:var(--ink-soft);margin-top:4px;}
+  .divider{height:1px;background:var(--line);margin:14px 0;}
+  .footer-ver{text-align:center;font-size:11px;color:var(--ink-soft);padding:6px 0 0;}
+
+  svg.chart{width:100%;height:auto;display:block;}
+  .chart-legend{display:flex;gap:14px;font-size:11.5px;color:var(--ink-soft);margin-top:8px;}
+  .chart-legend span{display:inline-flex;align-items:center;gap:5px;}
+  .chart-legend i{width:10px;height:10px;border-radius:2px;display:inline-block;}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>家計・年金シミュレーター</h1>
+    <div class="sub">収支の記録と、将来の資産推移シミュレーション</div>
+    <div class="summary">
+      <div class="box"><div class="label">貯蓄額</div><div class="val" id="hdr-savings">¥0</div></div>
+      <div class="box"><div class="label">投資運用額</div><div class="val" id="hdr-investment">¥0</div></div>
+    </div>
+    <div class="sync-status" id="sync-status">🔄 同期中…</div>
+  </header>
+  <main id="tab-content"></main>
+  <nav id="bottom-nav">
+    <button data-tab="input"><span class="ic">📝</span>収支入力</button>
+    <button data-tab="assets"><span class="ic">💰</span>資産管理</button>
+    <button data-tab="settings"><span class="ic">⚙️</span>年金設定</button>
+    <button data-tab="sim"><span class="ic">📈</span>シミュレーション</button>
+  </nav>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+/* ============ Firebase（他アプリと同じプロジェクトを再利用、データパスのみ分離） ============ */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBUQjfeamTm1gCWNiXhZcxyBIUiQSptvDs",
+  authDomain: "asset-tracker-b3fac.firebaseapp.com",
+  databaseURL: "https://asset-tracker-b3fac-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "asset-tracker-b3fac",
+  storageBucket: "asset-tracker-b3fac.firebasestorage.app",
+  messagingSenderId: "36181399487",
+  appId: "1:36181399487:web:0ef48412b814d81aaa330a"
+};
+const FIREBASE_PATH = 'household-finance';
+let dataRef = null;
+let firebaseReady = false;
+let firstSnapshotHandled = false;
+let suppressNextWrite = false;
+
+try{
+  firebase.initializeApp(FIREBASE_CONFIG);
+  dataRef = firebase.database().ref(FIREBASE_PATH);
+  firebaseReady = true;
+}catch(e){
+  console.error('Firebase init failed', e);
+}
+
+function setSyncStatus(mode){
+  const el = document.getElementById('sync-status');
+  if(!el) return;
+  el.classList.remove('ok','error');
+  if(mode==='syncing'){ el.textContent = '🔄 同期中…'; }
+  else if(mode==='ok'){ el.textContent = '✅ 同期済み'; el.classList.add('ok'); }
+  else if(mode==='offline'){ el.textContent = '📴 オフライン（この端末のみ）'; el.classList.add('error'); }
+  else if(mode==='error'){ el.textContent = '⚠️ 同期エラー'; el.classList.add('error'); }
+}
+
+/* ============ カテゴリ定義 ============ */
+const INCOME_FIELDS = [
+  {key:'salary', label:'給与'},
+  {key:'pension', label:'年金受給額'},
+  {key:'dividend', label:'株配当金'},
+];
+const EXPENSE_FIELDS = [
+  {key:'food', label:'食費'},
+  {key:'car', label:'自動車'},
+  {key:'insurance', label:'保険'},
+  {key:'tax', label:'税・社会保障'},
+  {key:'daily', label:'日用品'},
+  {key:'medical', label:'健康・医療費'},
+  {key:'social', label:'交際費'},
+  {key:'utility', label:'水道・光熱費'},
+  {key:'communication', label:'通信費'},
+  {key:'hobby', label:'趣味・娯楽'},
+  {key:'transport', label:'交通費'},
+  {key:'cash', label:'現金・カード'},
+];
+
+/* ============ 状態管理 ============ */
+const STORAGE_KEY = 'kakeiSimData_v1';
+let state = loadState();
+
+function defaultState(){
+  return {
+    entries: [],      // {ym:'2026-09', income:{...}, expenses:{...}, memo}
+    assets: { savings:0, investment:0, history:[] }, // history: {id,date,type,amount,note}
+    settings: { birthDate:'', pensionBase65:0, startAge:65, simEndAge:90, monthlyBudget:0 },
+    simInputs: { salary:0, dividend:0, expenses:{} }
+  };
+}
+function normalizeState(parsed){
+  const d = defaultState();
+  if(!parsed) return d;
+  return {
+    entries: parsed.entries || d.entries,
+    assets: Object.assign(d.assets, parsed.assets||{}),
+    settings: Object.assign(d.settings, parsed.settings||{}),
+    simInputs: Object.assign(d.simInputs, parsed.simInputs||{}, {expenses: Object.assign({}, (parsed.simInputs&&parsed.simInputs.expenses)||{})})
+  };
+}
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return defaultState();
+    return normalizeState(JSON.parse(raw));
+  }catch(e){ return defaultState(); }
+}
+function saveState(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  renderHeader();
+  if(firebaseReady && dataRef){
+    suppressNextWrite = true;
+    dataRef.set(state).then(()=>{
+      setSyncStatus('ok');
+    }).catch(err=>{
+      console.error('Firebase write failed', err);
+      setSyncStatus('error');
+    });
+  }
+}
+
+/* ============ Firebaseリアルタイム同期 ============ */
+function initFirebaseSync(){
+  if(!firebaseReady || !dataRef){ setSyncStatus('offline'); return; }
+  setSyncStatus('syncing');
+  dataRef.on('value', snap => {
+    // 自分自身の書き込みで発火した最初の通知はスキップ（不要な再描画防止）
+    if(suppressNextWrite){ suppressNextWrite = false; setSyncStatus('ok'); return; }
+
+    const val = snap.val();
+    if(val){
+      state = normalizeState(val);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      renderHeader();
+      renderers[currentTab]();
+    } else if(!firstSnapshotHandled){
+      // リモートが空 ＝ 初回。この端末のローカルデータをアップロードする
+      dataRef.set(state).catch(err=>console.error('initial upload failed', err));
+    }
+    firstSnapshotHandled = true;
+    setSyncStatus('ok');
+  }, err => {
+    console.error('Firebase sync error', err);
+    setSyncStatus('error');
+  });
+}
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+/* ============ ユーティリティ ============ */
+function yen(n){
+  n = Math.round(Number(n)||0);
+  return '¥' + n.toLocaleString('ja-JP');
+}
+function num(v){ return Number(v)||0; }
+function sumFields(obj, fields){
+  return fields.reduce((s,f)=> s + num(obj[f.key]), 0);
+}
+function monthLabel(ym){
+  if(!ym) return '';
+  const [y,m] = ym.split('-');
+  return `${y}年${parseInt(m,10)}月`;
+}
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+
+/* ============ ヘッダー ============ */
+function renderHeader(){
+  document.getElementById('hdr-savings').textContent = yen(state.assets.savings);
+  document.getElementById('hdr-investment').textContent = yen(state.assets.investment);
+}
+
+/* ============ タブ切替 ============ */
+let currentTab = 'input';
+const renderers = { input: renderInputTab, assets: renderAssetsTab, settings: renderSettingsTab, sim: renderSimTab };
+
+function setTab(tab){
+  currentTab = tab;
+  document.querySelectorAll('#bottom-nav button').forEach(b=>{
+    b.classList.toggle('active', b.dataset.tab === tab);
+  });
+  renderers[tab]();
+}
+document.querySelectorAll('#bottom-nav button').forEach(b=>{
+  b.addEventListener('click', ()=> setTab(b.dataset.tab));
+});
+
+/* ============ 収支入力タブ ============ */
+let editingYm = null;
+
+function renderInputTab(){
+  const main = document.getElementById('tab-content');
+  const draft = editingYm ? state.entries.find(e=>e.ym===editingYm) : null;
+  const inc = draft ? draft.income : {};
+  const exp = draft ? draft.expenses : {};
+
+  main.innerHTML = `
+    <div class="card">
+      <h2>${editingYm ? monthLabel(editingYm)+' を編集' : '今月の収支を記録'}</h2>
+      <label>対象年月</label>
+      <input type="month" id="f-ym" value="${draft ? draft.ym : ''}" ${draft ? 'disabled' : ''}>
+
+      <div class="divider"></div>
+      <h2 style="font-size:14px;">収入</h2>
+      <div class="grid3">
+        ${INCOME_FIELDS.map(f=>`
+          <div>
+            <label>${f.label}</label>
+            <input type="number" inputmode="numeric" id="inc-${f.key}" value="${inc[f.key]!=null?inc[f.key]:''}" placeholder="0">
+          </div>`).join('')}
+      </div>
+
+      <div class="divider"></div>
+      <h2 style="font-size:14px;">支出</h2>
+      <div class="grid3">
+        ${EXPENSE_FIELDS.map(f=>`
+          <div>
+            <label>${f.label}</label>
+            <input type="number" inputmode="numeric" id="exp-${f.key}" value="${exp[f.key]!=null?exp[f.key]:''}" placeholder="0">
+          </div>`).join('')}
+      </div>
+
+      <label>メモ</label>
+      <input type="text" id="f-memo" value="${draft && draft.memo ? draft.memo.replace(/"/g,'&quot;') : ''}" placeholder="任意">
+
+      <div class="row-flex">
+        <button class="btn" id="f-save">${editingYm ? '更新する' : '保存する'}</button>
+        ${editingYm ? '<button class="btn secondary" id="f-cancel">キャンセル</button>' : ''}
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>記録一覧<span class="sec-note">新しい月順</span></h2>
+      <div id="entry-list"></div>
+    </div>
+  `;
+
+  document.getElementById('f-save').addEventListener('click', saveEntry);
+  if(editingYm){
+    document.getElementById('f-cancel').addEventListener('click', ()=>{ editingYm=null; renderInputTab(); });
+  }
+  renderEntryList();
+}
+
+function saveEntry(){
+  const ym = document.getElementById('f-ym').value;
+  if(!ym){ alert('対象年月を選択してください'); return; }
+  const income = {}; INCOME_FIELDS.forEach(f=> income[f.key] = num(document.getElementById('inc-'+f.key).value));
+  const expenses = {}; EXPENSE_FIELDS.forEach(f=> expenses[f.key] = num(document.getElementById('exp-'+f.key).value));
+  const memo = document.getElementById('f-memo').value;
+
+  const idx = state.entries.findIndex(e=>e.ym===ym);
+  const entry = {ym, income, expenses, memo};
+  if(idx>=0) state.entries[idx] = entry; else state.entries.push(entry);
+
+  editingYm = null;
+  saveState();
+  renderInputTab();
+}
+
+function renderEntryList(){
+  const box = document.getElementById('entry-list');
+  const sorted = [...state.entries].sort((a,b)=> b.ym.localeCompare(a.ym));
+  if(sorted.length===0){ box.innerHTML = '<div class="empty">まだ記録がありません</div>'; return; }
+  box.innerHTML = sorted.map(e=>{
+    const incTotal = sumFields(e.income, INCOME_FIELDS);
+    const expTotal = sumFields(e.expenses, EXPENSE_FIELDS);
+    const net = incTotal - expTotal;
+    return `
+      <div class="entry-item">
+        <div>
+          <div class="meta">${monthLabel(e.ym)}</div>
+          <div class="sub">収入 ${yen(incTotal)} ／ 支出 ${yen(expTotal)}</div>
+        </div>
+        <div class="figs">
+          <div class="net ${net>=0?'pos':'neg'}">${net>=0?'+':''}${yen(net)}</div>
+        </div>
+        <div class="acts">
+          <button class="icon-btn" data-edit="${e.ym}" title="編集">✎</button>
+          <button class="icon-btn" data-del="${e.ym}" title="削除">🗑</button>
+        </div>
+      </div>`;
+  }).join('');
+  box.querySelectorAll('[data-edit]').forEach(b=> b.addEventListener('click', ()=>{ editingYm=b.dataset.edit; renderInputTab(); }));
+  box.querySelectorAll('[data-del]').forEach(b=> b.addEventListener('click', ()=>{
+    if(confirm(monthLabel(b.dataset.del)+'の記録を削除しますか？')){
+      state.entries = state.entries.filter(e=>e.ym!==b.dataset.del);
+      saveState(); renderEntryList();
+    }
+  }));
+}
+
+/* ============ 資産管理タブ ============ */
+function renderAssetsTab(){
+  const main = document.getElementById('tab-content');
+  main.innerHTML = `
+    <div class="card">
+      <h2>貯蓄額</h2>
+      <label>現在の貯蓄額</label>
+      <input type="number" inputmode="numeric" id="as-savings" value="${state.assets.savings}">
+      <label>メモ（任意）</label>
+      <input type="text" id="as-savings-note" placeholder="例：定期預金の利息反映">
+      <button class="btn" id="as-savings-save">貯蓄額を更新</button>
+    </div>
+
+    <div class="card">
+      <h2>投資運用額</h2>
+      <label>現在の投資運用額</label>
+      <input type="number" inputmode="numeric" id="as-invest" value="${state.assets.investment}">
+      <label>メモ（任意）</label>
+      <input type="text" id="as-invest-note" placeholder="例：評価額の更新">
+      <button class="btn gold" id="as-invest-save">投資運用額を更新</button>
+    </div>
+
+    <div class="card">
+      <h2>更新履歴</h2>
+      <div id="asset-history"></div>
+    </div>
+  `;
+  document.getElementById('as-savings-save').addEventListener('click', ()=>{
+    const v = num(document.getElementById('as-savings').value);
+    const note = document.getElementById('as-savings-note').value;
+    updateAsset('savings', v, note);
+  });
+  document.getElementById('as-invest-save').addEventListener('click', ()=>{
+    const v = num(document.getElementById('as-invest').value);
+    const note = document.getElementById('as-invest-note').value;
+    updateAsset('investment', v, note);
+  });
+  renderAssetHistory();
+}
+
+function updateAsset(type, value, note){
+  state.assets[type] = value;
+  state.assets.history.unshift({id:uid(), date:todayISO(), type, amount:value, note});
+  saveState();
+  renderAssetsTab();
+}
+
+function renderAssetHistory(){
+  const box = document.getElementById('asset-history');
+  const hist = state.assets.history || [];
+  if(hist.length===0){ box.innerHTML = '<div class="empty">更新履歴はまだありません</div>'; return; }
+  box.innerHTML = hist.map(h=>`
+    <div class="hist-item">
+      <div>
+        <div class="meta">${h.date} ・ ${h.type==='savings'?'貯蓄額':'投資運用額'}</div>
+        ${h.note?`<div class="sub">${h.note}</div>`:''}
+      </div>
+      <div class="figs">
+        <div>${yen(h.amount)}</div>
+      </div>
+      <div class="acts">
+        <button class="icon-btn" data-delh="${h.id}" title="削除">🗑</button>
+      </div>
+    </div>
+  `).join('');
+  box.querySelectorAll('[data-delh]').forEach(b=> b.addEventListener('click', ()=>{
+    state.assets.history = state.assets.history.filter(h=>h.id!==b.dataset.delh);
+    saveState(); renderAssetHistory();
+  }));
+}
+
+/* ============ 年金設定タブ ============ */
+function pensionAnnual(base65, startAge){
+  base65 = num(base65);
+  const months = (startAge - 65) * 12;
+  let rate = 0;
+  if(months > 0) rate = months * 0.007;       // 繰下げ受給：1ヶ月あたり+0.7%
+  else if(months < 0) rate = months * 0.004;  // 繰上げ受給：1ヶ月あたり-0.4%（参考）
+  return Math.round(base65 * (1 + rate));
+}
+function addYears(dateStr, years){
+  const d = new Date(dateStr);
+  d.setFullYear(d.getFullYear() + years);
+  return d;
+}
+function fmtDate(d){
+  return `${d.getFullYear()}年${d.getMonth()+1}月`;
+}
+
+function renderSettingsTab(){
+  const main = document.getElementById('tab-content');
+  const s = state.settings;
+  main.innerHTML = `
+    <div class="card">
+      <h2>基本情報</h2>
+      <label>生年月日</label>
+      <input type="date" id="st-birth" value="${s.birthDate||''}">
+
+      <label>年金受給額（65歳時／ねんきん定期便より・年額）</label>
+      <input type="number" inputmode="numeric" id="st-base65" value="${s.pensionBase65||''}" placeholder="円/年">
+
+      <label>年金受給開始年齢</label>
+      <div class="pill-select" id="st-startage">
+        ${[65,70,75].map(age=>`<button data-age="${age}" class="${s.startAge===age?'active':''}">${age}歳</button>`).join('')}
+      </div>
+      <div class="field-note">70歳・75歳を選ぶと繰下げ受給（1ヶ月ごとに+0.7%）で増額されます</div>
+    </div>
+
+    <div class="card">
+      <h2>シミュレーション条件</h2>
+      <label>何歳までシミュレーションするか</label>
+      <input type="number" inputmode="numeric" id="st-endage" value="${s.simEndAge||''}" placeholder="例：90">
+
+      <label>毎月の利用可能額（維持したい生活費）</label>
+      <input type="number" inputmode="numeric" id="st-budget" value="${s.monthlyBudget||''}" placeholder="円/月">
+    </div>
+
+    <button class="btn" id="st-save">設定を保存</button>
+
+    <div class="card" style="margin-top:14px;">
+      <h2>受給見込み（計算結果）</h2>
+      <div id="st-preview"></div>
+    </div>
+  `;
+
+  document.querySelectorAll('#st-startage button').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      document.querySelectorAll('#st-startage button').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      renderSettingsPreview(Number(b.dataset.age));
+    });
+  });
+  document.getElementById('st-save').addEventListener('click', saveSettings);
+  renderSettingsPreview(s.startAge || 65);
+}
+
+function currentStartAgeSelection(){
+  const active = document.querySelector('#st-startage button.active');
+  return active ? Number(active.dataset.age) : 65;
+}
+
+function renderSettingsPreview(startAge){
+  const box = document.getElementById('st-preview');
+  const birth = document.getElementById('st-birth').value;
+  const base65 = num(document.getElementById('st-base65').value);
+  if(!birth || !base65){
+    box.innerHTML = '<div class="empty">生年月日と65歳時の年金額を入力すると表示されます</div>';
+    return;
+  }
+  const annual = pensionAnnual(base65, startAge);
+  const monthly = annual / 12;
+  const startDate = addYears(birth, startAge);
+  const months = (startAge-65)*12;
+  const rate = months>0 ? months*0.007 : (months<0? months*0.004 : 0);
+  box.innerHTML = `
+    <div class="stat-line"><span>受給開始年齢</span><span class="v">${startAge}歳</span></div>
+    <div class="stat-line"><span>受給開始時期</span><span class="v">${fmtDate(startDate)}</span></div>
+    <div class="stat-line"><span>増減率</span><span class="v">${rate>=0?'+':''}${(rate*100).toFixed(1)}%</span></div>
+    <div class="stat-line"><span>受給年額</span><span class="v">${yen(annual)}</span></div>
+    <div class="stat-line"><span>受給月額</span><span class="v">${yen(monthly)}</span></div>
+  `;
+}
+
+function saveSettings(){
+  const birth = document.getElementById('st-birth').value;
+  const base65 = num(document.getElementById('st-base65').value);
+  const startAge = currentStartAgeSelection();
+  const endAge = num(document.getElementById('st-endage').value);
+  const budget = num(document.getElementById('st-budget').value);
+
+  if(!birth){ alert('生年月日を入力してください'); return; }
+  if(!endAge || endAge <= startAge){ alert('シミュレーション終了年齢は受給開始年齢より大きい値を入力してください'); return; }
+
+  state.settings = { birthDate:birth, pensionBase65:base65, startAge, simEndAge:endAge, monthlyBudget:budget };
+  saveState();
+  renderSettingsPreview(startAge);
+  alert('設定を保存しました');
+}
+
+/* ============ シミュレーションタブ ============ */
+function averageOf(key, source){
+  // source: 'income' or 'expenses'
+  const vals = state.entries.map(e => num(e[source][key]));
+  if(vals.length===0) return 0;
+  return Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
+}
+
+function renderSimTab(){
+  const main = document.getElementById('tab-content');
+  const s = state.settings;
+
+  if(!s.birthDate || !s.pensionBase65 || !s.simEndAge || !s.monthlyBudget){
+    main.innerHTML = `
+      <div class="card">
+        <h2>シミュレーション</h2>
+        <div class="empty">先に「年金設定」タブで基本情報とシミュレーション条件を保存してください</div>
+      </div>`;
+    return;
+  }
+
+  const annual = pensionAnnual(s.pensionBase65, s.startAge);
+  const pensionMonthly = Math.round(annual/12);
+  const startDate = addYears(s.birthDate, s.startAge);
+
+  const si = state.simInputs;
+  const defSalary = si.salary != null ? si.salary : 0;
+  const defDividend = si.dividend != null && si.dividend !== 0 ? si.dividend : averageOf('dividend','income');
+
+  main.innerHTML = `
+    <div class="card">
+      <h2>前提条件</h2>
+      <div class="stat-line"><span>受給開始</span><span class="v">${fmtDate(startDate)}（${s.startAge}歳）</span></div>
+      <div class="stat-line"><span>年金月額</span><span class="v">${yen(pensionMonthly)}</span></div>
+      <div class="stat-line"><span>シミュレーション終了</span><span class="v">${s.simEndAge}歳まで</span></div>
+      <div class="stat-line"><span>毎月の利用可能額（目標）</span><span class="v">${yen(s.monthlyBudget)}</span></div>
+    </div>
+
+    <div class="card">
+      <h2>月間の収入（受給開始後の見込み）</h2>
+      <label>給与（受給開始後も働く場合）</label>
+      <input type="number" inputmode="numeric" id="si-salary" value="${defSalary}">
+      <label>株配当金（月額・記録の平均値を初期表示）</label>
+      <input type="number" inputmode="numeric" id="si-dividend" value="${defDividend}">
+    </div>
+
+    <div class="card">
+      <h2>月間の支出（見込み）<span class="sec-note">記録の平均値を初期表示</span></h2>
+      <div class="grid3">
+        ${EXPENSE_FIELDS.map(f=>{
+          const def = si.expenses[f.key] != null ? si.expenses[f.key] : averageOf(f.key,'expenses');
+          return `<div><label>${f.label}</label><input type="number" inputmode="numeric" id="si-exp-${f.key}" value="${def}"></div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <button class="btn" id="si-run">シミュレーション実行</button>
+
+    <div id="si-result" style="margin-top:14px;"></div>
+  `;
+
+  document.getElementById('si-run').addEventListener('click', runSimulation);
+}
+
+function runSimulation(){
+  const s = state.settings;
+
+  const salary = num(document.getElementById('si-salary').value);
+  const dividend = num(document.getElementById('si-dividend').value);
+  const expenses = {};
+  EXPENSE_FIELDS.forEach(f=> expenses[f.key] = num(document.getElementById('si-exp-'+f.key).value));
+
+  state.simInputs = { salary, dividend, expenses };
+  saveState();
+
+  const annual = pensionAnnual(s.pensionBase65, s.startAge);
+  const pensionMonthly = annual/12;
+  const expenseTotal = Object.values(expenses).reduce((a,b)=>a+b,0);
+  const incomeMonthly = salary + pensionMonthly + dividend;
+  const netMonthly = incomeMonthly - expenseTotal;
+  const shortfall = s.monthlyBudget - netMonthly; // > 0 なら資産を取り崩す
+
+  let savings = state.assets.savings;
+  let investment = state.assets.investment;
+
+  const startDate = addYears(s.birthDate, s.startAge);
+  const endDate = addYears(s.birthDate, s.simEndAge);
+
+  const points = []; // {date, age, balance}
+  let cursor = new Date(startDate);
+  let depletedAt = null;
+
+  points.push({date:new Date(cursor), balance: savings+investment});
+
+  let guardMonths = 0;
+  while(cursor < endDate && guardMonths < 1200){
+    guardMonths++;
+    if(shortfall > 0){
+      if(savings >= shortfall){
+        savings -= shortfall;
+      } else {
+        const remaining = shortfall - savings;
+        savings = 0;
+        if(investment >= remaining){
+          investment -= remaining;
+        } else {
+          investment = 0;
+          depletedAt = new Date(cursor);
+          depletedAt.setMonth(depletedAt.getMonth()+1);
+          break;
+        }
+      }
+    } else {
+      savings += (-shortfall);
+    }
+    cursor.setMonth(cursor.getMonth()+1);
+    // 年に一度だけ記録（グラフを軽量化）
+    if(cursor.getMonth() === startDate.getMonth() || depletedAt){
+      points.push({date:new Date(cursor), balance: savings+investment});
+    }
+  }
+  if(!depletedAt){
+    points.push({date:new Date(cursor), balance: savings+investment});
+  }
+
+  renderSimResult({shortfall, depletedAt, birthDate:s.birthDate, endAgeSetting:s.simEndAge, finalBalance: savings+investment, points, startDate});
+}
+
+function ageAt(birthDateStr, date){
+  const b = new Date(birthDateStr);
+  let age = date.getFullYear() - b.getFullYear();
+  const beforeBirthday = (date.getMonth() < b.getMonth()) || (date.getMonth()===b.getMonth() && date.getDate() < b.getDate());
+  if(beforeBirthday) age--;
+  return age;
+}
+
+function renderSimResult({shortfall, depletedAt, birthDate, endAgeSetting, finalBalance, points, startDate}){
+  const box = document.getElementById('si-result');
+  let bannerClass, headline, detail;
+
+  if(depletedAt){
+    const age = ageAt(birthDate, depletedAt);
+    headline = `${age}歳ごろ（${fmtDate(depletedAt)}）に資金が枯渇する見込みです`;
+    detail = `毎月の不足額は約${yen(shortfall)}です。貯蓄・投資運用額を維持したまま毎月の利用可能額（${yen(state.settings.monthlyBudget)}）を使い続けると、上記の時期に資産が尽きる計算になります。`;
+    bannerClass = 'warn';
+  } else if(shortfall > 0){
+    headline = `${endAgeSetting}歳まで資金は維持できる見込みです`;
+    detail = `毎月の不足額は約${yen(shortfall)}で、貯蓄・投資運用額から取り崩しますが、${endAgeSetting}歳の時点で約${yen(finalBalance)}が残る見込みです。`;
+    bannerClass = 'ok';
+  } else {
+    headline = `${endAgeSetting}歳まで資金は減らずに維持できる見込みです`;
+    detail = `毎月の収支は目標の利用可能額を上回っており、余剰分は貯蓄に加算されます。${endAgeSetting}歳時点の資産見込みは約${yen(finalBalance)}です。`;
+    bannerClass = 'ok';
+  }
+
+  box.innerHTML = `
+    <div class="result-banner ${bannerClass}">
+      <div class="headline">${headline}</div>
+      <div class="detail">${detail}</div>
+    </div>
+    <div class="card">
+      <h2>資産残高の推移</h2>
+      <div id="chart-holder"></div>
+      <div class="chart-legend"><span><i style="background:#2E5266"></i>貯蓄＋投資の合計残高</span></div>
+    </div>
+  `;
+  drawChart(points, birthDate);
+}
+
+function drawChart(points, birthDate){
+  const holder = document.getElementById('chart-holder');
+  if(points.length < 2){ holder.innerHTML = '<div class="empty">データが不足しています</div>'; return; }
+
+  const W = 600, H = 220, padL = 54, padR = 12, padT = 12, padB = 28;
+  const maxVal = Math.max(...points.map(p=>p.balance), 1);
+  const minVal = 0;
+
+  const xForIndex = i => padL + (i/(points.length-1)) * (W-padL-padR);
+  const yForVal = v => H - padB - ((v-minVal)/(maxVal-minVal || 1)) * (H-padT-padB);
+
+  const pathD = points.map((p,i)=> `${i===0?'M':'L'} ${xForIndex(i).toFixed(1)} ${yForVal(p.balance).toFixed(1)}`).join(' ');
+  const areaD = pathD + ` L ${xForIndex(points.length-1).toFixed(1)} ${H-padB} L ${xForIndex(0).toFixed(1)} ${H-padB} Z`;
+
+  // x軸ラベル：開始・中間・終了の年齢
+  const labelIdxs = [0, Math.floor((points.length-1)/2), points.length-1];
+  const xLabels = labelIdxs.map(i=>{
+    const age = ageAt(birthDate, points[i].date);
+    return `<text x="${xForIndex(i)}" y="${H-8}" font-size="10" fill="#5B6B78" text-anchor="middle">${age}歳</text>`;
+  }).join('');
+
+  const yTop = `<text x="${padL-8}" y="${padT+10}" font-size="10" fill="#5B6B78" text-anchor="end">${yen(maxVal)}</text>`;
+  const yBottom = `<text x="${padL-8}" y="${H-padB}" font-size="10" fill="#5B6B78" text-anchor="end">¥0</text>`;
+
+  holder.innerHTML = `
+    <svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
+      <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${H-padB}" stroke="#E3DED0"/>
+      <line x1="${padL}" y1="${H-padB}" x2="${W-padR}" y2="${H-padB}" stroke="#E3DED0"/>
+      <path d="${areaD}" fill="#E3EDF0" stroke="none"/>
+      <path d="${pathD}" fill="none" stroke="#2E5266" stroke-width="2.2"/>
+      ${yTop}${yBottom}${xLabels}
+    </svg>
+  `;
+}
+
+/* ============ 初期化 ============ */
+renderHeader();
+setTab('input');
+initFirebaseSync();
+</script>
+</body>
+</html>
