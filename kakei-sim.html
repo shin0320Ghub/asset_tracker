@@ -45,14 +45,14 @@
   #app{max-width:520px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;}
 
   header{
-    padding:22px 20px 16px;
+    padding:calc(env(safe-area-inset-top) + 18px) 20px 16px;
     background:var(--ink);
     color:#F4F1E8;
     position:relative;
   }
   header .title-row{display:flex;align-items:baseline;justify-content:space-between;gap:10px;}
-  header h1{font-size:14px;color:#F4F1E8;font-weight:600;}
-  header .version{font-size:11.5px;color:#9FB0BB;font-family:'Noto Sans JP',sans-serif;white-space:nowrap;}
+  header h1{font-size:20px;color:#F4F1E8;}
+  header .version{font-size:12px;color:#9FB0BB;font-family:'Noto Sans JP',sans-serif;white-space:nowrap;}
   header .summary{
     display:flex;gap:10px;margin-top:16px;
   }
@@ -379,17 +379,32 @@ document.querySelectorAll('#bottom-nav button').forEach(b=>{
 /* ============ 収支入力タブ ============ */
 let editingYm = null;
 
+function yearMonthOptions(draft){
+  const now = new Date();
+  const curYear = now.getFullYear();
+  const [dy, dm] = draft ? draft.ym.split('-').map(Number) : [curYear, now.getMonth()+1];
+  const years = [];
+  for(let y=curYear-3; y<=curYear+60; y++) years.push(y);
+  const yearOpts = years.map(y=>`<option value="${y}" ${y===dy?'selected':''}>${y}年</option>`).join('');
+  const monthOpts = Array.from({length:12},(_,i)=>i+1).map(m=>`<option value="${m}" ${m===dm?'selected':''}>${m}月</option>`).join('');
+  return {yearOpts, monthOpts};
+}
+
 function renderInputTab(){
   const main = document.getElementById('tab-content');
   const draft = editingYm ? state.entries.find(e=>e.ym===editingYm) : null;
   const inc = draft ? draft.income : {};
   const exp = draft ? draft.expenses : {};
+  const {yearOpts, monthOpts} = yearMonthOptions(draft);
 
   main.innerHTML = `
     <div class="card">
       <h2>${editingYm ? monthLabel(editingYm)+' を編集' : '想定収支を記録'}</h2>
       <label>開始年月</label>
-      <input type="month" id="f-ym" value="${draft ? draft.ym : ''}" ${draft ? 'disabled' : ''}>
+      <div class="grid2">
+        <select id="f-year" ${draft ? 'disabled' : ''}>${yearOpts}</select>
+        <select id="f-month" ${draft ? 'disabled' : ''}>${monthOpts}</select>
+      </div>
 
       <div class="divider"></div>
       <h2 style="font-size:14px;">収入</h2>
@@ -431,7 +446,9 @@ function renderInputTab(){
 }
 
 function saveEntry(){
-  const ym = document.getElementById('f-ym').value;
+  const yearEl = document.getElementById('f-year');
+  const monthEl = document.getElementById('f-month');
+  const ym = (yearEl && monthEl) ? `${yearEl.value}-${String(monthEl.value).padStart(2,'0')}` : '';
   if(!ym){ alert('開始年月を選択してください'); return; }
   const income = {}; INCOME_FIELDS.forEach(f=> income[f.key] = num(document.getElementById('inc-'+f.key).value));
   const expenses = {}; EXPENSE_FIELDS.forEach(f=> expenses[f.key] = num(document.getElementById('exp-'+f.key).value));
