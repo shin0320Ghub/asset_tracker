@@ -279,7 +279,7 @@
     text-align:center;
     font-size:11px;
     color:var(--ink-soft);
-    padding:6px 0 20px;
+    padding:6px 0 10px;
   }
   .sync-dot{
     display:inline-block;
@@ -289,6 +289,22 @@
     margin-right:5px;
   }
   .sync-dot.off{ background:var(--stamp); }
+  .backup-row{
+    display:flex;
+    justify-content:center;
+    gap:18px;
+    padding-bottom:24px;
+  }
+  .backup-link{
+    font-size:12px;
+    color:var(--ledger);
+    background:none;
+    border:none;
+    text-decoration:underline;
+    cursor:pointer;
+    font-family:inherit;
+    padding:4px;
+  }
 
   /* modal */
   .overlay{
@@ -414,6 +430,11 @@
   <div class="empty" id="emptyState" style="display:none;">まだ登録がありません。右下の＋から追加してください。</div>
 
   <div class="sync-note"><span class="sync-dot" id="syncDot"></span><span id="syncText">同期状態を確認中…</span></div>
+  <div class="backup-row">
+    <button class="backup-link" id="backupBtn">バックアップを保存</button>
+    <button class="backup-link" id="restoreBtn">バックアップから復元</button>
+  </div>
+  <input type="file" id="restoreFile" accept="application/json" style="display:none;">
 </div>
 
 <button class="fab" id="openAdd" aria-label="追加">＋</button>
@@ -486,8 +507,9 @@ const firebaseConfig = {
   v1.1.2 (2026-09-05) 画面上部の「もうすぐ更新」一覧バナーを削除。項目カード側の赤背景・点滅バッジによる強調表示のみに変更
   v1.1.3 (2026-09-05) 次回更新日が翌年以降の場合は年も含めて表示するように変更
   v1.1.4 (2026-09-05) 更新ボタン押下時に確認ダイアログを表示するように変更（新しい次回課金日を提示して確認）
+  v1.2.0 (2026-09-05) バックアップの保存（JSONファイルとしてダウンロード）と復元（ファイル選択して上書き）機能を追加
 */
-const APP_VERSION = 'v1.1.4';
+const APP_VERSION = 'v1.2.0';
 document.getElementById('versionBadge').textContent = APP_VERSION;
 
 let db = null;
@@ -901,6 +923,73 @@ deleteBtn.addEventListener('click', () => {
 });
 
 render();
+
+// --- バックアップの保存・復元 ---
+document.getElementById('backupBtn').addEventListener('click', () => {
+  const backup = {
+    exportedAt: new Date().toISOString(),
+    appVersion: APP_VERSION,
+    categories: CATEGORIES,
+    subscriptions: items
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const dateStr = new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = `teiki-cost-backup-${dateStr}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+const restoreFile = document.getElementById('restoreFile');
+document.getElementById('restoreBtn').addEventListener('click', () => {
+  restoreFile.value = '';
+  restoreFile.click();
+});
+
+restoreFile.addEventListener('change', () => {
+  const file = restoreFile.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let backup;
+    try{
+      backup = JSON.parse(reader.result);
+    }catch(e){
+      alert('バックアップファイルの読み込みに失敗しました。ファイル形式を確認してください。');
+      return;
+    }
+    if(!backup || typeof backup.subscriptions !== 'object'){
+      alert('バックアップファイルの形式が正しくありません。');
+      return;
+    }
+    const count = Object.keys(backup.subscriptions).length;
+    const exportedLabel = backup.exportedAt ? new Date(backup.exportedAt).toLocaleString('ja-JP') : '不明な日時';
+    if(!confirm(`${exportedLabel} 時点のバックアップ（${count}件）を復元します。\n現在のデータはすべて上書きされます。よろしいですか？`)) return;
+
+    const newItems = backup.subscriptions;
+    const newCategories = Array.isArray(backup.categories) && backup.categories.length ? backup.categories : DEFAULT_CATEGORIES.slice();
+
+    if(firebaseReady){
+      const catObj = {};
+      newCategories.forEach(c => { catObj[c.id] = { label: c.label, color: c.color }; });
+      set(subsRef, newItems);
+      set(categoriesRef, catObj);
+    }else{
+      items = newItems;
+      CATEGORIES = newCategories;
+      saveLocal();
+      saveCategories();
+      renderCategoryOptions();
+      render();
+    }
+    alert('バックアップを復元しました。');
+  };
+  reader.readAsText(file);
+});
 </script>
 </body>
 </html>
