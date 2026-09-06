@@ -26,7 +26,11 @@
     --red-soft:#F5E6E0;
     --radius-card: 14px;
     --radius-pill: 999px;
+    --app-max: 520px;
   }
+  @media (min-width:700px){ :root{ --app-max: 660px; } }
+  @media (min-width:900px){ :root{ --app-max: 780px; } }
+  @media (min-width:1200px){ :root{ --app-max: 880px; } }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
   body{
@@ -42,7 +46,7 @@
     margin:0;
     letter-spacing:.02em;
   }
-  #app{max-width:520px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;}
+  #app{max-width:var(--app-max);margin:0 auto;min-height:100vh;display:flex;flex-direction:column;}
 
   header{
     padding:calc(env(safe-area-inset-top) + 18px) 20px 16px;
@@ -161,7 +165,7 @@
 
   nav#bottom-nav{
     position:fixed;bottom:0;left:0;right:0;
-    max-width:520px;margin:0 auto;
+    max-width:var(--app-max);margin:0 auto;
     background:#fff;border-top:1px solid var(--line);
     display:flex;
     padding-bottom:env(safe-area-inset-bottom);
@@ -182,6 +186,31 @@
   .chart-legend{display:flex;gap:14px;font-size:11.5px;color:var(--ink-soft);margin-top:8px;}
   .chart-legend span{display:inline-flex;align-items:center;gap:5px;}
   .chart-legend i{width:10px;height:10px;border-radius:2px;display:inline-block;}
+
+  /* ============ レスポンシブ対応（タブレット・横向き・大画面） ============ */
+  @media (min-width:700px){
+    main{padding:20px 24px 96px;}
+    header{padding-left:26px;padding-right:26px;}
+    header h1{font-size:23px;}
+    header .summary .box .val{font-size:18px;}
+    .card{padding:20px 22px;}
+    .card h2{font-size:17px;}
+    input[type=number],input[type=date],input[type=month],input[type=text],select,textarea{font-size:16px;padding:11px 12px;}
+    .grid3{grid-template-columns:repeat(4,1fr);gap:0 12px;}
+    .btn{font-size:16px;}
+    nav#bottom-nav button{font-size:12.5px;padding:12px 4px 10px;}
+    nav#bottom-nav button .ic{font-size:21px;}
+  }
+  @media (min-width:900px){
+    .grid3{gap:0 16px;}
+    main{padding:24px 30px 100px;}
+  }
+  /* 横向き（landscape）で高さが低い場合、下部ナビを詰めて画面を有効活用 */
+  @media (max-height:420px) and (orientation:landscape){
+    nav#bottom-nav button{padding:6px 4px 6px;font-size:10px;}
+    nav#bottom-nav button .ic{font-size:15px;}
+    main{padding-bottom:70px;}
+  }
 </style>
 </head>
 <body>
