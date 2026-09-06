@@ -23,6 +23,8 @@
     --job-3: #A6763F;
     --radius: 10px;
     --nav-h: 64px;
+    --content-max: 520px;
+    --side-pad: 18px;
   }
 
   * { box-sizing: border-box; }
@@ -46,7 +48,7 @@
 
   #app {
     width: 100%;
-    max-width: 520px;
+    max-width: var(--content-max);
     min-height: 100vh;
     background: var(--bg);
     display: flex;
@@ -91,7 +93,7 @@
 
   main {
     flex: 1;
-    padding: 18px 18px calc(var(--nav-h) + 28px);
+    padding: 18px var(--side-pad) calc(var(--nav-h) + 28px);
   }
 
   .tab-panel { display: none; }
@@ -454,7 +456,7 @@
   }
   #jobFormOverlay .sheet {
     width: 100%;
-    max-width: 520px;
+    max-width: var(--content-max);
     background: var(--surface);
     border-radius: 16px 16px 0 0;
     padding: 22px 20px calc(env(safe-area-inset-bottom, 16px) + 20px);
@@ -479,7 +481,7 @@
   }
   nav.bottom-nav .inner {
     width: 100%;
-    max-width: 520px;
+    max-width: var(--content-max);
     display: flex;
   }
   .navbtn {
@@ -497,6 +499,46 @@
   }
   .navbtn svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.7; }
   .navbtn.active { color: var(--accent); }
+
+  /* ============ レスポンシブ対応 ============ */
+  /* iPad縦向き・大きめのiPhoneなど */
+  @media (min-width: 600px) {
+    :root {
+      --content-max: 660px;
+      --side-pad: 28px;
+    }
+    header.topbar { padding: env(safe-area-inset-top, 24px) 28px 16px; }
+    header.topbar h1 { font-size: 25px; }
+    h2.section-title { font-size: 17.5px; }
+    .summary-hero .big { font-size: 34px; }
+    .navbtn { font-size: 12px; padding: 12px 4px 10px; }
+    .navbtn svg { width: 22px; height: 22px; }
+    :root { --nav-h: 70px; }
+  }
+
+  /* iPad横向き・大きめタブレット */
+  @media (min-width: 900px) {
+    :root {
+      --content-max: 760px;
+      --side-pad: 36px;
+    }
+    .row2 { gap: 20px; }
+    table.annual-table { font-size: 14.5px; }
+    table.annual-table th, table.annual-table td { padding: 11px 10px; }
+  }
+
+  /* 画面が横に広い（デスクトップブラウザ等）場合はコンテンツ幅の上限をやや控えめに保つ */
+  @media (min-width: 1200px) {
+    :root { --content-max: 820px; }
+  }
+
+  /* 横向き・画面高が低い場合はボトムナビを少し薄くして表示領域を確保 */
+  @media (max-height: 480px) and (orientation: landscape) {
+    :root { --nav-h: 54px; }
+    .navbtn { padding: 6px 4px; font-size: 10px; }
+    .navbtn svg { width: 17px; height: 17px; }
+    header.topbar { padding-top: env(safe-area-inset-top, 8px); padding-bottom: 8px; }
+  }
 </style>
 </head>
 <body>
@@ -504,7 +546,7 @@
 
   <header class="topbar">
     <p>PART-TIME PAYROLL</p>
-    <h1>パート管理 <span class="version-badge">v1.1.0</span></h1>
+    <h1>パート管理 <span class="version-badge">v1.2.0</span></h1>
   </header>
 
   <main>
