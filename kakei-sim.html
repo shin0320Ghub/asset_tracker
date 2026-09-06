@@ -827,13 +827,23 @@ function renderSimResult({shortfall, depletedAt, birthDate, endAgeSetting, final
   drawChart(points, birthDate);
 }
 
+function yenCompact(n){
+  n = Math.round(Number(n)||0);
+  if(n === 0) return '¥0';
+  const man = Math.round(n/10000);
+  return man.toLocaleString('ja-JP') + '万円';
+}
+
 function drawChart(points, birthDate){
   const holder = document.getElementById('chart-holder');
   if(points.length < 2){ holder.innerHTML = '<div class="empty">データが不足しています</div>'; return; }
 
-  const W = 600, H = 220, padL = 54, padR = 12, padT = 12, padB = 28;
+  const W = 600, H = 220, padR = 12, padT = 12, padB = 28;
   const maxVal = Math.max(...points.map(p=>p.balance), 1);
   const minVal = 0;
+  const topLabel = yenCompact(maxVal);
+  // ラベルの文字数に応じて左余白を可変にし、はみ出し（見切れ）を防ぐ
+  const padL = Math.max(54, topLabel.length * 8 + 14);
 
   const xForIndex = i => padL + (i/(points.length-1)) * (W-padL-padR);
   const yForVal = v => H - padB - ((v-minVal)/(maxVal-minVal || 1)) * (H-padT-padB);
@@ -848,7 +858,7 @@ function drawChart(points, birthDate){
     return `<text x="${xForIndex(i)}" y="${H-8}" font-size="10" fill="#5B6B78" text-anchor="middle">${age}歳</text>`;
   }).join('');
 
-  const yTop = `<text x="${padL-8}" y="${padT+10}" font-size="10" fill="#5B6B78" text-anchor="end">${yen(maxVal)}</text>`;
+  const yTop = `<text x="${padL-8}" y="${padT+10}" font-size="10" fill="#5B6B78" text-anchor="end">${topLabel}</text>`;
   const yBottom = `<text x="${padL-8}" y="${H-padB}" font-size="10" fill="#5B6B78" text-anchor="end">¥0</text>`;
 
   holder.innerHTML = `
