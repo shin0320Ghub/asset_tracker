@@ -218,7 +218,7 @@
   <header>
     <div class="title-row">
       <h1>家計・年金シミュレーター</h1>
-      <span class="version">Ver1.0</span>
+      <span class="version">Ver1.1</span>
     </div>
     <div class="summary">
       <div class="box"><div class="label">貯蓄額</div><div class="val" id="hdr-savings">¥0</div></div>
@@ -646,6 +646,14 @@ function renderSettingsTab(){
       <h2>受給見込み（計算結果）</h2>
       <div id="st-preview"></div>
     </div>
+
+    <div class="card">
+      <h2>バックアップ</h2>
+      <div class="field-note">収支の記録・資産・年金設定など全てのデータをファイルに保存したり、そのファイルから復元したりできます。機種変更時のデータ移行や、万一のデータ消失に備えてご利用ください。</div>
+      <button class="btn secondary" id="bk-export" style="margin-top:12px;">バックアップを保存（ファイル書き出し）</button>
+      <button class="btn secondary" id="bk-import-btn">バックアップから復元（ファイル読み込み）</button>
+      <input type="file" id="bk-import-file" accept="application/json,.json" style="display:none;">
+    </div>
   `;
 
   document.querySelectorAll('#st-startage button').forEach(b=>{
@@ -656,7 +664,63 @@ function renderSettingsTab(){
     });
   });
   document.getElementById('st-save').addEventListener('click', saveSettings);
+  document.getElementById('bk-export').addEventListener('click', exportBackup);
+  document.getElementById('bk-import-btn').addEventListener('click', ()=>{
+    document.getElementById('bk-import-file').click();
+  });
+  document.getElementById('bk-import-file').addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if(file) importBackupFile(file);
+    e.target.value = '';
+  });
   renderSettingsPreview(s.startAge || 65);
+}
+
+/* ============ バックアップの保存・復元 ============ */
+function exportBackup(){
+  const payload = {
+    app: 'kakei-sim',
+    version: 'Ver1.1',
+    exportedAt: new Date().toISOString(),
+    data: state
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const ts = new Date();
+  const pad = n=>String(n).padStart(2,'0');
+  const fname = `kakei-sim-backup-${ts.getFullYear()}${pad(ts.getMonth()+1)}${pad(ts.getDate())}-${pad(ts.getHours())}${pad(ts.getMinutes())}.json`;
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fname;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function importBackupFile(file){
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    let incoming;
+    try{
+      const parsed = JSON.parse(reader.result);
+      incoming = (parsed && typeof parsed === 'object' && parsed.data) ? parsed.data : parsed;
+      if(!incoming || typeof incoming !== 'object') throw new Error('invalid format');
+    }catch(e){
+      alert('ファイルの読み込みに失敗しました。正しいバックアップファイルか確認してください。');
+      return;
+    }
+    if(!confirm('現在のデータを、選択したバックアップファイルの内容で上書きします。よろしいですか？')) return;
+    state = normalizeState(incoming);
+    saveState();
+    renderHeader();
+    renderers[currentTab]();
+    alert('バックアップから復元しました');
+  };
+  reader.onerror = ()=>{
+    alert('ファイルの読み込みに失敗しました。');
+  };
+  reader.readAsText(file);
 }
 
 function currentStartAgeSelection(){
