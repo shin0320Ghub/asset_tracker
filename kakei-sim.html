@@ -50,8 +50,9 @@
     color:#F4F1E8;
     position:relative;
   }
-  header h1{font-size:20px;color:#F4F1E8;}
-  header .sub{font-size:12px;color:#B9C4CC;margin-top:4px;}
+  header .title-row{display:flex;align-items:baseline;justify-content:space-between;gap:10px;}
+  header h1{font-size:14px;color:#F4F1E8;font-weight:600;}
+  header .version{font-size:11.5px;color:#9FB0BB;font-family:'Noto Sans JP',sans-serif;white-space:nowrap;}
   header .summary{
     display:flex;gap:10px;margin-top:16px;
   }
@@ -186,8 +187,10 @@
 <body>
 <div id="app">
   <header>
-    <h1>家計・年金シミュレーター</h1>
-    <div class="sub">収支の記録と、将来の資産推移シミュレーション</div>
+    <div class="title-row">
+      <h1>家計・年金シミュレーター</h1>
+      <span class="version">Ver1.0</span>
+    </div>
     <div class="summary">
       <div class="box"><div class="label">貯蓄額</div><div class="val" id="hdr-savings">¥0</div></div>
       <div class="box"><div class="label">投資運用額</div><div class="val" id="hdr-investment">¥0</div></div>
@@ -243,7 +246,6 @@ function setSyncStatus(mode){
 /* ============ カテゴリ定義 ============ */
 const INCOME_FIELDS = [
   {key:'salary', label:'給与'},
-  {key:'pension', label:'年金受給額'},
   {key:'dividend', label:'株配当金'},
 ];
 const EXPENSE_FIELDS = [
@@ -267,7 +269,7 @@ let state = loadState();
 
 function defaultState(){
   return {
-    entries: [],      // {ym:'2026-09', income:{...}, expenses:{...}, memo}
+    entries: [],      // {ym:'2026-09', income:{...}, expenses:{...}}
     assets: { savings:0, investment:0, history:[] }, // history: {id,date,type,amount,note}
     settings: { birthDate:'', pensionBase65:0, startAge:65, simEndAge:90, monthlyBudget:0 },
     simInputs: { salary:0, dividend:0, expenses:{} }
@@ -385,8 +387,8 @@ function renderInputTab(){
 
   main.innerHTML = `
     <div class="card">
-      <h2>${editingYm ? monthLabel(editingYm)+' を編集' : '今月の収支を記録'}</h2>
-      <label>対象年月</label>
+      <h2>${editingYm ? monthLabel(editingYm)+' を編集' : '想定収支を記録'}</h2>
+      <label>開始年月</label>
       <input type="month" id="f-ym" value="${draft ? draft.ym : ''}" ${draft ? 'disabled' : ''}>
 
       <div class="divider"></div>
@@ -409,9 +411,6 @@ function renderInputTab(){
           </div>`).join('')}
       </div>
 
-      <label>メモ</label>
-      <input type="text" id="f-memo" value="${draft && draft.memo ? draft.memo.replace(/"/g,'&quot;') : ''}" placeholder="任意">
-
       <div class="row-flex">
         <button class="btn" id="f-save">${editingYm ? '更新する' : '保存する'}</button>
         ${editingYm ? '<button class="btn secondary" id="f-cancel">キャンセル</button>' : ''}
@@ -433,13 +432,12 @@ function renderInputTab(){
 
 function saveEntry(){
   const ym = document.getElementById('f-ym').value;
-  if(!ym){ alert('対象年月を選択してください'); return; }
+  if(!ym){ alert('開始年月を選択してください'); return; }
   const income = {}; INCOME_FIELDS.forEach(f=> income[f.key] = num(document.getElementById('inc-'+f.key).value));
   const expenses = {}; EXPENSE_FIELDS.forEach(f=> expenses[f.key] = num(document.getElementById('exp-'+f.key).value));
-  const memo = document.getElementById('f-memo').value;
 
   const idx = state.entries.findIndex(e=>e.ym===ym);
-  const entry = {ym, income, expenses, memo};
+  const entry = {ym, income, expenses};
   if(idx>=0) state.entries[idx] = entry; else state.entries.push(entry);
 
   editingYm = null;
