@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>ワクワクすごろく</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#EAF7FF; --bg2:#DFF3FF; --ink:#2B2E4A;
+    --yellow:#FFC947; --coral:#FF6F59; --mint:#35C4A9;
+    --purple:#9B6BCE; --pink:#FF8FB1; --gold:#FFD65C; --paper:#FFFFFF;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{ margin:0; padding:0; height:100%;
+    background:var(--bg);
+    background-image: radial-gradient(circle at 8% 12%, var(--bg2) 0, transparent 45%),
+                       radial-gradient(circle at 92% 88%, var(--bg2) 0, transparent 45%);
+    font-family:'Zen Maru Gothic', sans-serif; color:var(--ink);
+    overscroll-behavior:none; user-select:none; -webkit-user-select:none;
+  }
+  #app{ min-height:100vh; min-height:100dvh; display:flex; flex-direction:column;
+    padding:max(16px, env(safe-area-inset-top)) 14px max(16px, env(safe-area-inset-bottom)); }
+  .screen{ display:none; flex:1; flex-direction:column; }
+  .screen.active{ display:flex; }
+
+  header.top{ text-align:center; margin-bottom:10px; position:relative; }
+  header.top h1{ font-size:26px; font-weight:900; margin:4px 0 0; }
+  header.top .underline{ display:block; margin:0 auto; width:170px; height:9px; }
+  .backbtn{ position:absolute; left:0; top:2px; background:var(--paper); border:3px solid var(--ink);
+    border-radius:14px; font-family:inherit; font-weight:700; font-size:14px; padding:7px 12px;
+    cursor:pointer; box-shadow:3px 3px 0 var(--ink); color:var(--ink); }
+  .backbtn:active{ transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink); }
+
+  .btn{ font-family:inherit; font-weight:700; font-size:16px; border:3px solid var(--ink);
+    border-radius:16px; padding:12px 10px; cursor:pointer; box-shadow:3px 3px 0 var(--ink);
+    background:var(--paper); color:var(--ink); }
+  .btn:active{ transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink); }
+  .btn.primary{ background:var(--mint); }
+  .btn.big{ font-size:19px; padding:16px 14px; }
+  .btn:disabled{ opacity:.4; }
+
+  /* SETUP */
+  .count-row{ display:flex; gap:14px; justify-content:center; margin:10px 0 18px; }
+  .count-btn{ width:64px; height:64px; border-radius:50%; border:4px solid var(--ink);
+    background:var(--paper); font-size:24px; font-weight:900; cursor:pointer;
+    box-shadow:4px 4px 0 var(--ink); }
+  .count-btn.sel{ background:var(--yellow); }
+  .count-btn:active{ transform:translate(2px,2px); box-shadow:2px 2px 0 var(--ink); }
+
+  .slots{ display:flex; flex-direction:column; gap:12px; max-width:360px; width:100%; margin:0 auto; }
+  .slot{ background:var(--paper); border:4px solid var(--ink); border-radius:20px; padding:12px 14px;
+    display:flex; align-items:center; gap:12px; box-shadow:4px 4px 0 var(--ink); }
+  .slot-avatar{ width:60px; height:60px; border-radius:50%; border:3px solid var(--ink); flex:none;
+    background-size:cover; background-position:center; display:flex; align-items:center; justify-content:center;
+    font-size:26px; cursor:pointer; background-color:var(--yellow); }
+  .slot input[type=text]{ font-family:inherit; font-size:16px; flex:1; min-width:0; padding:9px 10px;
+    border-radius:12px; border:3px solid var(--ink); background:var(--bg); }
+
+  .start-wrap{ margin-top:auto; text-align:center; padding-top:16px; }
+
+  /* GAME */
+  .turn-bar{ display:flex; align-items:center; gap:8px; overflow-x:auto; padding:4px 2px 10px; }
+  .turn-chip{ display:flex; align-items:center; gap:6px; background:var(--paper); border:3px solid var(--ink);
+    border-radius:16px; padding:6px 10px 6px 6px; flex:none; opacity:.55; }
+  .turn-chip.current{ opacity:1; background:var(--yellow); box-shadow:3px 3px 0 var(--ink); }
+  .turn-chip.finished{ opacity:.35; }
+  .turn-chip .mini{ width:28px; height:28px; border-radius:50%; border:2px solid var(--ink);
+    background-size:cover; background-position:center; background-color:var(--yellow); font-size:14px;
+    display:flex; align-items:center; justify-content:center; }
+  .turn-chip .tname{ font-size:13px; font-weight:700; }
+
+  #board{ display:grid; grid-template-columns:repeat(5,1fr); grid-template-rows:repeat(6,1fr);
+    gap:5px; flex:1; max-height:min(58vh, 480px); }
+  .cell{ position:relative; border:3px solid var(--ink); border-radius:12px; background:var(--paper);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; padding:2px;
+    overflow:visible; min-height:0; }
+  .cell .num{ position:absolute; top:2px; left:5px; font-size:9px; font-weight:700; color:#8a8ea8; }
+  .cell .icon{ font-size:18px; line-height:1; }
+  .cell .lbl{ font-size:8px; font-weight:700; line-height:1.1; text-align:center; margin-top:1px; }
+  .c-normal{ background:var(--paper); }
+  .c-lucky{ background:#FFF3C4; }
+  .c-jump{ background:#CFF3EA; }
+  .c-back{ background:#FFDCD5; }
+  .c-rest{ background:#EAD9F7; }
+  .c-again{ background:#FFE0EC; }
+  .c-start{ background:var(--ink); }
+  .c-start .lbl, .c-start .num{ color:#fff; }
+  .c-goal{ background:linear-gradient(160deg, var(--gold), var(--yellow)); }
+  .tokens{ position:absolute; bottom:2px; left:0; right:0; display:flex; justify-content:center; gap:2px; }
+  .token{ width:18px; height:18px; border-radius:50%; border:2px solid var(--ink); background-size:cover;
+    background-position:center; background-color:var(--yellow); font-size:10px; display:flex;
+    align-items:center; justify-content:center; box-shadow:1px 1px 0 rgba(0,0,0,.25); }
+
+  .control-area{ margin-top:12px; text-align:center; }
+  .dice-display{ font-size:64px; line-height:1; margin-bottom:8px; height:70px; display:flex; align-items:center; justify-content:center; }
+  .msg-line{ min-height:22px; font-weight:700; font-size:15px; margin-bottom:8px; }
+
+  /* Overlays */
+  .overlay{ position:fixed; inset:0; z-index:90; display:none; align-items:center; justify-content:center;
+    background:rgba(43,46,74,.45); padding:20px; }
+  .overlay.active{ display:flex; }
+  .overlay-card{ background:var(--paper); border:4px solid var(--ink); border-radius:24px; padding:24px 20px;
+    text-align:center; max-width:340px; width:100%; box-shadow:6px 6px 0 var(--ink); }
+  .ov-photo{ width:96px; height:96px; border-radius:50%; border:4px solid var(--yellow); margin:0 auto 12px;
+    background-size:cover; background-position:center; background-color:var(--yellow); font-size:40px;
+    display:flex; align-items:center; justify-content:center; box-shadow:0 0 0 4px #fff, 4px 4px 0 var(--ink); }
+  .ov-title{ font-size:19px; font-weight:900; margin-bottom:6px; }
+  .ov-sub{ font-size:14px; font-weight:700; color:#5b5f82; margin-bottom:16px; }
+
+  #celebrate{ position:fixed; inset:0; z-index:100; display:none; align-items:center; justify-content:center;
+    flex-direction:column; background:rgba(255,255,255,.92); text-align:center; padding:24px; }
+  #celebrate.active{ display:flex; }
+  .cel-photo{ width:168px; height:168px; border-radius:50%; border:6px solid var(--gold);
+    box-shadow:0 0 0 6px #fff, 6px 6px 0 var(--ink); background-size:cover; background-position:center;
+    background-color:var(--yellow); display:flex; align-items:center; justify-content:center; font-size:64px;
+    margin-bottom:16px; animation:pop .4s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes pop{ 0%{transform:scale(.3); opacity:0;} 100%{transform:scale(1); opacity:1;} }
+  .cel-msg{ font-size:28px; font-weight:900; color:var(--coral); margin-bottom:6px; }
+  .cel-sub{ font-size:15px; font-weight:700; margin-bottom:20px; }
+  .cel-btnrow{ display:flex; gap:10px; }
+
+  #confetti-layer{ position:fixed; inset:0; pointer-events:none; overflow:hidden; z-index:99; }
+  .confetti-piece{ position:absolute; top:-40px; font-size:26px; animation:fall linear forwards; }
+  @keyframes fall{ to{ transform:translateY(115vh) rotate(360deg); opacity:.9; } }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- SETUP -->
+  <section id="screen-setup" class="screen active">
+    <header class="top">
+      <h1>ワクワクすごろく</h1>
+      <svg class="underline" viewBox="0 0 170 10"><path d="M2 7 Q 42 -2 85 7 T 168 7" fill="none" stroke="#35C4A9" stroke-width="5" stroke-linecap="round"/></svg>
+    </header>
+    <div style="text-align:center; font-weight:700; margin-bottom:6px;">なんにんで あそぶ?</div>
+    <div class="count-row" id="countRow"></div>
+    <div class="slots" id="slotsWrap"></div>
+    <div class="start-wrap"><button class="btn primary big" id="btnStart">あそぶ!▶</button></div>
+  </section>
+
+  <!-- GAME -->
+  <section id="screen-game" class="screen">
+    <header class="top">
+      <button class="backbtn" data-back="setup">← やめる</button>
+      <h1 style="font-size:20px;">ワクワクすごろく</h1>
+    </header>
+    <div class="turn-bar" id="turnBar"></div>
+    <div id="board"></div>
+    <div class="control-area">
+      <div class="dice-display" id="diceDisplay">🎲</div>
+      <div class="msg-line" id="gameMsg"></div>
+      <button class="btn primary big" id="btnRoll">サイコロを ふる</button>
+    </div>
+  </section>
+
+</div>
+
+<!-- small event overlay -->
+<div class="overlay" id="eventOverlay">
+  <div class="overlay-card">
+    <div class="ov-photo" id="ovPhoto">🎲</div>
+    <div class="ov-title" id="ovTitle"></div>
+    <div class="ov-sub" id="ovSub"></div>
+    <button class="btn primary" id="ovContinue">つぎへ ▶</button>
+  </div>
+</div>
+
+<!-- winner celebration -->
+<div id="confetti-layer"></div>
+<div id="celebrate">
+  <div class="cel-photo" id="celPhoto">🏆</div>
+  <div class="cel-msg" id="celMsg">ゴール!</div>
+  <div class="cel-sub" id="celSub"></div>
+  <div class="cel-btnrow">
+    <button class="btn primary" id="btnPlayAgain">もういちど あそぶ</button>
+    <button class="btn ghost" id="btnBackSetup">さんかしゃを かえる</button>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+var STORAGE_KEY = "sugorokuGame_v1";
+var DEFAULT_EMOJI = ["🦁","🐻","🐰"];
+
+function $(s){ return document.querySelector(s); }
+function $all(s){ return Array.prototype.slice.call(document.querySelectorAll(s)); }
+function randInt(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
+function pick(arr){ return arr[randInt(0,arr.length-1)]; }
+function showScreen(id){ $all(".screen").forEach(function(s){s.classList.remove("active");}); $("#"+id).classList.add("active"); }
+
+// ---------- BOARD DEFINITION ----------
+var BOARD = [
+  {t:"start", icon:"🏫", lbl:"スタート"},
+  {t:"normal", icon:"🌳", lbl:""},
+  {t:"lucky", icon:"🍀", lbl:"2すすむ", n:2},
+  {t:"normal", icon:"🌼", lbl:""},
+  {t:"rest", icon:"⛺", lbl:"1かいやすみ"},
+  {t:"normal", icon:"🌳", lbl:""},
+  {t:"normal", icon:"🦋", lbl:""},
+  {t:"back", icon:"🐌", lbl:"3もどる", n:3},
+  {t:"normal", icon:"🌻", lbl:""},
+  {t:"again", icon:"🎲", lbl:"もういちど"},
+  {t:"normal", icon:"🏞️", lbl:""},
+  {t:"normal", icon:"🐿️", lbl:""},
+  {t:"jump", icon:"🚀", lbl:"5すすむ", n:5},
+  {t:"normal", icon:"🍄", lbl:""},
+  {t:"normal", icon:"🐸", lbl:""},
+  {t:"rest", icon:"🐻", lbl:"1かいやすみ"},
+  {t:"normal", icon:"🌈", lbl:""},
+  {t:"lucky", icon:"🎈", lbl:"2すすむ", n:2},
+  {t:"normal", icon:"🐦", lbl:""},
+  {t:"back", icon:"🌧️", lbl:"2もどる", n:2},
+  {t:"normal", icon:"🦉", lbl:""},
+  {t:"again", icon:"⭐", lbl:"もういちど"},
+  {t:"normal", icon:"🐇", lbl:""},
+  {t:"jump", icon:"🎠", lbl:"3すすむ", n:3},
+  {t:"normal", icon:"🎪", lbl:""},
+  {t:"rest", icon:"🍦", lbl:"1かいやすみ"},
+  {t:"normal", icon:"🎡", lbl:""},
+  {t:"lucky", icon:"🎇", lbl:"2すすむ", n:2},
+  {t:"normal", icon:"🏁", lbl:""},
+  {t:"goal", icon:"🏆", lbl:"ゴール"}
+];
+var GOAL_INDEX = BOARD.length - 1;
+
+var EVENT_TEXT = {
+  lucky:{ title:function(p,c){ return "ラッキー!"; }, sub:function(p,c){ return c.n + "マス すすめるよ!"; } },
+  jump:{ title:function(){ return "だいジャンプ!"; }, sub:function(p,c){ return c.n + "マス いっきに すすむ!"; } },
+  back:{ title:function(){ return "おっとっと"; }, sub:function(p,c){ return c.n + "マス もどっちゃう"; } },
+  rest:{ title:function(){ return "ひとやすみ"; }, sub:function(){ return "つぎの ばんは おやすみ"; } },
+  again:{ title:function(){ return "もういちど!"; }, sub:function(){ return "サイコロを もう1かい ふれるよ"; } },
+  normal:{ title:function(){ return "すすんだ!"; }, sub:function(){ return ""; } }
+};
+
+var GOAL_PRAISE = ["やったー!ゴール!","すごいすごい!1いちばん!","ばんざーい!ゴール!","たからものを げっと!","かんぺき!ゴール!"];
+
+// ---------- STATE ----------
+var setup = { count:2, entries:[] };
+var game = null; // {players:[], current:0, rolling:false, awaitingContinue:false}
+
+function loadSetup(){
+  try{
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      var parsed = JSON.parse(raw);
+      if(parsed && parsed.entries && parsed.entries.length){ setup = parsed; }
+    }
+  }catch(e){}
+}
+function saveSetup(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(setup)); }catch(e){}
+}
+
+// ---------- SETUP SCREEN ----------
+function renderCountRow(){
+  var wrap = $("#countRow");
+  wrap.innerHTML = "";
+  [1,2,3].forEach(function(n){
+    var b = document.createElement("button");
+    b.className = "count-btn" + (setup.count===n ? " sel" : "");
+    b.textContent = n;
+    b.addEventListener("click", function(){
+      setup.count = n;
+      while(setup.entries.length < n){ setup.entries.push({name:"", photo:null}); }
+      setup.entries = setup.entries.slice(0,n);
+      renderCountRow(); renderSlots();
+    });
+    wrap.appendChild(b);
+  });
+}
+
+function renderSlots(){
+  var wrap = $("#slotsWrap");
+  wrap.innerHTML = "";
+  for(var i=0;i<setup.count;i++){
+    if(!setup.entries[i]) setup.entries[i] = {name:"", photo:null};
+    (function(i){
+      var e = setup.entries[i];
+      var slot = document.createElement("div");
+      slot.className = "slot";
+      var avStyle = e.photo ? ("background-image:url("+e.photo+");") : "";
+      slot.innerHTML =
+        '<div class="slot-avatar" style="'+avStyle+'">'+(e.photo?"":DEFAULT_EMOJI[i])+'</div>'+
+        '<input type="text" maxlength="8" placeholder="おなまえ '+(i+1)+'" value="'+(e.name||"").replace(/"/g,"")+'">'+
+        '<input type="file" accept="image/*" style="display:none;">';
+      var av = slot.querySelector(".slot-avatar");
+      var fileInput = slot.querySelector('input[type=file]');
+      var nameInput = slot.querySelector('input[type=text]');
+      av.addEventListener("click", function(){ fileInput.click(); });
+      fileInput.addEventListener("change", function(ev){
+        var file = ev.target.files[0];
+        if(!file) return;
+        var reader = new FileReader();
+        reader.onload = function(evt){
+          var img = new Image();
+          img.onload = function(){
+            var size = 200;
+            var canvas = document.createElement("canvas");
+            canvas.width=size; canvas.height=size;
+            var ctx = canvas.getContext("2d");
+            var scale = Math.max(size/img.width, size/img.height);
+            var w=img.width*scale, h=img.height*scale;
+            ctx.drawImage(img,(size-w)/2,(size-h)/2,w,h);
+            var dataUrl = canvas.toDataURL("image/jpeg",0.85);
+            e.photo = dataUrl;
+            av.style.backgroundImage = "url("+dataUrl+")";
+            av.textContent = "";
+            saveSetup();
+          };
+          img.src = evt.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+      nameInput.addEventListener("input", function(){ e.name = nameInput.value; saveSetup(); });
+      wrap.appendChild(slot);
+    })(i);
+  }
+}
+
+$("#btnStart").addEventListener("click", function(){
+  var names = setup.entries.slice(0,setup.count).map(function(e){ return e.name.trim(); });
+  for(var i=0;i<setup.count;i++){
+    if(!names[i]){ setup.entries[i].name = "プレイヤー" + (i+1); }
+  }
+  saveSetup();
+  startGame();
+});
+
+// ---------- GAME ----------
+function startGame(){
+  game = {
+    players: setup.entries.slice(0,setup.count).map(function(e,i){
+      return { id:"pl"+i, name: e.name || ("プレイヤー"+(i+1)), photo:e.photo, emoji:DEFAULT_EMOJI[i],
+               pos:0, skip:0, finished:false };
+    }),
+    current: 0
+  };
+  buildBoardDom();
+  renderTurnBar();
+  renderTokens();
+  $("#gameMsg").textContent = "";
+  $("#diceDisplay").textContent = "🎲";
+  showScreen("screen-game");
+  updateRollButton();
+}
+
+function buildBoardDom(){
+  var board = $("#board");
+  board.innerHTML = "";
+  for(var idx=0; idx<BOARD.length; idx++){
+    var cell = BOARD[idx];
+    var row = Math.floor(idx/5);
+    var colInRow = idx % 5;
+    var col = (row % 2 === 0) ? colInRow : (4-colInRow);
+    var div = document.createElement("div");
+    div.className = "cell c-" + cell.t;
+    div.style.gridRow = (row+1);
+    div.style.gridColumn = (col+1);
+    div.id = "cell-" + idx;
+    div.innerHTML =
+      '<div class="num">'+idx+'</div>'+
+      '<div class="icon">'+cell.icon+'</div>'+
+      (cell.lbl ? '<div class="lbl">'+cell.lbl+'</div>' : '') +
+      '<div class="tokens"></div>';
+    board.appendChild(div);
+  }
+}
+
+function renderTurnBar(){
+  var wrap = $("#turnBar");
+  wrap.innerHTML = "";
+  game.players.forEach(function(p,i){
+    var chip = document.createElement("div");
+    chip.className = "turn-chip" + (i===game.current ? " current":"") + (p.finished ? " finished":"");
+    var miniStyle = p.photo ? ("background-image:url("+p.photo+");") : "";
+    chip.innerHTML = '<div class="mini" style="'+miniStyle+'">'+(p.photo?"":p.emoji)+'</div><div class="tname">'+p.name+'</div>';
+    wrap.appendChild(chip);
+  });
+}
+
+function renderTokens(){
+  $all(".tokens").forEach(function(t){ t.innerHTML=""; });
+  game.players.forEach(function(p){
+    var tok = document.createElement("div");
+    tok.className = "token";
+    if(p.photo){ tok.style.backgroundImage = "url("+p.photo+")"; }
+    else { tok.textContent = p.emoji; }
+    var cellTokens = document.querySelector("#cell-"+p.pos+" .tokens");
+    if(cellTokens) cellTokens.appendChild(tok);
+  });
+}
+
+var DICE_FACES = ["⚀","⚁","⚂","⚃","⚄","⚅"];
+
+function updateRollButton(){
+  var p = game.players[game.current];
+  $("#btnRoll").disabled = false;
+  $("#gameMsg").textContent = p.name + "さんの ばん!";
+}
+
+$("#btnRoll").addEventListener("click", function(){
+  if(game.rolling) return;
+  var p = game.players[game.current];
+  if(p.skip > 0){
+    p.skip--;
+    renderTurnBar();
+    showEventOverlay(p, "1かい やすみ", p.name+"さんは こんかい おやすみです", function(){ advanceTurn(); });
+    return;
+  }
+  game.rolling = true;
+  $("#btnRoll").disabled = true;
+  var diceEl = $("#diceDisplay");
+  var ticks = 0;
+  var iv = setInterval(function(){
+    diceEl.textContent = pick(DICE_FACES);
+    ticks++;
+    if(ticks > 10){
+      clearInterval(iv);
+      var result = randInt(1,6);
+      diceEl.textContent = DICE_FACES[result-1];
+      setTimeout(function(){ movePlayer(p, result); }, 300);
+    }
+  }, 70);
+});
+
+function movePlayer(p, steps, cb){
+  var target = Math.min(p.pos + steps, GOAL_INDEX);
+  stepLoop(p, target, function(){
+    resolveCell(p, cb);
+  });
+}
+
+function stepLoop(p, target, done){
+  if(p.pos >= target){ done(); return; }
+  p.pos++;
+  renderTokens();
+  setTimeout(function(){ stepLoop(p, target, done); }, 160);
+}
+
+function resolveCell(p, cb){
+  if(p.pos >= GOAL_INDEX){
+    p.pos = GOAL_INDEX;
+    renderTokens();
+    renderTurnBar();
+    doWin(p);
+    return;
+  }
+  var cell = BOARD[p.pos];
+  var info = EVENT_TEXT[cell.t] || EVENT_TEXT.normal;
+
+  if(cell.t === "lucky" || cell.t === "jump"){
+    showEventOverlay(p, info.title(), info.sub(p,cell), function(){
+      var target = Math.min(p.pos + cell.n, GOAL_INDEX);
+      stepLoop(p, target, function(){
+        if(p.pos >= GOAL_INDEX){ p.pos = GOAL_INDEX; renderTokens(); renderTurnBar(); doWin(p); }
+        else { renderTurnBar(); advanceTurn(); }
+      });
+    });
+  } else if(cell.t === "back"){
+    showEventOverlay(p, info.title(), info.sub(p,cell), function(){
+      var target = Math.max(p.pos - cell.n, 0);
+      var backLoop = function(){
+        if(p.pos <= target){ renderTurnBar(); advanceTurn(); return; }
+        p.pos--; renderTokens();
+        setTimeout(backLoop, 160);
+      };
+      backLoop();
+    });
+  } else if(cell.t === "rest"){
+    p.skip = 1;
+    showEventOverlay(p, info.title(), info.sub(p,cell), function(){ renderTurnBar(); advanceTurn(); });
+  } else if(cell.t === "again"){
+    showEventOverlay(p, info.title(), info.sub(p,cell), function(){
+      renderTurnBar();
+      game.rolling = false;
+      updateRollButton();
+    });
+  } else {
+    game.rolling = false;
+    renderTurnBar();
+    advanceTurn();
+  }
+}
+
+function advanceTurn(){
+  game.rolling = false;
+  var n = game.players.length;
+  var tries = 0;
+  do{
+    game.current = (game.current+1) % n;
+    tries++;
+  } while(game.players[game.current].finished && tries <= n);
+  renderTurnBar();
+  updateRollButton();
+}
+
+function showEventOverlay(p, title, sub, onContinue){
+  var ov = $("#eventOverlay");
+  var photoEl = $("#ovPhoto");
+  if(p.photo){ photoEl.style.backgroundImage="url("+p.photo+")"; photoEl.textContent=""; }
+  else{ photoEl.style.backgroundImage=""; photoEl.textContent = p.emoji; }
+  $("#ovTitle").textContent = title;
+  $("#ovSub").textContent = (p.name?p.name+"さん、":"") + sub;
+  ov.classList.add("active");
+  var btn = $("#ovContinue");
+  var handler = function(){
+    ov.classList.remove("active");
+    btn.removeEventListener("click", handler);
+    onContinue();
+  };
+  btn.addEventListener("click", handler);
+}
+
+function doWin(p){
+  p.finished = true;
+  game.rolling = false;
+  var photoEl = $("#celPhoto");
+  if(p.photo){ photoEl.style.backgroundImage="url("+p.photo+")"; photoEl.textContent=""; }
+  else{ photoEl.style.backgroundImage=""; photoEl.textContent = p.emoji; }
+  $("#celMsg").textContent = pick(GOAL_PRAISE);
+  $("#celSub").textContent = (p.name?p.name+"さん、":"") + "1いちばん ゴール!";
+  $("#celebrate").classList.add("active");
+  launchConfetti();
+}
+
+function launchConfetti(){
+  var layer = $("#confetti-layer");
+  var pieces = ["🎉","⭐","✨","🎈","🏆","💮"];
+  for(var i=0;i<30;i++){
+    var span = document.createElement("span");
+    span.className = "confetti-piece";
+    span.textContent = pick(pieces);
+    span.style.left = randInt(0,98) + "vw";
+    span.style.animationDuration = (1.4+Math.random()*1.3)+"s";
+    span.style.animationDelay = (Math.random()*0.4)+"s";
+    layer.appendChild(span);
+    (function(s){ setTimeout(function(){ s.remove(); }, 3300); })(span);
+  }
+}
+
+$("#btnPlayAgain").addEventListener("click", function(){
+  $("#celebrate").classList.remove("active");
+  startGame();
+});
+$("#btnBackSetup").addEventListener("click", function(){
+  $("#celebrate").classList.remove("active");
+  showScreen("screen-setup");
+});
+$all("[data-back]").forEach(function(b){
+  b.addEventListener("click", function(){ showScreen("screen-setup"); });
+});
+
+// ---------- INIT ----------
+loadSetup();
+if(!setup.entries.length){
+  setup.entries = [{name:"",photo:null},{name:"",photo:null}];
+}
+renderCountRow();
+renderSlots();
+})();
+</script>
+</body>
+</html>
