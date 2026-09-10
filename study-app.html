@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>まなびひろば</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #EAF7FF;
+    --bg2: #DFF3FF;
+    --ink: #2B2E4A;
+    --yellow: #FFC947;
+    --yellow-dark: #E8A800;
+    --coral: #FF6F59;
+    --coral-dark: #E4523C;
+    --mint: #35C4A9;
+    --mint-dark: #1FA88F;
+    --purple: #9B6BCE;
+    --purple-dark: #7E4EB3;
+    --pink: #FF8FB1;
+    --paper: #FFFFFF;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  html,body{
+    margin:0; padding:0; height:100%;
+    background: var(--bg);
+    background-image:
+      radial-gradient(circle at 10% 15%, var(--bg2) 0, transparent 45%),
+      radial-gradient(circle at 90% 85%, var(--bg2) 0, transparent 45%);
+    font-family: 'Zen Maru Gothic', sans-serif;
+    color: var(--ink);
+    overscroll-behavior: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  #app{
+    min-height: 100vh;
+    min-height: 100dvh;
+    display:flex; flex-direction:column;
+    padding: max(18px, env(safe-area-inset-top)) 18px max(18px, env(safe-area-inset-bottom));
+  }
+  .screen{ display:none; flex:1; flex-direction:column; }
+  .screen.active{ display:flex; }
+
+  /* Header */
+  header.top{ text-align:center; margin-bottom: 14px; position:relative; }
+  header.top h1{
+    font-size: 30px; font-weight:900; margin: 6px 0 2px;
+    color: var(--ink);
+    display:inline-block;
+    position:relative;
+  }
+  header.top .underline{ display:block; margin:0 auto; width:180px; height:10px; }
+  .backbtn{
+    position:absolute; left:0; top:2px;
+    background: var(--paper); border: 3px solid var(--ink); border-radius: 16px;
+    font-family:inherit; font-weight:700; font-size:15px; padding:8px 14px;
+    cursor:pointer; color:var(--ink);
+    box-shadow: 3px 3px 0 var(--ink);
+  }
+  .backbtn:active{ transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }
+
+  /* HOME */
+  .profiles{ display:flex; gap:18px; justify-content:center; flex-wrap:wrap; margin-top: 10px; }
+  .profile-card{
+    background: var(--paper);
+    border: 4px solid var(--ink);
+    border-radius: 26px;
+    width: 158px;
+    padding: 16px 12px 14px;
+    text-align:center;
+    box-shadow: 5px 5px 0 var(--ink);
+    cursor:pointer;
+    transition: transform .12s;
+  }
+  .profile-card:nth-child(1){ transform: rotate(-2.2deg); }
+  .profile-card:nth-child(2){ transform: rotate(2.2deg); }
+  .profile-card:active{ transform: scale(.96) rotate(0deg); }
+  .avatar{
+    width: 96px; height:96px; border-radius:50%;
+    background: var(--yellow);
+    border: 4px solid var(--ink);
+    margin: 0 auto 10px;
+    display:flex; align-items:center; justify-content:center;
+    font-size: 40px; overflow:hidden;
+    background-size: cover; background-position:center;
+  }
+  .profile-name{ font-weight:700; font-size:17px; min-height:22px; word-break:break-all;}
+  .profile-hint{ font-size:12px; color:#6b6f8f; margin-top:2px; }
+  .home-foot{ text-align:center; margin-top:auto; padding-top:20px; font-size:13px; color:#7a7ea3; }
+
+  /* Edit profile modal */
+  .modal-bg{
+    position:fixed; inset:0; background:rgba(43,46,74,.45);
+    display:none; align-items:center; justify-content:center; z-index:50; padding:20px;
+  }
+  .modal-bg.active{ display:flex; }
+  .modal{
+    background:var(--paper); border:4px solid var(--ink); border-radius:24px;
+    padding:22px; width:100%; max-width:340px; box-shadow: 6px 6px 0 var(--ink);
+    text-align:center;
+  }
+  .modal h3{ margin:0 0 14px; font-size:20px; }
+  .modal .avatar{ width:120px; height:120px; font-size:48px; cursor:pointer; }
+  .modal input[type=text]{
+    font-family:inherit; font-size:17px; width:100%; margin-top:14px;
+    padding:10px 12px; border-radius:14px; border:3px solid var(--ink);
+    text-align:center; background:var(--bg);
+  }
+  .modal-btnrow{ display:flex; gap:10px; margin-top:18px; }
+  .btn{
+    font-family:inherit; font-weight:700; font-size:16px; border:3px solid var(--ink);
+    border-radius:16px; padding:12px 10px; cursor:pointer; flex:1;
+    box-shadow: 3px 3px 0 var(--ink); background:var(--paper); color:var(--ink);
+  }
+  .btn:active{ transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }
+  .btn.primary{ background:var(--mint); }
+  .btn.ghost{ background:var(--paper); }
+
+  /* SUBJECTS */
+  .who-strip{ display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:14px; }
+  .who-strip .mini-avatar{ width:40px; height:40px; border-radius:50%; border:3px solid var(--ink); background-size:cover; background-position:center; background-color:var(--yellow);}
+  .who-strip .who-name{ font-weight:700; font-size:16px; }
+  .subject-grid{
+    display:grid; grid-template-columns: 1fr 1fr; gap:16px;
+    max-width: 480px; width:100%; margin: 6px auto auto;
+  }
+  .subject-card{
+    border:4px solid var(--ink); border-radius:24px; padding: 22px 10px;
+    text-align:center; cursor:pointer; box-shadow:5px 5px 0 var(--ink);
+    display:flex; flex-direction:column; align-items:center; gap:8px;
+  }
+  .subject-card:nth-child(1){ background:var(--coral); transform:rotate(-1.5deg);}
+  .subject-card:nth-child(2){ background:var(--purple); transform:rotate(1.5deg);}
+  .subject-card:nth-child(3){ background:var(--mint); transform:rotate(1.2deg);}
+  .subject-card:nth-child(4){ background:var(--yellow); transform:rotate(-1.2deg);}
+  .subject-card:active{ transform: scale(.96); }
+  .subject-icon{ font-size:40px; }
+  .subject-label{ font-weight:700; font-size:16px; color:var(--ink); line-height:1.3; }
+
+  /* QUIZ */
+  .quiz-top{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .quiz-who{ display:flex; align-items:center; gap:8px; }
+  .quiz-who .mini-avatar{ width:34px; height:34px; border-radius:50%; border:3px solid var(--ink); background-size:cover; background-position:center; background-color:var(--yellow); }
+  .dots{ display:flex; gap:6px; }
+  .dot{ width:14px; height:14px; border-radius:50%; border:2.5px solid var(--ink); background:var(--paper); }
+  .dot.done{ background:var(--mint); }
+
+  .quiz-body{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px; padding: 6px 0 20px; }
+  .q-card{
+    background:var(--paper); border:4px solid var(--ink); border-radius:26px;
+    padding: 22px 18px; text-align:center; box-shadow:5px 5px 0 var(--ink);
+    width:100%; max-width:440px;
+  }
+  .q-prompt{ font-size:15px; color:#5b5f82; font-weight:700; margin-bottom:8px;}
+  .q-main{ font-size:40px; font-weight:900; letter-spacing:1px; }
+  .q-main.small{ font-size:26px; }
+  .emoji-row{ font-size:34px; line-height:1.5; word-break:break-word; }
+  .q-clock-wrap{ display:flex; justify-content:center; }
+
+  .choices{ display:grid; grid-template-columns: 1fr 1fr; gap:14px; width:100%; max-width:440px; }
+  .choice-btn{
+    font-family:inherit; font-weight:700; font-size:22px;
+    border:4px solid var(--ink); border-radius:20px; padding:18px 8px;
+    background:var(--paper); cursor:pointer; box-shadow:4px 4px 0 var(--ink);
+  }
+  .choice-btn:active{ transform: translate(2px,2px); box-shadow:2px 2px 0 var(--ink); }
+  .choice-btn.correct-flash{ background:var(--mint); color:#fff; }
+  .choice-btn.wrong-flash{ background:var(--coral); color:#fff; animation: shake .35s; }
+  @keyframes shake{
+    0%,100%{ transform: translateX(0);} 25%{ transform: translateX(-6px);} 75%{ transform: translateX(6px);}
+  }
+
+  .feedback-msg{ min-height:26px; font-weight:700; font-size:16px; color:var(--coral-dark); }
+
+  /* CELEBRATE overlay */
+  #celebrate{
+    position:fixed; inset:0; z-index:100; display:none;
+    align-items:center; justify-content:center; flex-direction:column;
+    background: rgba(255,255,255,.9);
+    text-align:center; padding:24px;
+  }
+  #celebrate.active{ display:flex; }
+  .celebrate-photo{
+    width: 168px; height:168px; border-radius:50%; border:6px solid var(--yellow);
+    box-shadow: 0 0 0 6px #fff, 6px 6px 0 var(--ink);
+    background-size:cover; background-position:center; background-color:var(--yellow);
+    display:flex; align-items:center; justify-content:center; font-size:64px;
+    margin-bottom: 18px;
+    animation: pop .4s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes pop{ 0%{ transform:scale(.3); opacity:0;} 100%{ transform:scale(1); opacity:1;} }
+  .celebrate-msg{ font-size:30px; font-weight:900; color:var(--coral-dark); margin-bottom:6px; }
+  .celebrate-sub{ font-size:16px; font-weight:700; color:var(--ink); margin-bottom:22px; }
+  #confetti-layer{ position:fixed; inset:0; pointer-events:none; overflow:hidden; z-index:99; }
+  .confetti-piece{ position:absolute; top:-40px; font-size:26px; animation: fall linear forwards; }
+  @keyframes fall{
+    to{ transform: translateY(115vh) rotate(360deg); opacity:.9; }
+  }
+
+  /* RESULTS */
+  .results-card{
+    background:var(--paper); border:4px solid var(--ink); border-radius:26px;
+    padding: 30px 22px; text-align:center; box-shadow:6px 6px 0 var(--ink);
+    max-width: 380px; margin: auto;
+  }
+  .stars{ font-size:40px; letter-spacing:4px; margin: 10px 0 6px; }
+  .results-score{ font-size:20px; font-weight:700; margin-bottom:18px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HOME -->
+  <section id="screen-home" class="screen active">
+    <header class="top">
+      <h1>まなびひろば</h1>
+      <svg class="underline" viewBox="0 0 180 12"><path d="M2 8 Q 45 -2 90 8 T 178 8" fill="none" stroke="#FF6F59" stroke-width="5" stroke-linecap="round"/></svg>
+    </header>
+    <div class="profiles" id="profileList"></div>
+    <div class="home-foot">おなまえの わくを タップして とうろくしてね</div>
+  </section>
+
+  <!-- SUBJECTS -->
+  <section id="screen-subjects" class="screen">
+    <header class="top">
+      <button class="backbtn" data-back="home">← もどる</button>
+      <h1 style="font-size:24px;">なにをする?</h1>
+    </header>
+    <div class="who-strip">
+      <div class="mini-avatar" id="subjWhoAvatar"></div>
+      <div class="who-name" id="subjWhoName"></div>
+    </div>
+    <div class="subject-grid">
+      <div class="subject-card" data-subject="calc">
+        <div class="subject-icon">➕➖</div>
+        <div class="subject-label">たしざん<br>ひきざん</div>
+      </div>
+      <div class="subject-card" data-subject="hiragana">
+        <div class="subject-icon">あ</div>
+        <div class="subject-label">ひらがな<br>よみ</div>
+      </div>
+      <div class="subject-card" data-subject="count">
+        <div class="subject-icon">🔢</div>
+        <div class="subject-label">かず<br>かぞえよう</div>
+      </div>
+      <div class="subject-card" data-subject="clock">
+        <div class="subject-icon">🕐</div>
+        <div class="subject-label">とけい<br>よもう</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- QUIZ -->
+  <section id="screen-quiz" class="screen">
+    <div class="quiz-top">
+      <button class="backbtn" data-back="subjects" style="position:static;">← やめる</button>
+      <div class="dots" id="quizDots"></div>
+    </div>
+    <div class="quiz-body">
+      <div class="q-card" id="qCard"></div>
+      <div class="feedback-msg" id="feedbackMsg"></div>
+      <div class="choices" id="choicesWrap"></div>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <section id="screen-results" class="screen">
+    <div class="quiz-body">
+      <div class="results-card">
+        <div style="font-size:20px; font-weight:700;">よくがんばりました!</div>
+        <div class="stars" id="resultStars"></div>
+        <div class="results-score" id="resultScore"></div>
+        <div class="modal-btnrow">
+          <button class="btn primary" id="btnRetry">もういちど</button>
+          <button class="btn ghost" id="btnToSubjects">ほかの もんだい</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<!-- Profile edit modal -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h3>とうろく</h3>
+    <div class="avatar" id="modalAvatar">📷</div>
+    <input type="file" id="photoInput" accept="image/*" capture="user" style="display:none;">
+    <input type="text" id="nameInput" placeholder="おなまえ" maxlength="10">
+    <div class="modal-btnrow">
+      <button class="btn ghost" id="modalCancel">キャンセル</button>
+      <button class="btn primary" id="modalSave">ほぞん</button>
+    </div>
+  </div>
+</div>
+
+<!-- Celebrate overlay -->
+<div id="confetti-layer"></div>
+<div id="celebrate">
+  <div class="celebrate-photo" id="celebratePhoto">⭐</div>
+  <div class="celebrate-msg" id="celebrateMsg">せいかい!</div>
+  <div class="celebrate-sub" id="celebrateSub"></div>
+  <button class="btn primary" id="btnNextQuestion" style="max-width:200px;">つぎへ ▶</button>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var STORAGE_KEY = "kidsStudyApp_v1";
+  var state = {
+    participants: [
+      {id:"p1", name:"", photo:null},
+      {id:"p2", name:"", photo:null}
+    ]
+  };
+
+  function loadState(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(raw){
+        var parsed = JSON.parse(raw);
+        if(parsed && parsed.participants && parsed.participants.length){
+          state = parsed;
+        }
+      }
+    }catch(e){ console.warn("load failed", e); }
+  }
+  function saveState(){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+    catch(e){ console.warn("save failed", e); }
+  }
+
+  var PRAISE = ["すごいね!","せいかい!","よくできました!","てんさいだね!","やったね!","そのちょうし!","かんぺき!","すばらしい!","ばっちり!","たいしたものだ!"];
+
+  var WORDS = [
+    {emoji:"🍎", word:"りんご"},{emoji:"🐱", word:"ねこ"},{emoji:"🐶", word:"いぬ"},
+    {emoji:"🐟", word:"さかな"},{emoji:"⭐", word:"ほし"},{emoji:"🌙", word:"つき"},
+    {emoji:"🌸", word:"はな"},{emoji:"🚗", word:"くるま"},{emoji:"🚃", word:"でんしゃ"},
+    {emoji:"🐦", word:"とり"},{emoji:"🐰", word:"うさぎ"},{emoji:"🐘", word:"ぞう"},
+    {emoji:"☂️", word:"かさ"},{emoji:"🎈", word:"ふうせん"},{emoji:"🍙", word:"おにぎり"},
+    {emoji:"🐢", word:"かめ"},{emoji:"🦋", word:"ちょう"},{emoji:"🎂", word:"けーき"}
+  ];
+  var COUNT_EMOJI = ["🍓","🍎","⭐","🎈","🐟","🍩","🌸","🟡"];
+
+  // ---------- helpers ----------
+  function $(sel){ return document.querySelector(sel); }
+  function $all(sel){ return Array.prototype.slice.call(document.querySelectorAll(sel)); }
+  function shuffle(arr){
+    var a = arr.slice();
+    for(var i=a.length-1;i>0;i--){
+      var j = Math.floor(Math.random()*(i+1));
+      var t = a[i]; a[i]=a[j]; a[j]=t;
+    }
+    return a;
+  }
+  function randInt(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
+  function pick(arr){ return arr[randInt(0,arr.length-1)]; }
+
+  function showScreen(id){
+    $all(".screen").forEach(function(s){ s.classList.remove("active"); });
+    $("#"+id).classList.add("active");
+  }
+
+  // ---------- HOME ----------
+  var currentEditId = null;
+
+  function renderProfiles(){
+    var wrap = $("#profileList");
+    wrap.innerHTML = "";
+    state.participants.forEach(function(p){
+      var card = document.createElement("div");
+      card.className = "profile-card";
+      var avatarStyle = p.photo ? ("background-image:url(" + p.photo + ");") : "";
+      card.innerHTML =
+        '<div class="avatar" style="' + avatarStyle + '">' + (p.photo ? "" : "🙂") + '</div>' +
+        '<div class="profile-name">' + (p.name || "まだ ないよ") + '</div>' +
+        '<div class="profile-hint">' + (p.name ? "タップで がくしゅう" : "タップで とうろく") + '</div>';
+      card.addEventListener("click", function(){
+        if(p.name){
+          startForParticipant(p.id);
+        } else {
+          openEditModal(p.id);
+        }
+      });
+      card.addEventListener("dblclick", function(){ openEditModal(p.id); });
+      wrap.appendChild(card);
+    });
+  }
+
+  function openEditModal(id){
+    currentEditId = id;
+    var p = state.participants.find(function(x){ return x.id===id; });
+    $("#nameInput").value = p.name || "";
+    var av = $("#modalAvatar");
+    if(p.photo){ av.style.backgroundImage = "url(" + p.photo + ")"; av.textContent=""; }
+    else { av.style.backgroundImage = ""; av.textContent = "📷"; }
+    $("#modalBg").classList.add("active");
+  }
+  function closeModal(){ $("#modalBg").classList.remove("active"); currentEditId=null; }
+
+  $("#modalCancel").addEventListener("click", closeModal);
+  $("#modalAvatar").addEventListener("click", function(){ $("#photoInput").click(); });
+
+  $("#photoInput").addEventListener("change", function(e){
+    var file = e.target.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      var img = new Image();
+      img.onload = function(){
+        var size = 240;
+        var canvas = document.createElement("canvas");
+        canvas.width = size; canvas.height = size;
+        var ctx = canvas.getContext("2d");
+        var scale = Math.max(size/img.width, size/img.height);
+        var w = img.width*scale, h = img.height*scale;
+        ctx.drawImage(img, (size-w)/2, (size-h)/2, w, h);
+        var dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+        var av = $("#modalAvatar");
+        av.style.backgroundImage = "url(" + dataUrl + ")";
+        av.textContent = "";
+        av.dataset.pending = dataUrl;
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  $("#modalSave").addEventListener("click", function(){
+    var p = state.participants.find(function(x){ return x.id===currentEditId; });
+    if(!p) return;
+    var name = $("#nameInput").value.trim();
+    var pending = $("#modalAvatar").dataset.pending;
+    if(name) p.name = name;
+    if(pending) p.photo = pending;
+    $("#modalAvatar").dataset.pending = "";
+    saveState();
+    renderProfiles();
+    closeModal();
+  });
+
+  // ---------- SUBJECTS ----------
+  var current = { participant:null, subject:null, qIndex:0, correctCount:0, totalQ:5, question:null };
+
+  function startForParticipant(id){
+    current.participant = state.participants.find(function(x){ return x.id===id; });
+    var av = $("#subjWhoAvatar");
+    if(current.participant.photo){ av.style.backgroundImage = "url("+current.participant.photo+")"; }
+    else { av.style.backgroundImage = ""; }
+    $("#subjWhoName").textContent = current.participant.name + " さん";
+    showScreen("screen-subjects");
+  }
+
+  $all(".subject-card").forEach(function(card){
+    card.addEventListener("click", function(){
+      current.subject = card.dataset.subject;
+      current.qIndex = 0;
+      current.correctCount = 0;
+      showScreen("screen-quiz");
+      renderDots();
+      nextQuestion();
+    });
+  });
+
+  // ---------- BACK BUTTONS ----------
+  $all("[data-back]").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      var target = btn.dataset.back;
+      if(target === "home") showScreen("screen-home");
+      if(target === "subjects") showScreen("screen-subjects");
+    });
+  });
+
+  // ---------- QUESTION GENERATORS ----------
+  function genCalc(){
+    var isAdd = Math.random() < 0.5;
+    var a,b,answer,text;
+    if(isAdd){
+      a = randInt(1,8);
+      b = randInt(0, 9-a);
+      answer = a+b;
+      text = a + " ＋ " + b + " ＝ ？";
+    } else {
+      a = randInt(1,9);
+      b = randInt(0,a);
+      answer = a-b;
+      text = a + " － " + b + " ＝ ？";
+    }
+    var choices = new Set([answer]);
+    while(choices.size < 4){
+      var d = answer + pick([-2,-1,1,2,3]);
+      if(d>=0 && d<=9) choices.add(d);
+    }
+    return {
+      prompt: "けいさんしよう",
+      mainHtml: '<div class="q-main">' + text + '</div>',
+      choices: shuffle(Array.from(choices)).map(function(n){ return {label:String(n), correct:n===answer}; })
+    };
+  }
+
+  function genHiragana(){
+    var item = pick(WORDS);
+    var others = shuffle(WORDS.filter(function(w){ return w.word!==item.word; })).slice(0,3);
+    var choiceWords = shuffle([item.word].concat(others.map(function(w){return w.word;})));
+    return {
+      prompt: "なんて よむかな?",
+      mainHtml: '<div class="emoji-row">' + item.emoji + '</div>',
+      choices: choiceWords.map(function(w){ return {label:w, correct: w===item.word}; })
+    };
+  }
+
+  function genCount(){
+    var n = randInt(3,10);
+    var emo = pick(COUNT_EMOJI);
+    var row = "";
+    for(var i=0;i<n;i++) row += emo;
+    var choices = new Set([n]);
+    while(choices.size < 4){
+      var d = n + pick([-2,-1,1,2]);
+      if(d>=1 && d<=12) choices.add(d);
+    }
+    return {
+      prompt: "なんこ あるかな?",
+      mainHtml: '<div class="emoji-row">' + row + '</div>',
+      choices: shuffle(Array.from(choices)).map(function(n2){ return {label:String(n2)+"こ", correct:n2===n}; })
+    };
+  }
+
+  function clockSvg(hour, minute){
+    var hourAngle = (hour%12)*30 + minute*0.5;
+    var minuteAngle = minute*6;
+    var ticks = "";
+    for(var i=0;i<12;i++){
+      var ang = i*30*Math.PI/180;
+      var x1 = 90+70*Math.sin(ang), y1 = 90-70*Math.cos(ang);
+      var x2 = 90+80*Math.sin(ang), y2 = 90-80*Math.cos(ang);
+      ticks += '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="#2B2E4A" stroke-width="3" stroke-linecap="round"/>';
+    }
+    return '<svg width="180" height="180" viewBox="0 0 180 180">' +
+      '<circle cx="90" cy="90" r="82" fill="#FFF" stroke="#2B2E4A" stroke-width="5"/>' +
+      ticks +
+      '<line x1="90" y1="90" x2="90" y2="40" stroke="#2B2E4A" stroke-width="6" stroke-linecap="round" transform="rotate('+hourAngle+' 90 90)"/>' +
+      '<line x1="90" y1="90" x2="90" y2="24" stroke="#FF6F59" stroke-width="4.5" stroke-linecap="round" transform="rotate('+minuteAngle+' 90 90)"/>' +
+      '<circle cx="90" cy="90" r="6" fill="#2B2E4A"/>' +
+      '</svg>';
+  }
+
+  function timeLabel(hour, minute){
+    return minute===30 ? (hour + "じはん") : (hour + "じ");
+  }
+
+  function genClock(){
+    var hour = randInt(1,12);
+    var minute = pick([0,30]);
+    var correctLabel = timeLabel(hour, minute);
+    var choiceSet = new Set([correctLabel]);
+    while(choiceSet.size < 4){
+      var dh = ((hour-1+pick([-2,-1,1,2])+12)%12)+1;
+      var dm = pick([0,30]);
+      choiceSet.add(timeLabel(dh,dm));
+    }
+    return {
+      prompt: "なんじかな?",
+      mainHtml: '<div class="q-clock-wrap">' + clockSvg(hour,minute) + '</div>',
+      choices: shuffle(Array.from(choiceSet)).map(function(l){ return {label:l, correct:l===correctLabel}; })
+    };
+  }
+
+  var GENERATORS = { calc:genCalc, hiragana:genHiragana, count:genCount, clock:genClock };
+
+  // ---------- QUIZ FLOW ----------
+  function renderDots(){
+    var dotsWrap = $("#quizDots");
+    dotsWrap.innerHTML = "";
+    for(var i=0;i<current.totalQ;i++){
+      var d = document.createElement("div");
+      d.className = "dot" + (i < current.correctCount ? " done" : "");
+      dotsWrap.appendChild(d);
+    }
+  }
+
+  function nextQuestion(){
+    if(current.qIndex >= current.totalQ){
+      showResults();
+      return;
+    }
+    $("#feedbackMsg").textContent = "";
+    var gen = GENERATORS[current.subject];
+    current.question = gen();
+    $("#qCard").innerHTML =
+      '<div class="q-prompt">' + current.question.prompt + '</div>' + current.question.mainHtml;
+    var wrap = $("#choicesWrap");
+    wrap.innerHTML = "";
+    current.question.choices.forEach(function(c){
+      var btn = document.createElement("button");
+      btn.className = "choice-btn";
+      btn.textContent = c.label;
+      btn.addEventListener("click", function(){ handleAnswer(btn, c.correct); });
+      wrap.appendChild(btn);
+    });
+  }
+
+  function handleAnswer(btn, correct){
+    if(correct){
+      btn.classList.add("correct-flash");
+      $all(".choice-btn").forEach(function(b){ b.disabled = true; });
+      current.correctCount++;
+      renderDots();
+      setTimeout(function(){ celebrate(); }, 250);
+    } else {
+      btn.classList.add("wrong-flash");
+      $("#feedbackMsg").textContent = "おしいな、もういちど かんがえてみよう";
+      setTimeout(function(){ btn.classList.remove("wrong-flash"); }, 400);
+    }
+  }
+
+  function celebrate(){
+    var p = current.participant;
+    var photoEl = $("#celebratePhoto");
+    if(p.photo){ photoEl.style.backgroundImage = "url("+p.photo+")"; photoEl.textContent=""; }
+    else { photoEl.style.backgroundImage = ""; photoEl.textContent = "⭐"; }
+    $("#celebrateMsg").textContent = pick(PRAISE);
+    $("#celebrateSub").textContent = (p.name ? p.name + "さん、" : "") + "せいかい!";
+    $("#celebrate").classList.add("active");
+    launchConfetti();
+  }
+
+  function launchConfetti(){
+    var layer = $("#confetti-layer");
+    var pieces = ["🎉","⭐","✨","🎈","🌟","💮"];
+    for(var i=0;i<26;i++){
+      var span = document.createElement("span");
+      span.className = "confetti-piece";
+      span.textContent = pick(pieces);
+      span.style.left = randInt(0,98) + "vw";
+      span.style.animationDuration = (1.4 + Math.random()*1.2) + "s";
+      span.style.animationDelay = (Math.random()*0.4) + "s";
+      layer.appendChild(span);
+      (function(s){ setTimeout(function(){ s.remove(); }, 3200); })(span);
+    }
+  }
+
+  $("#btnNextQuestion").addEventListener("click", function(){
+    $("#celebrate").classList.remove("active");
+    current.qIndex++;
+    nextQuestion();
+  });
+
+  function showResults(){
+    showScreen("screen-results");
+    var pct = current.correctCount / current.totalQ;
+    var starCount = pct>=1 ? 3 : pct>=0.6 ? 2 : 1;
+    $("#resultStars").textContent = "⭐".repeat(starCount) + "☆".repeat(3-starCount);
+    $("#resultScore").textContent = current.totalQ + "もん中 " + current.correctCount + "もん せいかい!";
+  }
+
+  $("#btnRetry").addEventListener("click", function(){
+    current.qIndex = 0; current.correctCount = 0;
+    showScreen("screen-quiz");
+    renderDots();
+    nextQuestion();
+  });
+  $("#btnToSubjects").addEventListener("click", function(){
+    showScreen("screen-subjects");
+  });
+
+  // ---------- INIT ----------
+  loadState();
+  renderProfiles();
+})();
+</script>
+</body>
+</html>
