@@ -446,18 +446,25 @@ document.getElementById('saveBtn').addEventListener('click', async ()=>{
     const id = newRef.key;
     let pdfURL = null, pdfName = null;
 
+    const withTimeout = (promise, ms, label) => {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(()=>reject(new Error(label + "がタイムアウトしました。Firebaseのdatabase URLやルール設定を確認してください。")), ms))
+      ]);
+    };
+
     if(file){
       const fileRef = storage.ref(STORAGE_PATH + "/" + id + ".pdf");
-      await fileRef.put(file);
-      pdfURL = await fileRef.getDownloadURL();
+      await withTimeout(fileRef.put(file), 15000, "PDFアップロード");
+      pdfURL = await withTimeout(fileRef.getDownloadURL(), 10000, "PDF URL取得");
       pdfName = file.name;
     }
 
-    await newRef.set({
+    await withTimeout(newRef.set({
       date, type: selectedType, amount,
       pdfURL, pdfName,
       createdAt: Date.now()
-    });
+    }), 10000, "データ保存");
 
     document.getElementById('inAmount').value = '';
     document.getElementById('inFile').value = '';
