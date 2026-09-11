@@ -334,7 +334,6 @@
 <!-- ▼▼▼ Firebase SDK（compat版） ▼▼▼ -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
 <script>
 /* ==========================================================
@@ -343,8 +342,8 @@
      household-finance-tracker等と同じ config 値をそのまま貼り付けてください。
      新規プロジェクトを使う場合は Firebase コンソールの
      プロジェクト設定 > SDK構成 から config をコピーして貼り付けてください。
-   ※ Firebase Storage を使うため、Firebaseコンソールで
-     「Storage」を有効化（Get Started）しておく必要があります。
+   ※ 有料のFirebase Storageは使わず、PDFはBase64文字列に変換して
+     Realtime Database（無料プラン）内に直接保存します。
    ========================================================== */
 const firebaseConfig = {
   apiKey: "AIzaSyDvXGKQkfgi3_aiuWq2I8VlT2GPgvCBd-k",
@@ -358,9 +357,11 @@ const firebaseConfig = {
 
 // データパス（他アプリと衝突しないよう独立させる）
 const DB_PATH = "salary-tracker/entries";
-const STORAGE_PATH = "salary-tracker/pdfs";
 
-let db, storage;
+// PDFファイルサイズの上限（Base64化するとサイズが約1.33倍になるため余裕を持たせる）
+const MAX_PDF_BYTES = 4 * 1024 * 1024; // 4MB
+
+let db;
 let entries = {}; // id -> entry
 let firebaseReady = false;
 
@@ -368,7 +369,6 @@ function initFirebase(){
   try{
     firebase.initializeApp(firebaseConfig);
     db = firebase.database();
-    storage = firebase.storage();
     firebaseReady = true;
     setSyncStatus("接続済み・同期中", "ok");
     listenEntries();
@@ -427,6 +427,16 @@ function toast(msg){
   setTimeout(()=>t.classList.remove('show'), 2000);
 }
 
+/* ---------- ファイルをBase64に変換 ---------- */
+function readFileAsDataURL(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("PDFの読み込みに失敗しました"));
+    reader.readAsDataURL(file);
+  });
+}
+
 /* ---------- 保存 ---------- */
 document.getElementById('saveBtn').addEventListener('click', async ()=>{
   if(!firebaseReady){ toast("Firebase未接続です"); return; }
@@ -436,33 +446,34 @@ document.getElementById('saveBtn').addEventListener('click', async ()=>{
 
   if(!date){ toast("給与日を入力してください"); return; }
   if(!amount || amount <= 0){ toast("金額を入力してください"); return; }
+  if(file && file.size > MAX_PDF_BYTES){
+    toast("PDFが大きすぎます（4MB以下にしてください）");
+    return;
+  }
 
   const saveBtn = document.getElementById('saveBtn');
   saveBtn.disabled = true;
   saveBtn.textContent = "保存中...";
 
+  const withTimeout = (promise, ms, label) => {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(()=>reject(new Error(label + "がタイムアウトしました。Firebaseのdatabase URLやルール設定を確認してください。")), ms))
+    ]);
+  };
+
   try{
     const newRef = db.ref(DB_PATH).push();
-    const id = newRef.key;
-    let pdfURL = null, pdfName = null;
-
-    const withTimeout = (promise, ms, label) => {
-      return Promise.race([
-        promise,
-        new Promise((_, reject) => setTimeout(()=>reject(new Error(label + "がタイムアウトしました。Firebaseのdatabase URLやルール設定を確認してください。")), ms))
-      ]);
-    };
+    let pdfData = null, pdfName = null;
 
     if(file){
-      const fileRef = storage.ref(STORAGE_PATH + "/" + id + ".pdf");
-      await withTimeout(fileRef.put(file), 15000, "PDFアップロード");
-      pdfURL = await withTimeout(fileRef.getDownloadURL(), 10000, "PDF URL取得");
+      pdfData = await withTimeout(readFileAsDataURL(file), 10000, "PDF読み込み");
       pdfName = file.name;
     }
 
     await withTimeout(newRef.set({
       date, type: selectedType, amount,
-      pdfURL, pdfName,
+      pdfData, pdfName,
       createdAt: Date.now()
     }), 10000, "データ保存");
 
@@ -499,8 +510,8 @@ function renderList(){
 
   body.innerHTML = ids.map(id=>{
     const e = entries[id];
-    const pdfLink = e.pdfURL
-      ? `<a class="pdf-link" href="${e.pdfURL}" target="_blank" rel="noopener">明細書PDF</a>`
+    const pdfLink = e.pdfData
+      ? `<a class="pdf-link" href="${e.pdfData}" target="_blank" rel="noopener" download="${e.pdfName||'明細書.pdf'}">明細書PDF</a>`
       : `<span class="pdf-link" style="color:#b0b6bd;">PDFなし</span>`;
     return `
       <div class="entry">
@@ -522,10 +533,6 @@ function renderList(){
 async function deleteEntry(id){
   if(!confirm("この記録を削除しますか？（PDFも削除されます）")) return;
   try{
-    const e = entries[id];
-    if(e && e.pdfURL){
-      try{ await storage.ref(STORAGE_PATH + "/" + id + ".pdf").delete(); }catch(err){}
-    }
     await db.ref(DB_PATH + "/" + id).remove();
     toast("削除しました");
   }catch(e){
@@ -565,13 +572,15 @@ document.getElementById('editSave').addEventListener('click', async ()=>{
   const amount = parseInt(document.getElementById('editAmount').value, 10);
   const file = document.getElementById('editFile').files[0];
   if(!date || !amount){ toast("入力内容を確認してください"); return; }
+  if(file && file.size > MAX_PDF_BYTES){
+    toast("PDFが大きすぎます（4MB以下にしてください）");
+    return;
+  }
 
   try{
     const update = { date, type: editingType, amount };
     if(file){
-      const fileRef = storage.ref(STORAGE_PATH + "/" + editingId + ".pdf");
-      await fileRef.put(file);
-      update.pdfURL = await fileRef.getDownloadURL();
+      update.pdfData = await readFileAsDataURL(file);
       update.pdfName = file.name;
     }
     await db.ref(DB_PATH + "/" + editingId).update(update);
