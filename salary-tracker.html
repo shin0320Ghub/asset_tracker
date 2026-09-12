@@ -193,7 +193,16 @@
   .entry .info{flex:1;min-width:0;}
   .entry .date{font-size:12px;color:var(--sub);}
   .entry .amount{font-size:16px;font-weight:600;}
-  .entry .pdf-link{font-size:12px;color:var(--accent);}
+  .entry .pdf-link{
+    font-size:12px;
+    color:var(--accent);
+    background:none;
+    border:none;
+    padding:0;
+    font-family:inherit;
+    text-decoration:underline;
+    cursor:pointer;
+  }
   .entry .actions{display:flex;gap:6px;flex-shrink:0;}
   .entry .actions button{
     border:none;background:none;font-size:18px;padding:4px 6px;color:var(--sub);
@@ -494,6 +503,35 @@ document.getElementById('saveBtn').addEventListener('click', async ()=>{
   }
 });
 
+/* ---------- PDFを開く（Base64→Blobに変換してから開く） ---------- */
+function dataURLtoBlob(dataurl){
+  const parts = dataurl.split(',');
+  const mimeMatch = parts[0].match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : 'application/pdf';
+  const bstr = atob(parts[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while(n--){ u8arr[n] = bstr.charCodeAt(n); }
+  return new Blob([u8arr], { type: mime });
+}
+
+function openPdf(id){
+  const e = entries[id];
+  if(!e || !e.pdfData){ toast("PDFがありません"); return; }
+  try{
+    const blob = dataURLtoBlob(e.pdfData);
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, '_blank');
+    if(!win){
+      toast("ポップアップがブロックされました。設定を確認してください");
+    }
+    setTimeout(()=>URL.revokeObjectURL(url), 60000);
+  }catch(err){
+    console.error(err);
+    toast("PDFを開けませんでした");
+  }
+}
+
 /* ---------- 一覧描画 ---------- */
 function fmtYen(n){ return "¥" + Number(n).toLocaleString('ja-JP'); }
 function fmtDate(d){
@@ -516,7 +554,7 @@ function renderList(){
   body.innerHTML = ids.map(id=>{
     const e = entries[id];
     const pdfLink = e.pdfData
-      ? `<a class="pdf-link" href="${e.pdfData}" target="_blank" rel="noopener" download="${e.pdfName||'明細書.pdf'}">明細書PDF</a>`
+      ? `<button class="pdf-link" onclick="openPdf('${id}')">明細書PDF</button>`
       : `<span class="pdf-link" style="color:#b0b6bd;">PDFなし</span>`;
     return `
       <div class="entry">
