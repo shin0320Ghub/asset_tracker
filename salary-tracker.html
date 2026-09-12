@@ -107,13 +107,18 @@
   .field input[type=date],
   .field input[type=number],
   .field select{
+    display:block;
     width:100%;
+    box-sizing:border-box;
+    -webkit-appearance:none;
+    appearance:none;
     padding:11px 10px;
     border:1px solid var(--border);
     border-radius:8px;
     font-size:16px;
     background:#fafbfc;
     color:var(--text);
+    min-height:44px;
   }
   .type-picker{display:flex;gap:8px;}
   .type-picker button{
