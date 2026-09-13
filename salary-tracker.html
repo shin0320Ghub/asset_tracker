@@ -263,6 +263,7 @@
     <button class="active" data-tab="input">入力</button>
     <button data-tab="list">一覧</button>
     <button data-tab="yearly">年別集計</button>
+    <button data-tab="settings">設定</button>
   </div>
 </nav>
 
@@ -309,6 +310,25 @@
   <section id="tab-yearly" style="display:none;">
     <div id="yearlyBody"></div>
     <div class="empty" id="yearlyEmpty" style="display:none;">まだ記録がありません</div>
+  </section>
+
+  <!-- 設定タブ -->
+  <section id="tab-settings" style="display:none;">
+    <div class="card">
+      <h3 style="margin-top:0;font-size:15px;">バックアップ</h3>
+      <p style="font-size:13px;color:var(--sub);margin-top:0;">全ての記録（PDF含む）をJSONファイルとして書き出します。</p>
+      <button class="primary" id="backupBtn">バックアップを書き出す</button>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0;font-size:15px;">復元</h3>
+      <p style="font-size:13px;color:var(--sub);margin-top:0;">
+        バックアップファイルを選択すると、現在のデータを<b>上書き</b>します。
+      </p>
+      <div class="file-drop">
+        <input type="file" id="restoreFile" accept="application/json,.json">
+      </div>
+      <button class="primary" id="restoreBtn" style="margin-top:10px;">このファイルで復元する</button>
+    </div>
   </section>
 
 </main>
@@ -414,7 +434,7 @@ document.querySelectorAll('nav.tabs button').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
-    ['input','list','yearly'].forEach(t=>{
+    ['input','list','yearly','settings'].forEach(t=>{
       document.getElementById('tab-'+t).style.display = (t===btn.dataset.tab) ? 'block':'none';
     });
   });
@@ -672,6 +692,67 @@ function renderYearly(){
       </div>`;
   }).join('');
 }
+
+/* ---------- バックアップ / 復元 ---------- */
+document.getElementById('backupBtn').addEventListener('click', ()=>{
+  if(Object.keys(entries).length === 0){ toast("バックアップする記録がありません"); return; }
+  const payload = {
+    app: "salary-tracker",
+    exportedAt: new Date().toISOString(),
+    entries
+  };
+  const json = JSON.stringify(payload, null, 2);
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const now = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const filename = `salary-backup-${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}.json`;
+
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 30000);
+  toast("バックアップを書き出しました");
+});
+
+document.getElementById('restoreBtn').addEventListener('click', async ()=>{
+  if(!firebaseReady){ toast("Firebase未接続です"); return; }
+  const file = document.getElementById('restoreFile').files[0];
+  if(!file){ toast("復元用のファイルを選択してください"); return; }
+
+  try{
+    const text = await file.text();
+    const payload = JSON.parse(text);
+    const restoredEntries = payload && payload.entries ? payload.entries : payload;
+
+    if(!restoredEntries || typeof restoredEntries !== 'object'){
+      toast("ファイルの形式が正しくありません");
+      return;
+    }
+
+    const count = Object.keys(restoredEntries).length;
+    if(!confirm(`現在のデータを削除して、${count}件の記録で上書きします。よろしいですか？`)) return;
+
+    const restoreBtn = document.getElementById('restoreBtn');
+    restoreBtn.disabled = true;
+    restoreBtn.textContent = "復元中...";
+
+    await db.ref(DB_PATH).set(restoredEntries);
+
+    document.getElementById('restoreFile').value = '';
+    toast("復元しました");
+  }catch(e){
+    console.error(e);
+    toast("復元に失敗しました: " + e.message);
+  }finally{
+    const restoreBtn = document.getElementById('restoreBtn');
+    restoreBtn.disabled = false;
+    restoreBtn.textContent = "このファイルで復元する";
+  }
+});
 
 /* ---------- 起動 ---------- */
 initFirebase();
