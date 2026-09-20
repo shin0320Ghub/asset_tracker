@@ -48,6 +48,20 @@
   }
   #app{max-width:var(--app-max);margin:0 auto;min-height:100vh;display:flex;flex-direction:column;}
 
+  .auth-screen{
+    display:flex;align-items:center;justify-content:center;
+    min-height:100vh;background:var(--ink);
+    padding:calc(env(safe-area-inset-top) + 24px) 20px calc(env(safe-area-inset-bottom) + 24px);
+  }
+  .auth-card{
+    width:100%;max-width:360px;
+    background:var(--card);border-radius:var(--radius-card);
+    padding:26px 22px;
+  }
+  .auth-card h1{font-size:19px;color:var(--ink);text-align:center;margin-bottom:18px;}
+  .auth-card .btn{margin-top:16px;}
+  .auth-card .btn.secondary{margin-top:10px;}
+
   header{
     padding:calc(env(safe-area-inset-top) + 18px) 20px 16px;
     background:var(--ink);
@@ -86,7 +100,7 @@
 
   label{display:block;font-size:12.5px;color:var(--ink-soft);margin:10px 0 4px;}
   label:first-child{margin-top:0;}
-  input[type=number],input[type=date],input[type=month],input[type=text],select,textarea{
+  input[type=number],input[type=date],input[type=month],input[type=text],input[type=password],select,textarea{
     width:100%;
     padding:10px 11px;
     font-size:15px;
@@ -195,7 +209,7 @@
     header .summary .box .val{font-size:18px;}
     .card{padding:20px 22px;}
     .card h2{font-size:17px;}
-    input[type=number],input[type=date],input[type=month],input[type=text],select,textarea{font-size:16px;padding:11px 12px;}
+    input[type=number],input[type=date],input[type=month],input[type=text],input[type=password],select,textarea{font-size:16px;padding:11px 12px;}
     .grid3{grid-template-columns:repeat(4,1fr);gap:0 12px;}
     .btn{font-size:16px;}
     nav#bottom-nav button{font-size:12.5px;padding:12px 4px 10px;}
@@ -214,7 +228,13 @@
 </style>
 </head>
 <body>
-<div id="app">
+<div id="auth-screen" class="auth-screen">
+  <div class="auth-card">
+    <h1>家計・年金シミュレーター</h1>
+    <div id="auth-body"></div>
+  </div>
+</div>
+<div id="app" style="display:none;">
   <header>
     <div class="title-row">
       <h1>家計・年金シミュレーター</h1>
@@ -228,12 +248,12 @@
   </header>
   <main id="tab-content"></main>
   <nav id="bottom-nav">
-    <button data-tab="dashboard"><span class="ic">🏠</span>ダッシュボード</button>
     <button data-tab="input"><span class="ic">📝</span>収支入力</button>
     <button data-tab="assets"><span class="ic">💰</span>資産管理</button>
     <button data-tab="settings"><span class="ic">⚙️</span>年金設定</button>
     <button data-tab="sim"><span class="ic">📈</span>シミュレーション</button>
   </nav>
+
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -295,6 +315,7 @@ const EXPENSE_FIELDS = [
 
 /* ============ 状態管理 ============ */
 const STORAGE_KEY = 'kakeiSimData_v1';
+const AUTH_LOCAL_KEY = 'kakeiSimAuthOK_v1';
 let state = loadState();
 
 function defaultState(){
@@ -302,7 +323,8 @@ function defaultState(){
     entries: [],      // {ym:'2026-09', income:{...}, expenses:{...}}
     assets: { savings:0, investment:0, history:[] }, // history: {id,date,type,amount,note}
     settings: { birthDate:'', pensionBase65:0, startAge:65, simEndAge:90, monthlyBudget:0 },
-    simInputs: { salary:0, dividend:0, expenses:{} }
+    simInputs: { salary:0, dividend:0, expenses:{} },
+    auth: { passwordHash:'' }
   };
 }
 function normalizeState(parsed){
@@ -312,7 +334,8 @@ function normalizeState(parsed){
     entries: parsed.entries || d.entries,
     assets: Object.assign(d.assets, parsed.assets||{}),
     settings: Object.assign(d.settings, parsed.settings||{}),
-    simInputs: Object.assign(d.simInputs, parsed.simInputs||{}, {expenses: Object.assign({}, (parsed.simInputs&&parsed.simInputs.expenses)||{})})
+    simInputs: Object.assign(d.simInputs, parsed.simInputs||{}, {expenses: Object.assign({}, (parsed.simInputs&&parsed.simInputs.expenses)||{})}),
+    auth: Object.assign(d.auth, parsed.auth||{})
   };
 }
 function loadState(){
@@ -337,8 +360,14 @@ function saveState(){
 }
 
 /* ============ Firebaseリアルタイム同期 ============ */
+let appUnlocked = false;
+
 function initFirebaseSync(){
-  if(!firebaseReady || !dataRef){ setSyncStatus('offline'); return; }
+  if(!firebaseReady || !dataRef){
+    setSyncStatus('offline');
+    checkAuthAndInit();
+    return;
+  }
   setSyncStatus('syncing');
   dataRef.on('value', snap => {
     // 自分自身の書き込みで発火した最初の通知はスキップ（不要な再描画防止）
@@ -348,19 +377,146 @@ function initFirebaseSync(){
     if(val){
       state = normalizeState(val);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      renderHeader();
-      renderers[currentTab]();
+      if(appUnlocked){
+        renderHeader();
+        renderers[currentTab]();
+      } else {
+        checkAuthAndInit();
+      }
     } else if(!firstSnapshotHandled){
       // リモートが空 ＝ 初回。この端末のローカルデータをアップロードする
       dataRef.set(state).catch(err=>console.error('initial upload failed', err));
+      checkAuthAndInit();
     }
     firstSnapshotHandled = true;
     setSyncStatus('ok');
   }, err => {
     console.error('Firebase sync error', err);
     setSyncStatus('error');
+    if(!firstSnapshotHandled){
+      firstSnapshotHandled = true;
+      checkAuthAndInit(); // オフライン時はローカルキャッシュのデータで認証チェック
+    }
   });
+  // 応答が一定時間なければローカルキャッシュにフォールバック
+  setTimeout(()=>{
+    if(!firstSnapshotHandled){
+      firstSnapshotHandled = true;
+      checkAuthAndInit();
+    }
+  }, 4000);
 }
+
+/* ============ ログイン認証 ============ */
+async function sha256Hex(text){
+  const enc = new TextEncoder().encode(text);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+function checkAuthAndInit(){
+  if(state.auth && state.auth.passwordHash){
+    if(localStorage.getItem(AUTH_LOCAL_KEY) === '1'){
+      unlockApp();
+    } else {
+      showAuthScreen('login');
+    }
+  } else {
+    showAuthScreen('setup');
+  }
+}
+
+function unlockApp(){
+  appUnlocked = true;
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  renderHeader();
+  setTab(currentTab || 'input');
+}
+
+function showAuthScreen(mode){
+  appUnlocked = false;
+  document.getElementById('app').style.display = 'none';
+  const scr = document.getElementById('auth-screen');
+  scr.style.display = 'flex';
+  const body = document.getElementById('auth-body');
+
+  if(mode === 'loading'){
+    body.innerHTML = `<div class="empty">読み込み中…</div>`;
+    return;
+  }
+
+  if(mode === 'setup'){
+    body.innerHTML = `
+      <div class="field-note">はじめに、このアプリを開く際のパスワードを設定してください（4文字以上）。設定後は他の端末でも同じパスワードでログインできます。</div>
+      <label>新しいパスワード</label>
+      <input type="password" id="auth-pw1" autocomplete="new-password">
+      <label>確認のため再入力</label>
+      <input type="password" id="auth-pw2" autocomplete="new-password">
+      <button class="btn" id="auth-setup-btn">パスワードを設定してはじめる</button>
+      <div class="field-note" id="auth-error" style="color:var(--red);"></div>
+    `;
+    document.getElementById('auth-setup-btn').addEventListener('click', async ()=>{
+      const p1 = document.getElementById('auth-pw1').value;
+      const p2 = document.getElementById('auth-pw2').value;
+      const err = document.getElementById('auth-error');
+      if(p1.length < 4){ err.textContent = '4文字以上で入力してください'; return; }
+      if(p1 !== p2){ err.textContent = 'パスワードが一致しません'; return; }
+      state.auth = { passwordHash: await sha256Hex(p1) };
+      saveState();
+      localStorage.setItem(AUTH_LOCAL_KEY, '1');
+      unlockApp();
+    });
+    return;
+  }
+
+  if(mode === 'login'){
+    body.innerHTML = `
+      <label>パスワード</label>
+      <input type="password" id="auth-pw" autocomplete="current-password">
+      <button class="btn" id="auth-login-btn">ログイン</button>
+      <div class="field-note" id="auth-error" style="color:var(--red);"></div>
+    `;
+    const tryLogin = async ()=>{
+      const pw = document.getElementById('auth-pw').value;
+      const err = document.getElementById('auth-error');
+      const hash = await sha256Hex(pw);
+      if(hash === state.auth.passwordHash){
+        localStorage.setItem(AUTH_LOCAL_KEY, '1');
+        unlockApp();
+      } else {
+        err.textContent = 'パスワードが違います';
+      }
+    };
+    document.getElementById('auth-login-btn').addEventListener('click', tryLogin);
+    document.getElementById('auth-pw').addEventListener('keydown', e=>{ if(e.key === 'Enter') tryLogin(); });
+    document.getElementById('auth-pw').focus();
+    return;
+  }
+}
+
+function logoutApp(){
+  localStorage.removeItem(AUTH_LOCAL_KEY);
+  showAuthScreen('login');
+}
+
+async function changePassword(){
+  if(!state.auth || !state.auth.passwordHash){ alert('パスワードが未設定です'); return; }
+  const current = prompt('現在のパスワードを入力してください');
+  if(current === null) return;
+  const curHash = await sha256Hex(current);
+  if(curHash !== state.auth.passwordHash){ alert('現在のパスワードが違います'); return; }
+  const next1 = prompt('新しいパスワードを入力してください（4文字以上）');
+  if(next1 === null) return;
+  if(next1.length < 4){ alert('4文字以上で入力してください'); return; }
+  const next2 = prompt('確認のため、もう一度入力してください');
+  if(next2 === null) return;
+  if(next1 !== next2){ alert('パスワードが一致しません'); return; }
+  state.auth.passwordHash = await sha256Hex(next1);
+  saveState();
+  alert('パスワードを変更しました');
+}
+
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 
 /* ============ ユーティリティ ============ */
@@ -393,7 +549,7 @@ function renderHeader(){
 
 /* ============ タブ切替 ============ */
 let currentTab = 'input';
-const renderers = { dashboard: renderDashboardTab, input: renderInputTab, assets: renderAssetsTab, settings: renderSettingsTab, sim: renderSimTab };
+const renderers = { input: renderInputTab, assets: renderAssetsTab, settings: renderSettingsTab, sim: renderSimTab };
 
 function setTab(tab){
   currentTab = tab;
@@ -405,154 +561,6 @@ function setTab(tab){
 document.querySelectorAll('#bottom-nav button').forEach(b=>{
   b.addEventListener('click', ()=> setTab(b.dataset.tab));
 });
-
-/* ============ ダッシュボードタブ ============ */
-function renderDashboardTab(){
-  const main = document.getElementById('tab-content');
-  const totalAssets = num(state.assets.savings) + num(state.assets.investment);
-  const sortedEntries = [...state.entries].sort((a,b)=> b.ym.localeCompare(a.ym));
-  const latest = sortedEntries[0];
-
-  let latestBlock;
-  if(latest){
-    const incTotal = sumFields(latest.income, INCOME_FIELDS);
-    const expTotal = sumFields(latest.expenses, EXPENSE_FIELDS);
-    const net = incTotal - expTotal;
-    latestBlock = `
-      <div class="stat-line"><span>収入</span><span class="v">${yen(incTotal)}</span></div>
-      <div class="stat-line"><span>支出</span><span class="v">${yen(expTotal)}</span></div>
-      <div class="stat-line"><span>差引</span><span class="v" style="color:${net>=0?'#2E5266':'#A6503B'}">${net>=0?'+':''}${yen(net)}</span></div>
-    `;
-  } else {
-    latestBlock = '<div class="empty">まだ収支の記録がありません</div>';
-  }
-
-  let simBlock;
-  const s = state.settings;
-  if(s.birthDate && s.pensionBase65 && s.simEndAge && s.monthlyBudget){
-    const si = state.simInputs || {};
-    const salary = si.salary || 0;
-    const dividend = (si.dividend != null && si.dividend !== 0) ? si.dividend : averageOf('dividend','income');
-    const expenses = {};
-    EXPENSE_FIELDS.forEach(f=> expenses[f.key] = (si.expenses && si.expenses[f.key] != null) ? si.expenses[f.key] : averageOf(f.key,'expenses'));
-    const result = computeSimulation(salary, dividend, expenses);
-    if(result){
-      let headline;
-      if(result.depletedAt){
-        const age = ageAt(result.birthDate, result.depletedAt);
-        headline = `⚠️ ${age}歳ごろに資金が枯渇する見込み`;
-      } else {
-        headline = `✅ ${result.endAgeSetting}歳まで資金維持の見込み（残り約${yenCompact(result.finalBalance)}）`;
-      }
-      simBlock = `
-        <div class="stat-line"><span>見込み</span><span class="v">${headline}</span></div>
-        <button class="btn secondary small" id="dash-go-sim" style="margin-top:10px;">シミュレーションで詳しく見る</button>
-      `;
-    } else {
-      simBlock = '<div class="empty">設定を確認してください</div>';
-    }
-  } else {
-    simBlock = '<div class="empty">「年金設定」タブで基本情報を保存するとここに表示されます</div>';
-  }
-
-  main.innerHTML = `
-    <div class="result-banner ok" style="text-align:center;">
-      <div class="detail" style="margin-top:0;">総資産（貯蓄＋投資）</div>
-      <div class="headline" style="font-size:26px;margin-top:4px;">${yen(totalAssets)}</div>
-    </div>
-
-    <div class="card">
-      <h2>直近の収支${latest? `<span class="sec-note">${monthLabel(latest.ym)}</span>`:''}</h2>
-      ${latestBlock}
-    </div>
-
-    <div class="card">
-      <h2>支出内訳${latest? `<span class="sec-note">${monthLabel(latest.ym)}</span>`:''}</h2>
-      <div id="dash-expense-chart"></div>
-    </div>
-
-    <div class="card">
-      <h2>収支推移<span class="sec-note">直近6ヶ月</span></h2>
-      <div id="dash-trend-chart"></div>
-    </div>
-
-    <div class="card">
-      <h2>将来シミュレーション（概要）</h2>
-      ${simBlock}
-    </div>
-  `;
-
-  drawExpenseBreakdownChart(latest ? latest.expenses : null);
-  drawTrendBarChart(sortedEntries.slice(0,6).reverse());
-
-  const goSimBtn = document.getElementById('dash-go-sim');
-  if(goSimBtn){ goSimBtn.addEventListener('click', ()=> setTab('sim')); }
-}
-
-function drawExpenseBreakdownChart(expenses){
-  const holder = document.getElementById('dash-expense-chart');
-  if(!holder) return;
-  if(!expenses){ holder.innerHTML = '<div class="empty">支出の記録がありません</div>'; return; }
-  const items = EXPENSE_FIELDS.map(f=>({label:f.label, val:num(expenses[f.key])})).filter(i=>i.val>0).sort((a,b)=>b.val-a.val);
-  if(items.length===0){ holder.innerHTML = '<div class="empty">支出の記録がありません</div>'; return; }
-  const max = Math.max(...items.map(i=>i.val));
-  const rowH = 26, gap = 8, padL = 76, padR = 54, W = 600;
-  const H = items.length*(rowH+gap) - gap;
-  const bars = items.map((it,i)=>{
-    const y = i*(rowH+gap);
-    const w = Math.max(2, (it.val/max) * (W-padL-padR));
-    return `
-      <text x="${padL-8}" y="${y+rowH*0.68}" font-size="12.5" fill="#5B6B78" text-anchor="end">${it.label}</text>
-      <rect x="${padL}" y="${y}" width="${w}" height="${rowH}" rx="5" fill="#2E5266"/>
-      <text x="${padL+w+6}" y="${y+rowH*0.68}" font-size="12.5" fill="#1B2A38">${yenCompact(it.val)}</text>
-    `;
-  }).join('');
-  holder.innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">${bars}</svg>`;
-}
-
-function drawTrendBarChart(entries){
-  const holder = document.getElementById('dash-trend-chart');
-  if(!holder) return;
-  if(!entries || entries.length===0){ holder.innerHTML = '<div class="empty">まだ収支の記録がありません</div>'; return; }
-  const data = entries.map(e=>({
-    ym:e.ym,
-    inc: sumFields(e.income, INCOME_FIELDS),
-    exp: sumFields(e.expenses, EXPENSE_FIELDS)
-  }));
-  const maxVal = Math.max(...data.map(d=>Math.max(d.inc,d.exp)), 1);
-  const W=600, H=220, padT=16, padB=34, padL=60, padR=16;
-  const groupW = (W-padL-padR)/data.length;
-  const barW = Math.min(22, groupW*0.32);
-  const yForVal = v => H-padB - (v/maxVal)*(H-padT-padB);
-  const topLabel = yenCompact(maxVal);
-
-  const bars = data.map((d,i)=>{
-    const cx = padL + groupW*i + groupW/2;
-    const incX = cx - barW - 3;
-    const expX = cx + 3;
-    const incY = yForVal(d.inc);
-    const expY = yForVal(d.exp);
-    const m = d.ym.split('-')[1];
-    return `
-      <rect x="${incX}" y="${incY}" width="${barW}" height="${Math.max(0,H-padB-incY)}" fill="#2E5266" rx="3"/>
-      <rect x="${expX}" y="${expY}" width="${barW}" height="${Math.max(0,H-padB-expY)}" fill="#A6503B" rx="3"/>
-      <text x="${cx}" y="${H-14}" font-size="12" fill="#5B6B78" text-anchor="middle">${parseInt(m,10)}月</text>
-    `;
-  }).join('');
-
-  holder.innerHTML = `
-    <svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
-      <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${H-padB}" stroke="#E3DED0"/>
-      <line x1="${padL}" y1="${H-padB}" x2="${W-padR}" y2="${H-padB}" stroke="#E3DED0"/>
-      <text x="${padL-8}" y="${padT+10}" font-size="12" fill="#5B6B78" text-anchor="end">${topLabel}</text>
-      ${bars}
-    </svg>
-    <div class="chart-legend">
-      <span><i style="background:#2E5266"></i>収入</span>
-      <span><i style="background:#A6503B"></i>支出</span>
-    </div>
-  `;
-}
 
 /* ============ 収支入力タブ ============ */
 let editingYm = null;
@@ -803,6 +811,13 @@ function renderSettingsTab(){
       <button class="btn secondary" id="bk-import-btn">バックアップから復元（ファイル読み込み）</button>
       <input type="file" id="bk-import-file" accept="application/json,.json" style="display:none;">
     </div>
+
+    <div class="card">
+      <h2>セキュリティ</h2>
+      <div class="field-note">ログインパスワードの変更や、この端末のログイン状態の解除ができます。</div>
+      <button class="btn secondary" id="auth-change-btn" style="margin-top:12px;">パスワードを変更</button>
+      <button class="btn secondary" id="auth-logout-btn">ログアウト</button>
+    </div>
   `;
 
   document.querySelectorAll('#st-startage button').forEach(b=>{
@@ -822,6 +837,10 @@ function renderSettingsTab(){
     if(file) importBackupFile(file);
     e.target.value = '';
   });
+  document.getElementById('auth-change-btn').addEventListener('click', changePassword);
+  document.getElementById('auth-logout-btn').addEventListener('click', ()=>{
+    if(confirm('ログアウトしますか？次回はパスワードの入力が必要になります。')) logoutApp();
+  });
   renderSettingsPreview(s.startAge || 65);
 }
 
@@ -829,7 +848,7 @@ function renderSettingsTab(){
 function exportBackup(){
   const payload = {
     app: 'kakei-sim',
-    version: 'Ver1.1',
+    version: 'Ver1.2',
     exportedAt: new Date().toISOString(),
     data: state
   };
@@ -989,6 +1008,8 @@ function renderSimTab(){
 }
 
 function runSimulation(){
+  const s = state.settings;
+
   const salary = num(document.getElementById('si-salary').value);
   const dividend = num(document.getElementById('si-dividend').value);
   const expenses = {};
@@ -996,16 +1017,6 @@ function runSimulation(){
 
   state.simInputs = { salary, dividend, expenses };
   saveState();
-
-  const result = computeSimulation(salary, dividend, expenses);
-  if(!result){ return; }
-  renderSimResult(result);
-}
-
-/* シミュレーション本体（ダッシュボードの簡易表示とシミュレーションタブの両方から利用） */
-function computeSimulation(salary, dividend, expenses){
-  const s = state.settings;
-  if(!s.birthDate || !s.pensionBase65 || !s.simEndAge || !s.monthlyBudget) return null;
 
   const annual = pensionAnnual(s.pensionBase65, s.startAge);
   const pensionMonthly = annual/12;
@@ -1071,7 +1082,7 @@ function computeSimulation(salary, dividend, expenses){
     points.push({date:new Date(cursor), balance: savings+investment});
   }
 
-  return {shortfall, depletedAt, birthDate:s.birthDate, endAgeSetting:s.simEndAge, finalBalance: savings+investment, points, startDate};
+  renderSimResult({shortfall, depletedAt, birthDate:s.birthDate, endAgeSetting:s.simEndAge, finalBalance: savings+investment, points, startDate});
 }
 
 function ageAt(birthDateStr, date){
@@ -1169,8 +1180,7 @@ document.addEventListener('input', e=>{
 });
 
 /* ============ 初期化 ============ */
-renderHeader();
-setTab('dashboard');
+showAuthScreen('loading');
 initFirebaseSync();
 </script>
 </body>
