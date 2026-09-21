@@ -478,14 +478,14 @@ window.addEventListener('unhandledrejection', function(e){
 <script type="module">
 /* ===== Firebase(新方式):ログイン用の隠しフレームを読み込まない軽量な方式 ===== */
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import { initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, signInWithEmailAndPassword,
+import { initializeAuth, browserLocalPersistence, signInWithEmailAndPassword,
          onAuthStateChanged, signOut, sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { getDatabase, ref as dRef, onValue, push as dPush, set as dSet, remove as dRemove } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
 import { getStorage, ref as sRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
 
 window.__fbInit = function(config){
   const app = initializeApp(config);
-  const A = initializeAuth(app, { persistence: [indexedDBLocalPersistence, browserLocalPersistence] });
+  const A = initializeAuth(app, { persistence: browserLocalPersistence });  // IndexedDBは使わない(Safariの保存領域の不具合対策)
   A.languageCode = 'ja';
   const D = getDatabase(app);
   const S = getStorage(app);
@@ -536,7 +536,7 @@ const firebaseConfig = {
 
 </script>
 <script type="module">
-const APP_VER = 'Ver3.1';
+const APP_VER = 'Ver3.2';
 const MAX_PDF = 10 * 1024 * 1024;          // PDFは10MBまで
 const ROOT = 'salary';                      // データベース上の保存場所
 const TYPES = {
