@@ -537,7 +537,7 @@ const firebaseConfig = {
 
 </script>
 <script type="module">
-const APP_VER = 'Ver3.3';
+const APP_VER = 'Ver3.4';
 const MAX_PDF = 10 * 1024 * 1024;          // PDFは10MBまで
 const ROOT = 'salary';                      // データベース上の保存場所
 const TYPES = {
@@ -654,7 +654,7 @@ const IS_STANDALONE = (window.navigator.standalone === true) || matchMedia('(dis
 if (IS_STANDALONE) {
   const em = $('email'), pw = $('password');
   $('loginForm').setAttribute('autocomplete','off');
-  em.type = 'text'; em.name = 'f_a'; em.setAttribute('autocomplete','off'); em.setAttribute('inputmode','email');
+  em.type = 'text'; em.name = 'f_a'; em.setAttribute('autocomplete','off'); em.removeAttribute('inputmode');  // メール用キーボードを使わない
   pw.type = 'text'; pw.name = 'f_b'; pw.setAttribute('autocomplete','off');
   pw.setAttribute('autocapitalize','off'); pw.setAttribute('autocorrect','off'); pw.setAttribute('spellcheck','false');
   pw.classList.add('masked');
