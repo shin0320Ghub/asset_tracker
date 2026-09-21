@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="給与管理">
 <meta name="theme-color" content="#1F3358">
-<meta name="referrer" content="no-referrer">
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="robots" content="noindex, nofollow">
 <title>給与管理</title>
 <style>
@@ -526,7 +526,7 @@ const firebaseConfig = {
 
 </script>
 <script type="module">
-const APP_VER = 'Ver2.8';
+const APP_VER = 'Ver2.9';
 const MAX_PDF = 10 * 1024 * 1024;          // PDFは10MBまで
 const ROOT = 'salary';                      // データベース上の保存場所
 const TYPES = {
@@ -625,8 +625,13 @@ function authMsg(code){
     'auth/invalid-email':'メールアドレスの形式が正しくありません。',
     'auth/too-many-requests':'試行回数が多すぎます。しばらく待ってから再度お試しください。',
     'auth/network-request-failed':'通信できません。電波状況を確認してください。',
-    'auth/user-disabled':'このアカウントは無効化されています。'
-  })[code] || 'ログインできませんでした。('+code+')';
+    'auth/user-disabled':'このアカウントは無効化されています。',
+    'auth/operation-not-allowed':'メール/パスワードでのログインが有効になっていません(Firebaseコンソール → Authentication → Sign-in method)。',
+    'auth/unauthorized-domain':'このサイトのドメインが承認済みドメインに登録されていません。',
+    'auth/timeout':'応答がありません。通信状態を確認して、もう一度お試しください。'
+  })[code] || (/referer|referrer|api-key|API_KEY/i.test(String(code))
+      ? 'APIキーの使用元の制限で拒否されました。Google Cloud の APIキー設定に「https://あなたのID.github.io/*」が入っているか確認してください。('+code+')'
+      : 'ログインできませんでした。('+code+')');
 }
 
 $('loginForm').addEventListener('submit', e => { e.preventDefault(); doLogin(); });
@@ -638,16 +643,22 @@ async function doLogin(){
   }
   const email=$('email').value.trim(), pw=$('password').value;
   if(!email||!pw){ $('loginErr').textContent='メールアドレスとパスワードを入力してください。'; return; }
-  $('loginBtn').disabled=true; $('loginErr').textContent='';
+  $('loginBtn').disabled=true; $('loginBtn').textContent='ログイン中…'; $('loginErr').textContent='';
   try{
-    await auth.signInWithEmailAndPassword(email,pw);
+    await Promise.race([
+      auth.signInWithEmailAndPassword(email,pw),
+      new Promise((_,rej)=>setTimeout(()=>rej({code:'auth/timeout'}),20000))
+    ]);
     setLock({n:0,until:0});
     $('password').value='';
   }catch(e){
+    const code = e && (e.code || e.message) || 'unknown';
+    try{ const d=JSON.parse(localStorage.getItem('salary_diag'))||{}; d.errs=(d.errs||[]).concat(['login '+code]).slice(-3); localStorage.setItem('salary_diag',JSON.stringify(d)); }catch(_){}
+    if(code==='auth/timeout' || code==='auth/network-request-failed'){ $('loginErr').textContent=authMsg(code); return; }
     const n=s.n+1;
     setLock(n>=5 ? {n:0,until:Date.now()+5*60000} : {n,until:0});
-    $('loginErr').textContent = n>=5 ? '5回失敗したため、5分間ログインを停止します。' : authMsg(e.code);
-  }finally{ $('loginBtn').disabled=false; }
+    $('loginErr').textContent = n>=5 ? '5回失敗したため、5分間ログインを停止します。' : authMsg(code);
+  }finally{ $('loginBtn').disabled=false; $('loginBtn').textContent='ログイン'; }
 }
 
 $('resetBtn').onclick = async () => {
