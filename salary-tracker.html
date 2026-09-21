@@ -16,7 +16,7 @@
   --band:#1F3358; --band-2:#2A4373; --band-ink:#FFFFFF; --band-sub:#B9C6DE;
   --bg:#EEF1F5; --card:#FFFFFF; --ink:#172234; --sub:#5E6B80; --line:#DCE2EA;
   --salary:#3D63B0; --bonus:#C0902F; --div:#2E8062; --danger:#B3362D;
-  --field:#F6F8FB; --focus:#3D63B0;
+  --field:#F6F8FB; --focus:#3D63B0; --focus-ring:rgba(61,99,176,.22);
   --r-lg:18px; --r-md:12px; --r-sm:8px;
   --shell:680px;
   --font:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;
@@ -26,7 +26,7 @@
     --band:#16223A; --band-2:#1F2F50; --band-sub:#9AA9C6;
     --bg:#0E131C; --card:#171E2A; --ink:#E6EBF3; --sub:#95A1B5; --line:#283244;
     --salary:#7C9BE0; --bonus:#DDB25A; --div:#58B38F; --danger:#E0736A;
-    --field:#1D2533; --focus:#7C9BE0;
+    --field:#1D2533; --focus:#7C9BE0; --focus-ring:rgba(124,155,224,.30);
   }
 }
 *,*::before,*::after{box-sizing:border-box}
@@ -159,14 +159,14 @@ main{padding:14px 0 110px}
 .field>label,.field>.lbl{display:block;font-size:12.5px;font-weight:600;color:var(--sub);margin-bottom:6px}
 .inp{display:block;width:100%;min-width:0;max-width:100%;height:48px;padding:0 14px;border:1px solid var(--line);
   border-radius:var(--r-sm);background:var(--field);font-size:16px;-webkit-appearance:none;appearance:none}
-.inp:focus{outline:none;border-color:var(--focus);box-shadow:0 0 0 3px color-mix(in srgb,var(--focus) 22%,transparent)}
+.inp:focus{outline:none;border-color:var(--focus);box-shadow:0 0 0 3px var(--focus-ring)}
 select.inp{background-image:linear-gradient(45deg,transparent 50%,var(--sub) 50%),linear-gradient(135deg,var(--sub) 50%,transparent 50%);
   background-position:calc(100% - 20px) 21px,calc(100% - 15px) 21px;background-size:5px 5px;background-repeat:no-repeat;padding-right:36px}
 
 /* 給与日：表示用ボックスの上に透明な日付入力を重ねる(はみ出し防止) */
 .date-box{position:relative;height:48px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--field);
   overflow:hidden;display:flex;align-items:center;gap:10px;padding:0 14px}
-.date-box:focus-within{border-color:var(--focus);box-shadow:0 0 0 3px color-mix(in srgb,var(--focus) 22%,transparent)}
+.date-box:focus-within{border-color:var(--focus);box-shadow:0 0 0 3px var(--focus-ring)}
 .date-box svg{flex:none;color:var(--sub)}
 .date-text{flex:1;min-width:0;font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .date-text.ph{color:var(--sub);font-weight:400}
@@ -457,7 +457,7 @@ const firebaseConfig = {
 
 </script>
 <script>
-const APP_VER = 'Ver2.4';
+const APP_VER = 'Ver2.5';
 const MAX_PDF = 10 * 1024 * 1024;          // PDFは10MBまで
 const ROOT = 'salary';                      // データベース上の保存場所
 const TYPES = {
