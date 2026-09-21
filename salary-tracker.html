@@ -536,7 +536,7 @@ const firebaseConfig = {
 
 </script>
 <script type="module">
-const APP_VER = 'Ver3.0';
+const APP_VER = 'Ver3.1';
 const MAX_PDF = 10 * 1024 * 1024;          // PDFは10MBまで
 const ROOT = 'salary';                      // データベース上の保存場所
 const TYPES = {
@@ -607,6 +607,7 @@ const bootTimer = setTimeout(() => {
 }, 15000);
 
 let user = null, records = {}, recRef = null, connRef = null;
+const IDLE_KEY='salary_idle_min', LAST_KEY='salary_last_active';
 let curYear = new Date().getFullYear();
 let editingId = null, pendingFile = null, removePdf = false;
 
@@ -658,6 +659,7 @@ async function doLogin(){
   if(!email||!pw){ $('loginErr').textContent='メールアドレスとパスワードを入力してください。'; return; }
   $('loginBtn').disabled=true; $('loginBtn').textContent='ログイン中…'; $('loginErr').textContent='';
   try{
+    touch(); justLoggedIn = true;
     await Promise.race([
       auth.signInWithEmailAndPassword(email,pw),
       new Promise((_,rej)=>setTimeout(()=>rej({code:'auth/timeout'}),20000))
@@ -665,6 +667,7 @@ async function doLogin(){
     setLock({n:0,until:0});
     $('password').value='';
   }catch(e){
+    justLoggedIn = false;
     const code = e && (e.code || e.message) || 'unknown';
     try{ const d=JSON.parse(localStorage.getItem('salary_diag'))||{}; d.errs=(d.errs||[]).concat(['login '+code]).slice(-3); localStorage.setItem('salary_diag',JSON.stringify(d)); }catch(_){}
     if(code==='auth/timeout' || code==='auth/network-request-failed'){ $('loginErr').textContent=authMsg(code); return; }
@@ -681,13 +684,20 @@ $('resetBtn').onclick = async () => {
   $('loginErr').textContent='登録済みのアドレスであれば、再設定メールを送信しました。';
 };
 
+let justLoggedIn = false;
 auth.onAuthStateChanged(u => {
   if (u) {
-    if (idleExpired()) { auth.signOut(); return; }
+    if (!justLoggedIn && idleExpired()) {
+      auth.signOut();
+      $('loginErr').textContent = '前回の操作から時間が経ったため、ログアウトしました。';
+      return;
+    }
+    justLoggedIn = false;
     user=u; touch(); $('userEmail').textContent=u.email||'';
     show('app'); subscribe();
   } else {
     user=null; unsubscribe(); records={}; closeSheet(true); show('login');
+    try{ localStorage.removeItem(LAST_KEY); }catch(e){}
   }
 });
 
@@ -707,7 +717,7 @@ function unsubscribe(){ if(recRef){recRef.off();recRef=null;} if(connRef){connRe
 $('logoutBtn').onclick = () => { if(confirm('ログアウトしますか?')) auth.signOut(); };
 
 /* ---------- 自動ログアウト ---------- */
-const IDLE_KEY='salary_idle_min', LAST_KEY='salary_last_active';
+
 const idleMin = () => { const v=localStorage.getItem(IDLE_KEY); return v===null?30:Number(v); };
 $('idleSel').value = String(idleMin());
 $('idleSel').onchange = e => { localStorage.setItem(IDLE_KEY,e.target.value); touch(); toast('自動ログアウトを変更しました'); };
