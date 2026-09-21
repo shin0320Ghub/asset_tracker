@@ -2,10 +2,10 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="給与管理">
 <meta name="theme-color" content="#1F3358">
 <meta name="referrer" content="strict-origin-when-cross-origin">
@@ -30,9 +30,9 @@
   }
 }
 *,*::before,*::after{box-sizing:border-box}
-html{height:100%;-webkit-text-size-adjust:100%;overscroll-behavior-y:none}
+html{height:100%;-webkit-text-size-adjust:100%}
 body{
-  margin:0;min-height:100%;overscroll-behavior-y:none;background:var(--bg);color:var(--ink);
+  margin:0;min-height:100%;background:var(--bg);color:var(--ink);
   font-family:var(--font);font-size:15px;line-height:1.55;
   -webkit-tap-highlight-color:transparent;
   padding-bottom:env(safe-area-inset-bottom,0px);
@@ -537,7 +537,7 @@ const firebaseConfig = {
 
 </script>
 <script type="module">
-const APP_VER = 'Ver3.4';
+const APP_VER = 'Ver3.5';
 const MAX_PDF = 10 * 1024 * 1024;          // PDFは10MBまで
 const ROOT = 'salary';                      // データベース上の保存場所
 const TYPES = {
