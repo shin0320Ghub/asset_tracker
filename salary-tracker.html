@@ -211,7 +211,8 @@ select.inp{background-image:linear-gradient(45deg,transparent 50%,var(--sub) 50%
 /* ===== 入力シート ===== */
 .overlay{position:fixed;inset:0;background:rgba(10,16,28,.5);z-index:40;display:flex;align-items:flex-end;justify-content:center;
   opacity:0;pointer-events:none;transition:opacity .2s}
-.overlay.open{opacity:1;pointer-events:auto}
+.overlay{visibility:hidden;transition:opacity .2s,visibility 0s linear .2s}
+.overlay.open{opacity:1;pointer-events:auto;visibility:visible;transition:opacity .2s,visibility 0s}
 .sheet{width:100%;max-width:var(--shell);max-height:92vh;overflow-y:auto;background:var(--card);border-radius:var(--r-lg) var(--r-lg) 0 0;
   padding:8px 18px calc(20px + env(safe-area-inset-bottom,0px));transform:translateY(24px);transition:transform .22s ease;
   -webkit-overflow-scrolling:touch;overscroll-behavior:contain}
@@ -410,7 +411,7 @@ window.addEventListener('unhandledrejection', function(e){
 </div>
 
 <!-- ===== 入力シート ===== -->
-<div class="overlay" id="overlay" aria-hidden="true">
+<div class="overlay" id="overlay" aria-hidden="true" inert>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
     <div class="grab"></div>
     <div class="sheet-head">
@@ -525,7 +526,7 @@ const firebaseConfig = {
 
 </script>
 <script type="module">
-const APP_VER = 'Ver2.7';
+const APP_VER = 'Ver2.8';
 const MAX_PDF = 10 * 1024 * 1024;          // PDFは10MBまで
 const ROOT = 'salary';                      // データベース上の保存場所
 const TYPES = {
@@ -808,14 +809,14 @@ function openSheet(id){
   $('fMemo').value = r ? (r.memo||'') : '';
   $('delWrap').classList.toggle('hidden',!r);
   renderPdfBox();
-  $('overlay').classList.add('open'); $('overlay').setAttribute('aria-hidden','false');
+  $('overlay').inert=false; $('overlay').removeAttribute('inert'); $('overlay').classList.add('open'); $('overlay').setAttribute('aria-hidden','false');
   document.body.style.overflow='hidden';
 }
 window.openSheet=openSheet;
 window.__pickYear = y => { curYear = y; render(); scrollTo({top:0,behavior:'smooth'}); };
 function closeSheet(force){
   if(!force && $('saveBtn').disabled) return;
-  $('overlay').classList.remove('open'); $('overlay').setAttribute('aria-hidden','true');
+  $('overlay').classList.remove('open'); $('overlay').setAttribute('aria-hidden','true'); $('overlay').setAttribute('inert',''); if(document.activeElement && $('overlay').contains(document.activeElement)) document.activeElement.blur();
   document.body.style.overflow=''; editingId=null; pendingFile=null;
 }
 $('addBtn').onclick=()=>openSheet();
