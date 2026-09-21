@@ -57,6 +57,8 @@ button{cursor:pointer}
 .login-body{padding:22px 24px 24px}
 .login-body .field+.field{margin-top:14px}
 .login-err{min-height:20px;margin:12px 0 0;color:var(--danger);font-size:13px}
+.diag-box{margin:0 24px 20px;padding:10px 12px;border-radius:8px;background:var(--field);font-size:11.5px;line-height:1.6;color:var(--sub);word-break:break-all}
+.diag-box:empty{display:none}
 .linkbtn{background:none;border:0;padding:6px 0;color:var(--salary);font-size:13px;text-decoration:underline;text-underline-offset:3px}
 
 /* ===== ヘッダー(通帳の帯) ===== */
@@ -239,6 +241,31 @@ select.inp{background-image:linear-gradient(45deg,transparent 50%,var(--sub) 50%
 </style>
 </head>
 <body>
+<script>
+/* ===== 診断記録:画面が消える原因を特定するための記録 ===== */
+(function(){
+  var K='salary_diag', d={};
+  try{ d=JSON.parse(localStorage.getItem(K))||{}; }catch(e){}
+  var now=Date.now();
+  var save=function(){ try{ localStorage.setItem(K,JSON.stringify(d)); }catch(e){} };
+  var nav=''; try{ var n=performance.getEntriesByType('navigation')[0]; nav=n?n.type:''; }catch(e){}
+  window.__diag = {
+    nav: nav,
+    loads: (d.loads||[]).filter(function(t){return now-t<120000;}).length + 1,
+    focusAgo: d.lastFocus ? Math.round((now-d.lastFocus)/1000) : null,
+    focusId: d.lastFocusId || '',
+    hideAgo: d.lastHide ? Math.round((now-d.lastHide)/1000) : null,
+    errs: (d.errs||[]).slice(-3)
+  };
+  d.loads=(d.loads||[]).filter(function(t){return now-t<120000;}); d.loads.push(now);
+  d.lastFocus=0; d.lastFocusId=''; d.lastHide=0; d.errs=[];
+  save();
+  document.addEventListener('focusin',function(e){ d.lastFocus=Date.now(); d.lastFocusId=(e.target&&e.target.id)||''; save(); },true);
+  addEventListener('pagehide',function(){ d.lastHide=Date.now(); save(); });
+  addEventListener('error',function(e){ d.errs=(d.errs||[]).concat([String(e.message||'resource')+' '+String(e.filename||'').split('/').pop()+':'+(e.lineno||'')]).slice(-3); save(); },true);
+  addEventListener('unhandledrejection',function(e){ d.errs=(d.errs||[]).concat(['rej '+String(e.reason&&e.reason.message||e.reason)]).slice(-3); save(); });
+})();
+</script>
 
 <!-- ===== 起動中/エラー表示(何も出ない状態を防ぐ) ===== -->
 <div id="bootView" class="setup">
@@ -283,21 +310,22 @@ window.addEventListener('unhandledrejection', function(e){
       <h1>給与管理</h1>
       <p>登録済みのメールアドレスでログインしてください<span id="loginVer" style="float:right;opacity:.8"></span></p>
     </div>
-    <div class="login-body">
+    <form class="login-body" id="loginForm" autocomplete="on" novalidate>
       <div class="field">
         <label for="email">メールアドレス</label>
-        <input id="email" class="inp" type="email" autocomplete="username" inputmode="email" autocapitalize="off">
+        <input id="email" name="email" class="inp" type="email" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false">
       </div>
       <div class="field">
         <label for="password">パスワード</label>
-        <input id="password" class="inp" type="password" autocomplete="current-password">
+        <input id="password" name="password" class="inp" type="password" autocomplete="current-password">
       </div>
       <p class="login-err" id="loginErr" role="alert"></p>
-      <button class="btn primary block" id="loginBtn">ログイン</button>
+      <button type="submit" class="btn primary block" id="loginBtn">ログイン</button>
       <div style="text-align:center;margin-top:10px">
-        <button class="linkbtn" id="resetBtn">パスワードを再設定する</button>
+        <button type="button" class="linkbtn" id="resetBtn">パスワードを再設定する</button>
       </div>
-    </div>
+    </form>
+    <div class="diag-box" id="diagBox"></div>
   </div>
 </section>
 
@@ -457,7 +485,7 @@ const firebaseConfig = {
 
 </script>
 <script>
-const APP_VER = 'Ver2.5';
+const APP_VER = 'Ver2.6';
 const MAX_PDF = 10 * 1024 * 1024;          // PDFは10MBまで
 const ROOT = 'salary';                      // データベース上の保存場所
 const TYPES = {
@@ -476,6 +504,21 @@ const parseD = s => { const [y,m,d]=s.split('-').map(Number); return new Date(y,
 
 $('verLabel').textContent = APP_VER;
 $('loginVer').textContent = APP_VER;
+(function(){
+  const g = window.__diag || {};
+  const standalone = (window.navigator.standalone === true) || matchMedia('(display-mode: standalone)').matches;
+  const ios = (navigator.userAgent.match(/OS (\d+)_(\d+)/) || []).slice(1).join('.');
+  const browser = /CriOS/.test(navigator.userAgent) ? 'Chrome' : /FxiOS/.test(navigator.userAgent) ? 'Firefox' : 'Safari';
+  const reloaded = g.loads > 1 && g.focusAgo !== null && g.focusAgo <= 20;
+  if (!reloaded && g.loads <= 1) return;
+  $('diagBox').innerHTML =
+    '<b>診断情報</b>(この内容をそのまま送ってください)<br>' +
+    `${APP_VER} / ${standalone ? 'ホーム画面' : browser} / iOS ${ios || '不明'}<br>` +
+    `読込:${g.nav || '-'} / 2分内の読込:${g.loads}回<br>` +
+    `タッチから再読込まで:${g.focusAgo ?? '-'}秒(${g.focusId || '-'})<br>` +
+    `終了処理:${g.hideAgo === null ? 'なし' : g.hideAgo + '秒前'}<br>` +
+    `エラー:${(g.errs && g.errs.length) ? esc(g.errs.join(' | ')) : 'なし'}`;
+})();
 
 /* ---------- 初期化 ---------- */
 if (typeof firebase === 'undefined') {
@@ -549,7 +592,8 @@ function authMsg(code){
   })[code] || 'ログインできませんでした。('+code+')';
 }
 
-$('loginBtn').onclick = async () => {
+$('loginForm').addEventListener('submit', e => { e.preventDefault(); doLogin(); });
+async function doLogin(){
   const s = lockState();
   if (Date.now() < s.until) {
     $('loginErr').textContent = `ログインを一時停止しています。あと${Math.ceil((s.until-Date.now())/60000)}分お待ちください。`;
@@ -567,8 +611,8 @@ $('loginBtn').onclick = async () => {
     setLock(n>=5 ? {n:0,until:Date.now()+5*60000} : {n,until:0});
     $('loginErr').textContent = n>=5 ? '5回失敗したため、5分間ログインを停止します。' : authMsg(e.code);
   }finally{ $('loginBtn').disabled=false; }
-};
-$('password').addEventListener('keydown',e=>{ if(e.key==='Enter') $('loginBtn').click(); });
+}
+
 $('resetBtn').onclick = async () => {
   const email=$('email').value.trim();
   if(!email){ $('loginErr').textContent='先にメールアドレスを入力してください。'; return; }
