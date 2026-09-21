@@ -240,11 +240,31 @@ select.inp{background-image:linear-gradient(45deg,transparent 50%,var(--sub) 50%
 </head>
 <body>
 
-<!-- ===== 初期設定未完了の表示 ===== -->
-<div id="setupView" class="setup hidden">
-  <h2 style="margin-top:0">Firebaseの設定が必要です</h2>
-  <p>このHTMLファイル内の <code>firebaseConfig</code> に、asset-tracker プロジェクトの設定値を貼り付けてください。</p>
+<!-- ===== 起動中/エラー表示(何も出ない状態を防ぐ) ===== -->
+<div id="bootView" class="setup">
+  <h2 style="margin-top:0" id="bootTitle">給与管理を起動しています…</h2>
+  <div id="bootMsg" style="color:var(--sub)">しばらくお待ちください。</div>
 </div>
+<script>
+window.__bootFail = function(title, html){
+  var v=document.getElementById('bootView'); if(!v) return;
+  v.classList.remove('hidden');
+  document.getElementById('bootTitle').textContent = title;
+  document.getElementById('bootMsg').innerHTML = html;
+  ['loginView','appView'].forEach(function(id){ var e=document.getElementById(id); if(e) e.classList.add('hidden'); });
+};
+window.addEventListener('error', function(e){
+  if (e.target && e.target.tagName === 'SCRIPT') {
+    __bootFail('部品を読み込めませんでした', 'Firebaseのプログラムを取得できませんでした。<br>インターネット接続、またはコンテンツブロッカー(広告ブロック)を確認してください。');
+    return;
+  }
+  var m = String(e.message||'');
+  var hint = /firebaseConfig|Unexpected|Identifier|SyntaxError|missing/i.test(m)
+    ? '<br><br>多くの場合、<b>firebaseConfig の貼り付け部分</b>の書式の誤りです。<br>・「const firebaseConfig =」が二重になっていないか<br>・{ } の中だけを置き換え、カンマ(,)や " が欠けていないか<br>を確認してください。'
+    : '';
+  __bootFail('エラーのため起動できませんでした', '内容:<code>'+m.replace(/</g,'&lt;')+'</code>'+(e.lineno?'('+e.lineno+'行目)':'')+hint);
+}, true);
+</script>
 
 <!-- ===== ログイン画面 ===== -->
 <section id="loginView" class="hidden">
@@ -330,7 +350,7 @@ select.inp{background-image:linear-gradient(45deg,transparent 50%,var(--sub) 50%
           </div>
           <div class="set-item">
             <h3>復元</h3>
-            <p>バックアップファイルから記録を読み込みます。</p>
+            <p>バックアップファイルから記録を読み込みます。旧版(Ver1.x)のバックアップも、PDFごと移行できます。</p>
             <label class="check"><input type="radio" name="rsMode" value="merge" checked><span>統合する(今のデータを残し、同じ記録は上書き)</span></label>
             <label class="check"><input type="radio" name="rsMode" value="replace"><span>置き換える(今のデータとPDFをすべて削除してから読み込み)</span></label>
             <button class="btn small" id="restoreBtn">ファイルを選んで復元</button>
@@ -413,18 +433,22 @@ select.inp{background-image:linear-gradient(45deg,transparent 50%,var(--sub) 50%
 <script>
 /* =========================================================
    ここに asset-tracker プロジェクトの設定を貼り付けてください
-   (Firebaseコンソール → プロジェクトの設定 → マイ
+   (Firebaseコンソール → プロジェクトの設定 → マイアプリ)
+   ========================================================= */
+
 const firebaseConfig = {
-  apiKey: "AIzaSyBUQjfeamTm1gCWNiXhZcxyBIUiQSptvDs",
-  authDomain: "asset-tracker-b3fac.firebaseapp.com",
-  databaseURL: "https://asset-tracker-b3fac-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "asset-tracker-b3fac",
-  storageBucket: "asset-tracker-b3fac.firebasestorage.app",
-  messagingSenderId: "36181399487",
-  appId: "1:36181399487:web:0ef48412b814d81aaa330a"
+  apiKey: "AIzaSyBUQjfeamTm1gCWNiXhZcxyBIUiQSptvDs",
+  authDomain: "asset-tracker-b3fac.firebaseapp.com",
+  databaseURL: "https://asset-tracker-b3fac-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "asset-tracker-b3fac",
+  storageBucket: "asset-tracker-b3fac.firebasestorage.app",
+  messagingSenderId: "36181399487",
+  appId: "1:36181399487:web:0ef48412b814d81aaa330a"
 };
 
-const APP_VER = 'Ver2.0';
+</script>
+<script>
+const APP_VER = 'Ver2.2';
 const MAX_PDF = 10 * 1024 * 1024;          // PDFは10MBまで
 const ROOT = 'salary';                      // データベース上の保存場所
 const TYPES = {
@@ -444,15 +468,42 @@ const parseD = s => { const [y,m,d]=s.split('-').map(Number); return new Date(y,
 $('verLabel').textContent = APP_VER;
 
 /* ---------- 初期化 ---------- */
-if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes('ここに')) {
-  $('setupView').classList.remove('hidden');
-  throw new Error('firebaseConfig未設定');
+if (typeof firebase === 'undefined') {
+  __bootFail('部品を読み込めませんでした', 'Firebaseのプログラムを取得できませんでした。<br>インターネット接続、またはコンテンツブロッカー(広告ブロック)を確認してください。');
+  throw new Error('firebase SDK not loaded');
 }
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db = firebase.database();
-const storage = firebase.storage();
-auth.languageCode = 'ja';
+if (typeof firebaseConfig === 'undefined') {
+  __bootFail('設定の書式に誤りがあります', 'firebaseConfig の貼り付け部分を確認してください。<br>「const firebaseConfig =」の二重記載、カンマ(,)や " の欠けがよくある原因です。');
+  throw new Error('firebaseConfig invalid');
+}
+(function(){
+  const need = ['apiKey','authDomain','databaseURL','projectId','storageBucket','appId'];
+  const bad = need.filter(k => !firebaseConfig[k] || String(firebaseConfig[k]).includes('ここに'));
+  if (bad.length) {
+    __bootFail('Firebaseの設定が必要です', 'firebaseConfig に次の項目が入っていません:<br><code>'+bad.join('</code> <code>')+'</code>'
+      + (bad.includes('databaseURL') ? '<br><br>databaseURL は Realtime Database の画面上部に表示されるURL(https://…firebaseio.com または …firebasedatabase.app)です。' : '')
+      + (bad.includes('storageBucket') ? '<br><br>storageBucket は Storage を開始すると設定値に表示されます(…firebasestorage.app または …appspot.com)。' : ''));
+    throw new Error('firebaseConfig incomplete');
+  }
+})();
+if (location.protocol === 'file:') {
+  __bootFail('ファイルを直接開いています', 'ログイン機能はブラウザでファイルを直接開く方法では動作しません。<br>GitHubにアップロードし、GitHub Pages のURL(https://…github.io/…)から開いてください。');
+  throw new Error('file protocol');
+}
+let auth, db, storage;
+try {
+  firebase.initializeApp(firebaseConfig);
+  auth = firebase.auth();
+  db = firebase.database();
+  storage = firebase.storage();
+  auth.languageCode = 'ja';
+} catch (e) {
+  __bootFail('Firebaseに接続できませんでした', '内容:<code>'+String(e.message).replace(/</g,'&lt;')+'</code><br>firebaseConfig の値(特に databaseURL)を確認してください。');
+  throw e;
+}
+const bootTimer = setTimeout(() => {
+  __bootFail('応答がありません', 'Firebaseから応答がありません。<br>・通信状態<br>・Firebaseコンソール → Authentication → 設定 → 承認済みドメイン に「'+location.hostname+'」が入っているか<br>を確認してください。');
+}, 15000);
 
 let user = null, records = {}, recRef = null, connRef = null;
 let curYear = new Date().getFullYear();
@@ -460,6 +511,7 @@ let editingId = null, pendingFile = null, removePdf = false;
 
 /* ---------- 画面表示 ---------- */
 function show(view){
+  clearTimeout(bootTimer); $('bootView').classList.add('hidden');
   $('loginView').classList.toggle('hidden', view !== 'login');
   $('appView').classList.toggle('hidden', view !== 'app');
 }
@@ -813,58 +865,146 @@ $('backupBtn').onclick = async () => {
   finally{ busy(false); }
 };
 
+/* ===== バックアップの読み取り(新版・旧版Ver1.x 両対応) ===== */
+const pick = (o, keys) => { for (const k of keys) { if (o && o[k] !== undefined && o[k] !== null && o[k] !== '') return o[k]; } return undefined; };
+
+function normDate(v){
+  if (v === undefined) return null;
+  if (typeof v === 'number' || /^\d{10,13}$/.test(String(v))) {
+    let n = Number(v); if (n < 1e12) n *= 1000;
+    const d = new Date(n); if (isNaN(d)) return null;
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+  const s = String(v).trim().replace(/[年月\/\.]/g,'-').replace(/日.*$/,'').replace(/T.*$/,'');
+  const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (!m) return null;
+  const y=+m[1], mo=+m[2], d=+m[3];
+  if (mo<1||mo>12||d<1||d>31) return null;
+  return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+function normType(v){
+  const s = String(v ?? '').trim().toLowerCase();
+  if (!s) return 'salary';
+  if (s.includes('賞与') || s.includes('ボーナス') || s.includes('bonus')) return 'bonus';
+  if (s.includes('配当') || s.includes('divid')) return 'dividend';
+  if (s.includes('給与') || s.includes('給料') || s.includes('salary') || s.includes('pay')) return 'salary';
+  return TYPES[s] ? s : null;
+}
+function normAmount(v){
+  if (v === undefined) return null;
+  const n = Number(String(v).replace(/[^\d.\-]/g,''));
+  return Number.isFinite(n) && n >= 0 ? Math.round(n) : null;
+}
+/* PDFのBase64を取り出す(文字列 / data:URL / {data,name} など) */
+function extractPdf(r){
+  let src = pick(r, ['pdfData','pdfBase64','pdf','payslip','slip','file','attachment','meisai','明細書','給与明細書']);
+  let name = pick(r, ['pdfName','fileName','filename','payslipName']);
+  if (src && typeof src === 'object') {
+    name = name || src.name || src.fileName;
+    src = pick(src, ['data','base64','dataUrl','dataURL','content','url']);
+  }
+  if (typeof src !== 'string' || !src) return null;
+  let b64 = src;
+  if (b64.startsWith('data:')) { const i = b64.indexOf(','); if (i < 0) return null; b64 = b64.slice(i+1); }
+  b64 = b64.replace(/\s/g,'');
+  if (b64.length < 100 || !/^[A-Za-z0-9+/=_-]+$/.test(b64)) return null;   // Base64以外(パス等)は対象外
+  b64 = b64.replace(/-/g,'+').replace(/_/g,'/');
+  return { b64, name: String(name || '給与明細書.pdf') };
+}
+/* ファイル内から「記録の集まり」を探す */
+function findRecords(data){
+  const looksLike = o => o && typeof o === 'object' && !Array.isArray(o) &&
+    pick(o,['date','payDate','paydate','payday','day','給与日','日付']) !== undefined &&
+    pick(o,['amount','value','money','金額']) !== undefined;
+  const asList = c => Array.isArray(c) ? c.map((r,i)=>[String(i),r]) : Object.entries(c);
+  const seen = new Set();
+  const walk = (node, depth) => {
+    if (!node || typeof node !== 'object' || depth > 6 || seen.has(node)) return null;
+    seen.add(node);
+    const list = asList(node);
+    if (list.length && list.filter(([,v])=>looksLike(v)).length >= Math.ceil(list.length/2)) return list;
+    for (const [,v] of list) { const f = walk(v, depth+1); if (f) return f; }
+    return null;
+  };
+  return walk(data, 0) || [];
+}
+function parseBackup(data){
+  const isNew = data && data.app === 'salary-tracker' && /^Ver2/.test(String(data.version||''));
+  const out = [];
+  let skip = 0;
+  for (const [rawId, r] of findRecords(data)) {
+    const date = normDate(pick(r,['date','payDate','paydate','payday','day','給与日','日付']));
+    const type = normType(pick(r,['type','category','kind','kubun','division','区分','給与区分']));
+    const amount = normAmount(pick(r,['amount','value','money','金額']));
+    if (!date || !type || amount === null) { skip++; continue; }
+    const memo = pick(r,['memo','note','notes','comment','remarks','メモ','備考']);
+    const rec = { date, type, amount };
+    if (typeof memo === 'string' && memo.trim()) rec.memo = memo.trim().slice(0,200);
+    const created = Number(pick(r,['createdAt','created','timestamp']));
+    const item = { id: /^[A-Za-z0-9_-]{1,64}$/.test(rawId) && !/^\d+$/.test(rawId) ? rawId : null,
+                   rec, created: Number.isFinite(created) && created > 0 ? created : null,
+                   pdf: extractPdf(r), keepPath: null };
+    if (!item.pdf && isNew && r.pdf && typeof r.pdf.path === 'string') item.keepPath = r.pdf;
+    out.push(item);
+  }
+  return { items: out, skip, isNew };
+}
+
 /* ---------- 復元 ---------- */
 $('restoreBtn').onclick=()=>$('restoreFile').click();
-function cleanRecord(r){
-  if(!r||typeof r!=='object') return null;
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(r.date)) return null;
-  if(!TYPES[r.type]) return null;
-  const amount=Number(r.amount); if(!Number.isFinite(amount)||amount<0) return null;
-  const now=Date.now();
-  const o={date:r.date,type:r.type,amount:Math.round(amount),createdAt:Number(r.createdAt)||now,updatedAt:now};
-  if(typeof r.memo==='string'&&r.memo) o.memo=r.memo.slice(0,200);
-  return o;
-}
 $('restoreFile').addEventListener('change',async e=>{
   const f=e.target.files[0]; e.target.value=''; if(!f) return;
   let data;
-  try{ data=JSON.parse(await f.text()); }catch(_){ toast('ファイルを読み込めません'); return; }
-  if(!data||data.app!=='salary-tracker'||typeof data.records!=='object'){ toast('給与管理のバックアップファイルではありません'); return; }
+  try{ data=JSON.parse(await f.text()); }catch(_){ toast('JSON形式のバックアップファイルを選んでください'); return; }
+
+  const { items, skip, isNew } = parseBackup(data);
+  if(!items.length){
+    alert('このファイルから給与の記録を見つけられませんでした。\n給与管理アプリ(旧版Ver1.x または Ver2.x)のバックアップか確認してください。');
+    return;
+  }
+  const withPdf = items.filter(i=>i.pdf).length;
+  const years = [...new Set(items.map(i=>i.rec.date.slice(0,4)))].sort();
   const mode=document.querySelector('input[name=rsMode]:checked').value;
-  const count=Object.keys(data.records).length;
-  const msg = mode==='replace'
-    ? `今のデータとPDFをすべて削除し、${count}件を読み込みます。よろしいですか?`
-    : `${count}件を今のデータに統合します。よろしいですか?`;
+  const head = isNew ? 'バックアップ' : '旧版(Ver1.x)のバックアップ';
+  const msg = `${head}を読み込みます。\n\n記録:${items.length}件(${years[0]}年〜${years[years.length-1]}年)\nPDF付き:${withPdf}件` +
+    (skip?`\n読み込めない記録:${skip}件(除外します)`:'') +
+    (mode==='replace' ? '\n\n今のデータとPDFはすべて削除されます。よろしいですか?' : '\n\n今のデータに統合します。よろしいですか?');
   if(!confirm(msg)) return;
 
   busy(true,'復元中…');
-  let ok=0, skip=0;
+  let ok=0, pdfNg=0;
   try{
     const base=`${ROOT}/${user.uid}/records`;
     if(mode==='replace'){
       for(const r of Object.values(records)){ if(r&&r.pdf) await deletePdf(r.pdf.path); }
       await db.ref(base).remove();
     }
-    const entries=Object.entries(data.records);
-    for(let i=0;i<entries.length;i++){
-      const [rawId,r]=entries[i];
-      const id=/^[A-Za-z0-9_-]{1,64}$/.test(rawId)?rawId:db.ref(base).push().key;
-      const rec=cleanRecord(r); if(!rec){ skip++; continue; }
-      $('busyText').textContent=`復元中… ${i+1}/${entries.length}`;
-      if(typeof r.pdfData==='string' && r.pdfData){
-        const blob=b64ToBlob(r.pdfData);
-        if(blob.size<=MAX_PDF){
-          if(mode==='merge' && records[id] && records[id].pdf) await deletePdf(records[id].pdf.path);
+    for(let i=0;i<items.length;i++){
+      const it=items[i];
+      $('busyText').textContent=`復元中… ${i+1}/${items.length}`;
+      const id = it.id || db.ref(base).push().key;
+      const now = Date.now();
+      const rec = { ...it.rec, createdAt: it.created || now, updatedAt: now };
+      const current = mode==='merge' ? records[id] : null;
+      if(it.pdf){
+        try{
+          const blob=b64ToBlob(it.pdf.b64);
+          if(blob.size>MAX_PDF) throw new Error('size');
           const path=newPdfPath(id);
           await uploadPdf(path,blob);
-          rec.pdf={path,name:String(r.pdf&&r.pdf.name||'給与明細書.pdf').slice(0,120),size:blob.size};
-        }
-      }else if(r.pdf && typeof r.pdf.path==='string' && r.pdf.path.startsWith(`${ROOT}/${user.uid}/payslips/`) && mode==='merge'){
-        rec.pdf={path:r.pdf.path,name:String(r.pdf.name||'給与明細書.pdf').slice(0,120),size:Number(r.pdf.size)||0};
+          if(current && current.pdf) await deletePdf(current.pdf.path);
+          let name = it.pdf.name.slice(0,120); if(!/\.pdf$/i.test(name)) name += '.pdf';
+          rec.pdf={path,name,size:blob.size};
+        }catch(err){ pdfNg++; if(current && current.pdf) rec.pdf=current.pdf; }
+      }else if(it.keepPath && mode==='merge' && it.keepPath.path.startsWith(`${ROOT}/${user.uid}/payslips/`)){
+        rec.pdf={path:it.keepPath.path,name:String(it.keepPath.name||'給与明細書.pdf').slice(0,120),size:Number(it.keepPath.size)||0};
+      }else if(current && current.pdf){
+        rec.pdf=current.pdf;
       }
       await db.ref(`${base}/${id}`).set(rec); ok++;
     }
-    toast(`${ok}件を復元しました${skip?`(${skip}件は形式不正のため除外)`:''}`);
+    const y = Number(years[years.length-1]); if (y) { curYear = y; render(); }
+    toast(`${ok}件を復元しました` + (pdfNg?`(PDF ${pdfNg}件は取り込めませんでした)`:'') + (skip?`(${skip}件除外)`:''));
   }catch(err){ toast('復元に失敗しました:'+(err.code||err.message)); }
   finally{ busy(false); }
 });
