@@ -30,9 +30,9 @@
   }
 }
 *,*::before,*::after{box-sizing:border-box}
-html{height:100%;-webkit-text-size-adjust:100%}
+html{height:100%;-webkit-text-size-adjust:100%;overscroll-behavior-y:none}
 body{
-  margin:0;min-height:100%;background:var(--bg);color:var(--ink);
+  margin:0;min-height:100%;overscroll-behavior-y:none;background:var(--bg);color:var(--ink);
   font-family:var(--font);font-size:15px;line-height:1.55;
   -webkit-tap-highlight-color:transparent;
   padding-bottom:env(safe-area-inset-bottom,0px);
@@ -47,7 +47,7 @@ button{cursor:pointer}
 .shell{width:100%;max-width:var(--shell);margin:0 auto;padding:0 12px}
 
 /* ===== ログイン ===== */
-#loginView{min-height:100vh;min-height:100svh;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;
+#loginView{display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;
   padding-top:calc(24px + env(safe-area-inset-top,0px))}
 .login-card{width:100%;max-width:380px;margin-top:8vh;background:var(--card);border-radius:var(--r-lg);overflow:hidden;
   box-shadow:0 12px 32px -18px rgba(23,34,52,.45)}
@@ -250,18 +250,28 @@ select.inp{background-image:linear-gradient(45deg,transparent 50%,var(--sub) 50%
   var now=Date.now();
   var save=function(){ try{ localStorage.setItem(K,JSON.stringify(d)); }catch(e){} };
   var nav=''; try{ var n=performance.getEntriesByType('navigation')[0]; nav=n?n.type:''; }catch(e){}
+  var hadQuery = /[?&](email|password)=/.test(location.search);
+  // 万一ログイン内容がURLに付いていたら、すぐに消す(履歴にも残さない)
+  if (location.search) { try{ history.replaceState(null,'',location.pathname+location.hash); }catch(e){} }
+  var ago=function(t){ return t ? Math.round((now-t)/1000) : null; };
   window.__diag = {
     nav: nav,
     loads: (d.loads||[]).filter(function(t){return now-t<120000;}).length + 1,
-    focusAgo: d.lastFocus ? Math.round((now-d.lastFocus)/1000) : null,
-    focusId: d.lastFocusId || '',
-    hideAgo: d.lastHide ? Math.round((now-d.lastHide)/1000) : null,
-    errs: (d.errs||[]).slice(-3)
+    focusAgo: ago(d.lastFocus), focusId: d.lastFocusId || '',
+    hideAgo: ago(d.lastHide),
+    shown: d.lastHide && d.loadAt ? Math.round((d.lastHide-d.loadAt)/1000) : null,
+    submitAgo: ago(d.lastSubmit), pullAgo: ago(d.lastPull), tapAgo: ago(d.lastTap), tapWhat: d.lastTapWhat || '',
+    hadQuery: hadQuery, errs: (d.errs||[]).slice(-3)
   };
   d.loads=(d.loads||[]).filter(function(t){return now-t<120000;}); d.loads.push(now);
-  d.lastFocus=0; d.lastFocusId=''; d.lastHide=0; d.errs=[];
+  d.loadAt=now; d.lastFocus=0; d.lastFocusId=''; d.lastHide=0; d.lastSubmit=0; d.lastPull=0; d.lastTap=0; d.lastTapWhat=''; d.errs=[];
   save();
   document.addEventListener('focusin',function(e){ d.lastFocus=Date.now(); d.lastFocusId=(e.target&&e.target.id)||''; save(); },true);
+  document.addEventListener('submit',function(){ d.lastSubmit=Date.now(); save(); },true);
+  document.addEventListener('click',function(e){ var t=e.target&&e.target.closest?e.target.closest('button,a,input,label'):null; d.lastTap=Date.now(); d.lastTapWhat=t?(t.id||t.tagName):''; save(); },true);
+  var y0=null;
+  document.addEventListener('touchstart',function(e){ y0=(window.scrollY<=0&&e.touches[0])?e.touches[0].clientY:null; },{passive:true,capture:true});
+  document.addEventListener('touchmove',function(e){ if(y0!==null&&e.touches[0]&&e.touches[0].clientY-y0>60){ d.lastPull=Date.now(); y0=null; save(); } },{passive:true,capture:true});
   addEventListener('pagehide',function(){ d.lastHide=Date.now(); save(); });
   addEventListener('error',function(e){ d.errs=(d.errs||[]).concat([String(e.message||'resource')+' '+String(e.filename||'').split('/').pop()+':'+(e.lineno||'')]).slice(-3); save(); },true);
   addEventListener('unhandledrejection',function(e){ d.errs=(d.errs||[]).concat(['rej '+String(e.reason&&e.reason.message||e.reason)]).slice(-3); save(); });
@@ -311,7 +321,7 @@ window.addEventListener('unhandledrejection', function(e){
       <h1>給与管理</h1>
       <p>登録済みのメールアドレスでログインしてください<span id="loginVer" style="float:right;opacity:.8"></span></p>
     </div>
-    <form class="login-body" id="loginForm" autocomplete="on" novalidate>
+    <form class="login-body" id="loginForm" autocomplete="on" novalidate action="#" method="post" onsubmit="event.preventDefault();return false;">
       <div class="field">
         <label for="email">メールアドレス</label>
         <input id="email" name="email" class="inp" type="email" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false">
@@ -526,7 +536,7 @@ const firebaseConfig = {
 
 </script>
 <script type="module">
-const APP_VER = 'Ver2.9';
+const APP_VER = 'Ver3.0';
 const MAX_PDF = 10 * 1024 * 1024;          // PDFは10MBまで
 const ROOT = 'salary';                      // データベース上の保存場所
 const TYPES = {
@@ -550,14 +560,15 @@ $('loginVer').textContent = APP_VER;
   const standalone = (window.navigator.standalone === true) || matchMedia('(display-mode: standalone)').matches;
   const ios = (navigator.userAgent.match(/OS (\d+)_(\d+)/) || []).slice(1).join('.');
   const browser = /CriOS/.test(navigator.userAgent) ? 'Chrome' : /FxiOS/.test(navigator.userAgent) ? 'Firefox' : 'Safari';
-  const reloaded = g.loads > 1 && g.focusAgo !== null && g.focusAgo <= 20;
-  if (!reloaded && g.loads <= 1) return;
+  if (!(g.loads > 1)) return;
+  const sec = v => v === null || v === undefined ? '-' : v + '秒前';
   $('diagBox').innerHTML =
     '<b>診断情報</b>(この内容をそのまま送ってください)<br>' +
     `${APP_VER} / ${standalone ? 'ホーム画面' : browser} / iOS ${ios || '不明'}<br>` +
-    `読込:${g.nav || '-'} / 2分内の読込:${g.loads}回<br>` +
-    `タッチから再読込まで:${g.focusAgo ?? '-'}秒(${g.focusId || '-'})<br>` +
-    `終了処理:${g.hideAgo === null ? 'なし' : g.hideAgo + '秒前'}<br>` +
+    `読込:${g.nav || '-'} / 2分内の読込:${g.loads}回 / 前回の表示時間:${g.shown ?? '-'}秒<br>` +
+    `終了処理:${sec(g.hideAgo)} / URL付加:${g.hadQuery ? 'あり' : 'なし'}<br>` +
+    `入力欄:${sec(g.focusAgo)}(${g.focusId || '-'}) / 送信:${sec(g.submitAgo)}<br>` +
+    `タップ:${sec(g.tapAgo)}(${esc(g.tapWhat || '-')}) / 引っ張り:${sec(g.pullAgo)}<br>` +
     `エラー:${(g.errs && g.errs.length) ? esc(g.errs.join(' | ')) : 'なし'}`;
 })();
 
@@ -635,6 +646,8 @@ function authMsg(code){
 }
 
 $('loginForm').addEventListener('submit', e => { e.preventDefault(); doLogin(); });
+try{ const em = sessionStorage.getItem('salary_email'); if(em) $('email').value = em; }catch(_){}
+$('email').addEventListener('input', e => { try{ sessionStorage.setItem('salary_email', e.target.value); }catch(_){} });
 async function doLogin(){
   const s = lockState();
   if (Date.now() < s.until) {
