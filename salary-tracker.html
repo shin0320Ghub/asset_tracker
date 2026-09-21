@@ -246,6 +246,7 @@ select.inp{background-image:linear-gradient(45deg,transparent 50%,var(--sub) 50%
   <div id="bootMsg" style="color:var(--sub)">しばらくお待ちください。</div>
 </div>
 <script>
+window.__booted = false;
 window.__bootFail = function(title, html){
   var v=document.getElementById('bootView'); if(!v) return;
   v.classList.remove('hidden');
@@ -254,6 +255,7 @@ window.__bootFail = function(title, html){
   ['loginView','appView'].forEach(function(id){ var e=document.getElementById(id); if(e) e.classList.add('hidden'); });
 };
 window.addEventListener('error', function(e){
+  if (window.__booted) { console.error('salary-tracker error:', e.error || e.message); return; } // 起動完了後は画面を消さない
   if (e.target && e.target.tagName === 'SCRIPT') {
     __bootFail('部品を読み込めませんでした', 'Firebaseのプログラムを取得できませんでした。<br>インターネット接続、またはコンテンツブロッカー(広告ブロック)を確認してください。');
     return;
@@ -264,6 +266,9 @@ window.addEventListener('error', function(e){
     : '';
   __bootFail('エラーのため起動できませんでした', '内容:<code>'+m.replace(/</g,'&lt;')+'</code>'+(e.lineno?'('+e.lineno+'行目)':'')+hint);
 }, true);
+window.addEventListener('unhandledrejection', function(e){
+  if (window.__booted) { console.error('salary-tracker rejection:', e.reason); return; }
+});
 </script>
 
 <!-- ===== ログイン画面 ===== -->
@@ -447,7 +452,7 @@ const firebaseConfig = {
 
 </script>
 <script>
-const APP_VER = 'Ver2.2';
+const APP_VER = 'Ver2.3';
 const MAX_PDF = 10 * 1024 * 1024;          // PDFは10MBまで
 const ROOT = 'salary';                      // データベース上の保存場所
 const TYPES = {
@@ -510,6 +515,7 @@ let editingId = null, pendingFile = null, removePdf = false;
 
 /* ---------- 画面表示 ---------- */
 function show(view){
+  window.__booted = true;
   clearTimeout(bootTimer); $('bootView').classList.add('hidden');
   $('loginView').classList.toggle('hidden', view !== 'login');
   $('appView').classList.toggle('hidden', view !== 'app');
