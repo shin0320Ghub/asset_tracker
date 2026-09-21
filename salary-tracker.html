@@ -2,851 +2,961 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="給与管理">
+<meta name="theme-color" content="#1F3358">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex, nofollow">
 <title>給与管理</title>
 <style>
+:root{
+  --band:#1F3358; --band-2:#2A4373; --band-ink:#FFFFFF; --band-sub:#B9C6DE;
+  --bg:#EEF1F5; --card:#FFFFFF; --ink:#172234; --sub:#5E6B80; --line:#DCE2EA;
+  --salary:#3D63B0; --bonus:#C0902F; --div:#2E8062; --danger:#B3362D;
+  --field:#F6F8FB; --focus:#3D63B0;
+  --r-lg:18px; --r-md:12px; --r-sm:8px;
+  --shell:680px;
+  --font:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;
+}
+@media (prefers-color-scheme: dark){
   :root{
-    --bg:#f4f6f8;
-    --card:#ffffff;
-    --accent:#2f6fed;
-    --accent-dark:#1f4fbf;
-    --text:#1d2433;
-    --sub:#6b7480;
-    --border:#e3e7ec;
-    --danger:#e0524a;
-    --給与:#2f6fed;
-    --賞与:#2fa86a;
-    --配当:#c98a1c;
+    --band:#16223A; --band-2:#1F2F50; --band-sub:#9AA9C6;
+    --bg:#0E131C; --card:#171E2A; --ink:#E6EBF3; --sub:#95A1B5; --line:#283244;
+    --salary:#7C9BE0; --bonus:#DDB25A; --div:#58B38F; --danger:#E0736A;
+    --field:#1D2533; --focus:#7C9BE0;
   }
-  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-  body{
-    margin:0;
-    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",sans-serif;
-    background:var(--bg);
-    color:var(--text);
-    padding-bottom:80px;
-  }
-  header{
-    background:var(--card);
-    border-bottom:1px solid var(--border);
-    position:sticky;
-    top:0;
-    z-index:20;
-  }
-  header .inner{
-    max-width:640px;
-    margin:0 auto;
-    padding:14px 16px 10px;
-    box-sizing:border-box;
-  }
-  header h1{
-    font-size:19px;
-    margin:0;
-    display:flex;
-    align-items:baseline;
-    gap:6px;
-  }
-  header h1 span.ver{
-    font-size:11px;
-    color:var(--sub);
-    font-weight:normal;
-  }
-  #syncStatus{
-    font-size:11px;
-    color:var(--sub);
-    margin-top:2px;
-  }
-  #syncStatus.ok{color:var(--賞与);}
-  #syncStatus.err{color:var(--danger);}
+}
+*,*::before,*::after{box-sizing:border-box}
+html{height:100%;-webkit-text-size-adjust:100%}
+body{
+  margin:0;min-height:100%;background:var(--bg);color:var(--ink);
+  font-family:var(--font);font-size:15px;line-height:1.55;
+  -webkit-tap-highlight-color:transparent;
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.hidden{display:none!important}
 
-  nav.tabs{
-    background:var(--card);
-    border-bottom:1px solid var(--border);
-    position:sticky;
-    top:53px;
-    z-index:19;
-  }
-  nav.tabs .inner{
-    display:flex;
-    max-width:640px;
-    margin:0 auto;
-    padding:0 16px;
-    box-sizing:border-box;
-  }
-  nav.tabs button{
-    flex:1;
-    padding:11px 4px;
-    border:none;
-    background:none;
-    font-size:14px;
-    color:var(--sub);
-    border-bottom:2px solid transparent;
-    min-width:0;
-  }
-  nav.tabs button.active{
-    color:var(--accent);
-    border-bottom-color:var(--accent);
-    font-weight:600;
-  }
+/* ===== 共通レイアウト：ヘッダーと明細は同じ幅 ===== */
+.shell{width:100%;max-width:var(--shell);margin:0 auto;padding:0 12px}
 
-  main{padding:14px 16px;max-width:640px;margin:0 auto;box-sizing:border-box;}
-  .card{
-    background:var(--card);
-    border-radius:12px;
-    padding:16px;
-    margin-bottom:14px;
-    box-shadow:0 1px 3px rgba(0,0,0,0.05);
-  }
-  .field{margin-bottom:14px;}
-  .field label{
-    display:block;
-    font-size:13px;
-    color:var(--sub);
-    margin-bottom:5px;
-  }
-  .field input[type=date],
-  .field input[type=number],
-  .field select{
-    display:block;
-    width:100%;
-    box-sizing:border-box;
-    -webkit-appearance:none;
-    appearance:none;
-    padding:11px 10px;
-    border:1px solid var(--border);
-    border-radius:8px;
-    font-size:16px;
-    background:#fafbfc;
-    color:var(--text);
-    min-height:44px;
-  }
-  .type-picker{display:flex;gap:8px;}
-  .type-picker button{
-    flex:1;
-    padding:11px 4px;
-    border:1px solid var(--border);
-    border-radius:8px;
-    background:#fafbfc;
-    font-size:14px;
-    color:var(--sub);
-  }
-  .type-picker button.sel{
-    color:#fff;
-    border-color:transparent;
-  }
-  .type-picker button[data-t="給与"].sel{background:var(--給与);}
-  .type-picker button[data-t="賞与"].sel{background:var(--賞与);}
-  .type-picker button[data-t="配当"].sel{background:var(--配当);}
+/* ===== ログイン ===== */
+#loginView{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px;
+  padding-top:calc(24px + env(safe-area-inset-top,0px))}
+.login-card{width:100%;max-width:380px;background:var(--card);border-radius:var(--r-lg);overflow:hidden;
+  box-shadow:0 12px 32px -18px rgba(23,34,52,.45)}
+.login-head{background:var(--band);color:var(--band-ink);padding:26px 24px 22px}
+.login-head h1{margin:0;font-size:22px;font-weight:700;letter-spacing:.04em}
+.login-head p{margin:6px 0 0;color:var(--band-sub);font-size:13px}
+.login-body{padding:22px 24px 24px}
+.login-body .field+.field{margin-top:14px}
+.login-err{min-height:20px;margin:12px 0 0;color:var(--danger);font-size:13px}
+.linkbtn{background:none;border:0;padding:6px 0;color:var(--salary);font-size:13px;text-decoration:underline;text-underline-offset:3px}
 
-  .file-drop{
-    border:1px dashed var(--border);
-    border-radius:8px;
-    padding:12px;
-    font-size:13px;
-    color:var(--sub);
-    background:#fafbfc;
-  }
-  .file-drop.has-file{color:var(--text);}
-  .file-drop input{width:100%;font-size:13px;}
+/* ===== ヘッダー(通帳の帯) ===== */
+.app-top{padding-top:calc(10px + env(safe-area-inset-top,0px))}
+.bar{background:var(--band);color:var(--band-ink);border-radius:var(--r-lg);padding:16px 16px 0;overflow:hidden}
+.bar-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.bar-top h1{margin:0;font-size:17px;font-weight:700;letter-spacing:.06em}
+.ver{font-size:11px;font-weight:500;color:var(--band-sub);margin-left:6px;letter-spacing:0}
+.sync{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--band-sub)}
+.sync i{width:7px;height:7px;border-radius:50%;background:#7FD1A8;display:block}
+.sync.off i{background:#E8A15B}
 
-  button.primary{
-    width:100%;
-    padding:13px;
-    border:none;
-    border-radius:9px;
-    background:var(--accent);
-    color:#fff;
-    font-size:15px;
-    font-weight:600;
-  }
-  button.primary:active{background:var(--accent-dark);}
-  button.primary:disabled{background:#b7c3d6;}
+.year-row{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:end;gap:12px;margin-top:14px}
+.year-pick{display:flex;align-items:center;gap:2px}
+.yr-btn{width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.22);background:transparent;color:var(--band-ink);
+  font-size:18px;line-height:1;display:grid;place-items:center}
+.yr-btn:active{background:rgba(255,255,255,.12)}
+.year{font-size:34px;font-weight:700;line-height:1;padding:0 6px;letter-spacing:.02em}
+.year small{font-size:14px;font-weight:500;margin-left:2px;color:var(--band-sub)}
+.total{text-align:right;min-width:0}
+.total small{display:block;font-size:11px;color:var(--band-sub)}
+.total strong{display:block;font-size:24px;font-weight:700;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-  button.secondary{
-    padding:9px 14px;
-    border:1px solid var(--border);
-    border-radius:8px;
-    background:#fff;
-    color:var(--sub);
-    font-size:13px;
-  }
+.comp{margin-top:14px}
+.comp-bar{display:flex;height:8px;border-radius:4px;overflow:hidden;background:rgba(255,255,255,.14)}
+.comp-bar span{display:block;height:100%;transition:width .35s ease}
+.legend{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
+.legend div{min-width:0}
+.legend b{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:var(--band-sub)}
+.legend b i{width:8px;height:8px;border-radius:2px;display:block}
+.legend span{display:block;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-  .entry{
-    display:flex;
-    align-items:center;
-    gap:10px;
-    padding:12px 0;
-    border-bottom:1px solid var(--border);
-  }
-  .entry:last-child{border-bottom:none;}
-  .entry .badge{
-    font-size:11px;
-    color:#fff;
-    padding:3px 8px;
-    border-radius:20px;
-    white-space:nowrap;
-    flex-shrink:0;
-  }
-  .badge.給与{background:var(--給与);}
-  .badge.賞与{background:var(--賞与);}
-  .badge.配当{background:var(--配当);}
-  .entry .info{flex:1;min-width:0;}
-  .entry .date{font-size:12px;color:var(--sub);}
-  .entry .amount{font-size:16px;font-weight:600;}
-  .entry .pdf-link{
-    font-size:12px;
-    color:var(--accent);
-    background:none;
-    border:none;
-    padding:0;
-    font-family:inherit;
-    text-decoration:underline;
-    cursor:pointer;
-  }
-  .entry .actions{display:flex;gap:6px;flex-shrink:0;}
-  .entry .actions button{
-    border:none;background:none;font-size:18px;padding:4px 6px;color:var(--sub);
-  }
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);margin:14px -16px 0;border-top:1px solid rgba(255,255,255,.12)}
+.tabs button{background:none;border:0;color:var(--band-sub);padding:12px 0 11px;font-size:14px;font-weight:600;border-bottom:3px solid transparent}
+.tabs button[aria-selected="true"]{color:var(--band-ink);border-bottom-color:#fff;background:var(--band-2)}
 
-  .empty{
-    text-align:center;
-    color:var(--sub);
-    padding:30px 10px;
-    font-size:14px;
-  }
+/* ===== 明細エリア ===== */
+main{padding:14px 0 110px}
+.month{margin-bottom:14px}
+.month-head{display:flex;justify-content:space-between;align-items:baseline;padding:4px 6px 6px;color:var(--sub);font-size:13px}
+.month-head strong{color:var(--ink);font-size:14px}
+.list{background:var(--card);border-radius:var(--r-md);overflow:hidden}
+.row{display:grid;grid-template-columns:52px minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;
+  padding:12px 14px;background:none;border:0;text-align:left}
+.row+.row{border-top:1px solid var(--line)}
+.row:active{background:var(--field)}
+.d{line-height:1.15}
+.d b{display:block;font-size:17px;font-weight:700}
+.d small{font-size:11px;color:var(--sub)}
+.mid{min-width:0;display:flex;align-items:center;gap:8px}
+.chip{flex:none;font-size:11.5px;font-weight:700;padding:3px 8px;border-radius:999px;color:#fff}
+.t-salary{background:var(--salary)} .t-bonus{background:var(--bonus)} .t-div{background:var(--div)}
+.memo{min-width:0;font-size:12.5px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.amt{text-align:right;font-weight:700;font-size:16px;white-space:nowrap}
+.pdf-mark{display:block;font-size:10.5px;font-weight:600;color:var(--danger);text-align:right;margin-top:1px}
 
-  .year-block{margin-bottom:16px;}
-  .year-block h3{
-    font-size:15px;
-    margin:0 0 8px;
-    display:flex;
-    justify-content:space-between;
-    align-items:baseline;
-  }
-  .year-block h3 .total{font-size:17px;font-weight:700;color:var(--accent);}
-  .year-table{width:100%;border-collapse:collapse;font-size:13px;}
-  .year-table td{padding:7px 4px;border-bottom:1px solid var(--border);}
-  .year-table td.label{color:var(--sub);}
-  .year-table td.num{text-align:right;font-variant-numeric:tabular-nums;}
-  .year-table tr.total-row td{font-weight:700;border-top:1px solid var(--text);border-bottom:none;}
+.empty{background:var(--card);border-radius:var(--r-md);padding:34px 20px;text-align:center;color:var(--sub)}
+.empty p{margin:0 0 14px}
 
-  .modal-bg{
-    position:fixed;inset:0;background:rgba(0,0,0,0.4);
-    display:none;align-items:flex-end;justify-content:center;z-index:50;
-  }
-  .modal-bg.show{display:flex;}
-  .modal{
-    background:#fff;border-radius:16px 16px 0 0;
-    padding:18px;width:100%;max-width:640px;
-    max-height:80vh;overflow-y:auto;
-  }
-  .modal h3{margin-top:0;}
-  .toast{
-    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
-    background:#1d2433;color:#fff;padding:10px 18px;border-radius:20px;
-    font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:100;
-  }
-  .toast.show{opacity:1;}
+/* 年集計 */
+.sec-title{font-size:14px;font-weight:700;margin:4px 6px 8px}
+.card{background:var(--card);border-radius:var(--r-md);padding:14px}
+.card+.sec-title{margin-top:22px}
+.mrow{display:grid;grid-template-columns:34px minmax(0,1fr) 96px;align-items:center;gap:8px;padding:5px 0;font-size:13px}
+.mrow .m{color:var(--sub)}
+.mbar{display:flex;height:12px;border-radius:3px;overflow:hidden;background:var(--field)}
+.mbar span{height:100%}
+.mrow .v{text-align:right;font-weight:600;white-space:nowrap}
+.yrow{display:block;width:100%;background:none;border:0;text-align:left;padding:12px 0}
+.yrow+.yrow{border-top:1px solid var(--line)}
+.yrow .top{display:flex;justify-content:space-between;align-items:baseline}
+.yrow .top b{font-size:17px}
+.yrow .top strong{font-size:17px}
+.yrow.cur .top b{color:var(--salary)}
+.ysub{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:6px;font-size:12px;color:var(--sub)}
+.ysub span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ysub i{display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:4px;vertical-align:1px}
+
+/* 設定 */
+.set-group{background:var(--card);border-radius:var(--r-md);padding:4px 14px;margin-bottom:18px}
+.set-item{padding:14px 0}
+.set-item+.set-item{border-top:1px solid var(--line)}
+.set-item h3{margin:0 0 4px;font-size:15px}
+.set-item p{margin:0 0 10px;font-size:12.5px;color:var(--sub)}
+.set-item .btns{display:flex;flex-wrap:wrap;gap:8px}
+.check{display:flex;align-items:flex-start;gap:8px;font-size:13px;margin-bottom:10px}
+.check input{width:18px;height:18px;margin:1px 0 0;flex:none;accent-color:var(--salary)}
+.kv{display:flex;justify-content:space-between;gap:12px;font-size:14px}
+.kv span:last-child{color:var(--sub);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ===== ボタン・入力 ===== */
+.btn{border:0;border-radius:var(--r-sm);padding:12px 16px;font-size:15px;font-weight:700;background:var(--field);color:var(--ink)}
+.btn.primary{background:var(--salary);color:#fff}
+.btn.danger{background:transparent;color:var(--danger);border:1px solid var(--danger)}
+.btn.block{width:100%}
+.btn:disabled{opacity:.5}
+.btn.small{padding:9px 13px;font-size:13.5px}
+
+.field{min-width:0}
+.field>label,.field>.lbl{display:block;font-size:12.5px;font-weight:600;color:var(--sub);margin-bottom:6px}
+.inp{display:block;width:100%;min-width:0;max-width:100%;height:48px;padding:0 14px;border:1px solid var(--line);
+  border-radius:var(--r-sm);background:var(--field);font-size:16px;-webkit-appearance:none;appearance:none}
+.inp:focus{outline:none;border-color:var(--focus);box-shadow:0 0 0 3px color-mix(in srgb,var(--focus) 22%,transparent)}
+select.inp{background-image:linear-gradient(45deg,transparent 50%,var(--sub) 50%),linear-gradient(135deg,var(--sub) 50%,transparent 50%);
+  background-position:calc(100% - 20px) 21px,calc(100% - 15px) 21px;background-size:5px 5px;background-repeat:no-repeat;padding-right:36px}
+
+/* 給与日：表示用ボックスの上に透明な日付入力を重ねる(はみ出し防止) */
+.date-box{position:relative;height:48px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--field);
+  overflow:hidden;display:flex;align-items:center;gap:10px;padding:0 14px}
+.date-box:focus-within{border-color:var(--focus);box-shadow:0 0 0 3px color-mix(in srgb,var(--focus) 22%,transparent)}
+.date-box svg{flex:none;color:var(--sub)}
+.date-text{flex:1;min-width:0;font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.date-text.ph{color:var(--sub);font-weight:400}
+.date-box input{position:absolute;inset:0;width:100%;height:100%;min-width:0;opacity:0;border:0;margin:0;padding:0;
+  -webkit-appearance:none;appearance:none;cursor:pointer;font-size:16px}
+
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg label{display:flex;align-items:center;justify-content:center;height:44px;border-radius:var(--r-sm);border:1px solid var(--line);
+  background:var(--field);font-weight:700;font-size:14.5px;color:var(--sub)}
+.seg input:checked+label{color:#fff;border-color:transparent}
+.seg input[value="salary"]:checked+label{background:var(--salary)}
+.seg input[value="bonus"]:checked+label{background:var(--bonus)}
+.seg input[value="dividend"]:checked+label{background:var(--div)}
+.seg input:focus-visible+label{outline:2px solid var(--focus);outline-offset:2px}
+
+.amount-wrap{position:relative}
+.amount-wrap .inp{padding-right:40px;text-align:right;font-weight:700;font-size:20px}
+.amount-wrap em{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-style:normal;color:var(--sub);font-size:14px}
+
+.pdf-box{border:1px dashed var(--line);border-radius:var(--r-sm);padding:12px;background:var(--field)}
+.pdf-file{display:flex;align-items:center;gap:10px;min-width:0}
+.pdf-ico{flex:none;width:34px;height:40px;border-radius:5px;background:var(--danger);color:#fff;font-size:10px;font-weight:700;display:grid;place-items:center}
+.pdf-meta{min-width:0;flex:1}
+.pdf-meta b{display:block;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pdf-meta small{color:var(--sub);font-size:12px}
+.pdf-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.pdf-actions a{text-decoration:none;display:inline-flex;align-items:center}
+.pdf-actions a[aria-disabled="true"]{opacity:.5;pointer-events:none}
+.progress{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:10px}
+.progress span{display:block;height:100%;width:0;background:var(--salary);transition:width .2s}
+
+/* ===== 追加ボタン ===== */
+.fab-wrap{position:fixed;left:0;right:0;bottom:calc(18px + env(safe-area-inset-bottom,0px));pointer-events:none;z-index:20}
+.fab-wrap .shell{display:flex;justify-content:flex-end}
+.fab{pointer-events:auto;height:54px;padding:0 22px 0 18px;border-radius:27px;border:0;background:var(--band);color:#fff;
+  font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;box-shadow:0 10px 24px -10px rgba(23,34,52,.6)}
+.fab svg{width:20px;height:20px}
+
+/* ===== 入力シート ===== */
+.overlay{position:fixed;inset:0;background:rgba(10,16,28,.5);z-index:40;display:flex;align-items:flex-end;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity .2s}
+.overlay.open{opacity:1;pointer-events:auto}
+.sheet{width:100%;max-width:var(--shell);max-height:92vh;overflow-y:auto;background:var(--card);border-radius:var(--r-lg) var(--r-lg) 0 0;
+  padding:8px 18px calc(20px + env(safe-area-inset-bottom,0px));transform:translateY(24px);transition:transform .22s ease;
+  -webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.overlay.open .sheet{transform:none}
+.grab{width:40px;height:5px;border-radius:3px;background:var(--line);margin:4px auto 10px}
+.sheet-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.sheet-head h2{margin:0;font-size:18px}
+.x{width:36px;height:36px;border-radius:50%;border:0;background:var(--field);font-size:18px;line-height:1}
+.form-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
+.sheet-foot{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:10px;margin-top:22px}
+.sheet-del{margin-top:14px;text-align:center}
+@media (min-width:600px){
+  .overlay{align-items:center}
+  .sheet{border-radius:var(--r-lg);max-height:88vh}
+}
+
+/* ===== トースト・ローディング ===== */
+.toast{position:fixed;left:50%;bottom:calc(88px + env(safe-area-inset-bottom,0px));transform:translate(-50%,10px);background:var(--ink);color:var(--bg);
+  padding:10px 16px;border-radius:10px;font-size:13.5px;opacity:0;pointer-events:none;transition:.2s;z-index:60;max-width:90vw;text-align:center}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.busy{position:fixed;inset:0;background:rgba(10,16,28,.35);z-index:70;display:grid;place-items:center}
+.busy div{background:var(--card);padding:16px 22px;border-radius:12px;font-size:14px;font-weight:600}
+.setup{max-width:520px;margin:40px auto;padding:20px;background:var(--card);border-radius:var(--r-md);font-size:14px}
+.setup code{background:var(--field);padding:1px 5px;border-radius:4px}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
 
-<!-- ログイン画面 -->
-<div id="loginScreen" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;">
-  <div class="card" style="width:100%;max-width:360px;">
-    <h1 style="font-size:19px;margin:0 0 4px;">給与管理 <span class="ver">Ver1.1</span></h1>
-    <p style="font-size:13px;color:var(--sub);margin-top:0;margin-bottom:16px;">ログインしてください</p>
-    <div class="field">
-      <label>メールアドレス</label>
-      <input type="email" id="loginEmail" autocomplete="username">
-    </div>
-    <div class="field">
-      <label>パスワード</label>
-      <input type="password" id="loginPassword" autocomplete="current-password">
-    </div>
-    <div id="loginError" style="font-size:12px;color:var(--danger);margin-bottom:10px;display:none;"></div>
-    <button class="primary" id="loginBtn">ログイン</button>
-  </div>
+<!-- ===== 初期設定未完了の表示 ===== -->
+<div id="setupView" class="setup hidden">
+  <h2 style="margin-top:0">Firebaseの設定が必要です</h2>
+  <p>このHTMLファイル内の <code>firebaseConfig</code> に、asset-tracker プロジェクトの設定値を貼り付けてください。</p>
 </div>
 
-<div id="appRoot" style="display:none;">
-
-<header>
-  <div class="inner">
-    <h1>給与管理 <span class="ver">Ver1.1</span></h1>
-    <div id="syncStatus">Firebase 接続中...</div>
-  </div>
-</header>
-
-<nav class="tabs">
-  <div class="inner">
-    <button class="active" data-tab="input">入力</button>
-    <button data-tab="list">一覧</button>
-    <button data-tab="yearly">年別集計</button>
-    <button data-tab="settings">設定</button>
-  </div>
-</nav>
-
-<main>
-
-  <!-- 入力タブ -->
-  <section id="tab-input">
-    <div class="card">
+<!-- ===== ログイン画面 ===== -->
+<section id="loginView" class="hidden">
+  <div class="login-card">
+    <div class="login-head">
+      <h1>給与管理</h1>
+      <p>登録済みのメールアドレスでログインしてください</p>
+    </div>
+    <div class="login-body">
       <div class="field">
-        <label>給与日</label>
-        <input type="date" id="inDate">
+        <label for="email">メールアドレス</label>
+        <input id="email" class="inp" type="email" autocomplete="username" inputmode="email" autocapitalize="off">
       </div>
       <div class="field">
-        <label>給与区分</label>
-        <div class="type-picker" id="typePicker">
-          <button data-t="給与" class="sel">給与</button>
-          <button data-t="賞与">賞与</button>
-          <button data-t="配当">配当</button>
+        <label for="password">パスワード</label>
+        <input id="password" class="inp" type="password" autocomplete="current-password">
+      </div>
+      <p class="login-err" id="loginErr" role="alert"></p>
+      <button class="btn primary block" id="loginBtn">ログイン</button>
+      <div style="text-align:center;margin-top:10px">
+        <button class="linkbtn" id="resetBtn">パスワードを再設定する</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== アプリ本体 ===== -->
+<div id="appView" class="hidden">
+  <div class="shell app-top">
+    <header class="bar">
+      <div class="bar-top">
+        <h1>給与管理<span class="ver" id="verLabel"></span></h1>
+        <div class="sync" id="sync"><i></i><span>同期中</span></div>
+      </div>
+      <div class="year-row">
+        <div class="year-pick">
+          <button class="yr-btn" id="prevY" aria-label="前の年">‹</button>
+          <div class="year num"><span id="yearNum"></span><small>年</small></div>
+          <button class="yr-btn" id="nextY" aria-label="次の年">›</button>
+        </div>
+        <div class="total"><small>年間合計</small><strong class="num" id="yearTotal">0円</strong></div>
+      </div>
+      <div class="comp">
+        <div class="comp-bar" id="compBar"></div>
+        <div class="legend" id="legend"></div>
+      </div>
+      <nav class="tabs" role="tablist">
+        <button role="tab" data-tab="list" aria-selected="true">明細</button>
+        <button role="tab" data-tab="summary" aria-selected="false">年集計</button>
+        <button role="tab" data-tab="settings" aria-selected="false">設定</button>
+      </nav>
+    </header>
+
+    <main>
+      <div id="tab-list"></div>
+      <div id="tab-summary" class="hidden"></div>
+      <div id="tab-settings" class="hidden">
+        <div class="set-group">
+          <div class="set-item">
+            <div class="kv"><span>ログイン中</span><span id="userEmail"></span></div>
+          </div>
+          <div class="set-item">
+            <h3>自動ログアウト</h3>
+            <p>操作がない状態が続くと自動でログアウトします。この端末だけの設定です。</p>
+            <select class="inp" id="idleSel">
+              <option value="0">しない</option>
+              <option value="15">15分</option>
+              <option value="30">30分</option>
+              <option value="60">60分</option>
+            </select>
+          </div>
+          <div class="set-item">
+            <button class="btn danger block" id="logoutBtn">ログアウト</button>
+          </div>
+        </div>
+
+        <div class="set-group">
+          <div class="set-item">
+            <h3>バックアップ</h3>
+            <p>すべての記録をファイル(JSON)に保存します。</p>
+            <label class="check"><input type="checkbox" id="bkPdf"><span>給与明細書PDFも含める(ファイルが大きくなります。Storage側のCORS設定が必要です)</span></label>
+            <button class="btn primary small" id="backupBtn">バックアップを保存</button>
+          </div>
+          <div class="set-item">
+            <h3>復元</h3>
+            <p>バックアップファイルから記録を読み込みます。旧版(Ver1.x)のバックアップも、PDFごと移行できます。</p>
+            <label class="check"><input type="radio" name="rsMode" value="merge" checked><span>統合する(今のデータを残し、同じ記録は上書き)</span></label>
+            <label class="check"><input type="radio" name="rsMode" value="replace"><span>置き換える(今のデータとPDFをすべて削除してから読み込み)</span></label>
+            <button class="btn small" id="restoreBtn">ファイルを選んで復元</button>
+            <input type="file" id="restoreFile" accept="application/json,.json" class="hidden">
+          </div>
         </div>
       </div>
-      <div class="field">
-        <label>金額（円）</label>
-        <input type="number" id="inAmount" placeholder="例: 350000" inputmode="numeric">
-      </div>
-      <div class="field">
-        <label>給与明細書（PDF）</label>
-        <div class="file-drop" id="fileDrop">
-          <input type="file" id="inFile" accept="application/pdf">
-        </div>
-      </div>
-      <button class="primary" id="saveBtn">保存する</button>
-    </div>
-  </section>
+    </main>
+  </div>
 
-  <!-- 一覧タブ -->
-  <section id="tab-list" style="display:none;">
-    <div class="card" id="listCard">
-      <div class="empty" id="listEmpty">まだ記録がありません</div>
-      <div id="listBody"></div>
-    </div>
-  </section>
-
-  <!-- 年別集計タブ -->
-  <section id="tab-yearly" style="display:none;">
-    <div id="yearlyBody"></div>
-    <div class="empty" id="yearlyEmpty" style="display:none;">まだ記録がありません</div>
-  </section>
-
-  <!-- 設定タブ -->
-  <section id="tab-settings" style="display:none;">
-    <div class="card">
-      <h3 style="margin-top:0;font-size:15px;">バックアップ</h3>
-      <p style="font-size:13px;color:var(--sub);margin-top:0;">全ての記録（PDF含む）をJSONファイルとして書き出します。</p>
-      <button class="primary" id="backupBtn">バックアップを書き出す</button>
-    </div>
-    <div class="card">
-      <h3 style="margin-top:0;font-size:15px;">復元</h3>
-      <p style="font-size:13px;color:var(--sub);margin-top:0;">
-        バックアップファイルを選択すると、現在のデータを<b>上書き</b>します。
-      </p>
-      <div class="file-drop">
-        <input type="file" id="restoreFile" accept="application/json,.json">
-      </div>
-      <button class="primary" id="restoreBtn" style="margin-top:10px;">このファイルで復元する</button>
-    </div>
-    <div class="card">
-      <h3 style="margin-top:0;font-size:15px;">アカウント</h3>
-      <p style="font-size:13px;color:var(--sub);margin-top:0;" id="loginAs"></p>
-      <button class="secondary" id="logoutBtn">ログアウト</button>
-    </div>
-  </section>
-
-</main>
-
-</div><!-- /appRoot -->
-
-<div class="modal-bg" id="editModalBg">
-  <div class="modal">
-    <h3>編集</h3>
-    <div class="field">
-      <label>給与日</label>
-      <input type="date" id="editDate">
-    </div>
-    <div class="field">
-      <label>給与区分</label>
-      <div class="type-picker" id="editTypePicker">
-        <button data-t="給与">給与</button>
-        <button data-t="賞与">賞与</button>
-        <button data-t="配当">配当</button>
-      </div>
-    </div>
-    <div class="field">
-      <label>金額（円）</label>
-      <input type="number" id="editAmount">
-    </div>
-    <div class="field">
-      <label>給与明細書（PDF）差し替え（任意）</label>
-      <div class="file-drop"><input type="file" id="editFile" accept="application/pdf"></div>
-    </div>
-    <div style="display:flex;gap:8px;">
-      <button class="secondary" id="editCancel" style="flex:1;">キャンセル</button>
-      <button class="primary" id="editSave" style="flex:2;">更新する</button>
+  <div class="fab-wrap" id="fabWrap">
+    <div class="shell">
+      <button class="fab" id="addBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        記録する
+      </button>
     </div>
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<!-- ===== 入力シート ===== -->
+<div class="overlay" id="overlay" aria-hidden="true">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="grab"></div>
+    <div class="sheet-head">
+      <h2 id="sheetTitle">記録を追加</h2>
+      <button class="x" id="closeSheet" aria-label="閉じる">×</button>
+    </div>
+    <div class="form-grid">
+      <div class="field">
+        <span class="lbl">給与日</span>
+        <div class="date-box">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+          <span class="date-text" id="dateText">日付を選ぶ</span>
+          <input type="date" id="fDate" aria-label="給与日">
+        </div>
+      </div>
+      <div class="field">
+        <span class="lbl">給与区分</span>
+        <div class="seg" role="radiogroup">
+          <input type="radio" name="fType" id="ty1" value="salary" checked><label for="ty1">給与</label>
+          <input type="radio" name="fType" id="ty2" value="bonus"><label for="ty2">賞与</label>
+          <input type="radio" name="fType" id="ty3" value="dividend"><label for="ty3">配当</label>
+        </div>
+      </div>
+      <div class="field">
+        <label for="fAmount">金額</label>
+        <div class="amount-wrap">
+          <input id="fAmount" class="inp num" type="text" inputmode="numeric" autocomplete="off" placeholder="0">
+          <em>円</em>
+        </div>
+      </div>
+      <div class="field">
+        <label for="fMemo">メモ(任意)</label>
+        <input id="fMemo" class="inp" type="text" maxlength="200" placeholder="例:9月分 / 銘柄名">
+      </div>
+      <div class="field">
+        <span class="lbl">給与明細書(PDF)</span>
+        <div class="pdf-box" id="pdfBox"></div>
+        <input type="file" id="fPdf" accept="application/pdf,.pdf" class="hidden">
+      </div>
+    </div>
+    <div class="sheet-foot">
+      <button class="btn" id="cancelBtn">キャンセル</button>
+      <button class="btn primary" id="saveBtn">保存</button>
+    </div>
+    <div class="sheet-del hidden" id="delWrap">
+      <button class="linkbtn" id="deleteBtn" style="color:var(--danger)">この記録を削除</button>
+    </div>
+  </div>
+</div>
 
-<!-- ▼▼▼ Firebase SDK（compat版） ▼▼▼ -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="busy hidden" id="busy"><div id="busyText">処理中…</div></div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <script>
-/* ==========================================================
-   Firebase設定
-   ※ 既存の「asset-tracker-b3fac」プロジェクトを再利用する場合は
-     household-finance-tracker等と同じ config 値をそのまま貼り付けてください。
-     新規プロジェクトを使う場合は Firebase コンソールの
-     プロジェクト設定 > SDK構成 から config をコピーして貼り付けてください。
-   ※ 有料のFirebase Storageは使わず、PDFはBase64文字列に変換して
-     Realtime Database（無料プラン）内に直接保存します。
-   ========================================================== */
+/* =========================================================
+   ここに asset-tracker プロジェクトの設定を貼り付けてください
+   (Firebaseコンソール → プロジェクトの設定 → マイアプリ)
+   ========================================================= */
 const firebaseConfig = {
-  apiKey: "AIzaSyDvXGKQkfgi3_aiuWq2I8VlT2GPgvCBd-k",
-  authDomain: "my-notes-12452.firebaseapp.com",
-  databaseURL: "https://my-notes-12452-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "my-notes-12452",
-  storageBucket: "my-notes-12452.firebasestorage.app",
-  messagingSenderId: "397368603141",
-  appId: "1:397368603141:web:09d7489026c35ebff4626c"
+  apiKey: "ここに貼り付け",
+  authDomain: "ここに貼り付け",
+  databaseURL: "ここに貼り付け",
+  projectId: "ここに貼り付け",
+  storageBucket: "ここに貼り付け",
+  messagingSenderId: "ここに貼り付け",
+  appId: "ここに貼り付け"
 };
 
-// データパス（他アプリと衝突しないよう独立させる）
-const DB_PATH = "salary-tracker/entries";
+const APP_VER = 'Ver2.1';
+const MAX_PDF = 10 * 1024 * 1024;          // PDFは10MBまで
+const ROOT = 'salary';                      // データベース上の保存場所
+const TYPES = {
+  salary:   { label:'給与', cls:'t-salary', color:'var(--salary)' },
+  bonus:    { label:'賞与', cls:'t-bonus',  color:'var(--bonus)'  },
+  dividend: { label:'配当', cls:'t-div',    color:'var(--div)'    }
+};
+const WD = ['日','月','火','水','木','金','土'];
 
-// PDFファイルサイズの上限（Base64化するとサイズが約1.33倍になるため余裕を持たせる）
-const MAX_PDF_BYTES = 4 * 1024 * 1024; // 4MB
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const yen = n => (Number(n)||0).toLocaleString('ja-JP') + '円';
+const fmtSize = b => b >= 1048576 ? (b/1048576).toFixed(1)+'MB' : Math.max(1,Math.round(b/1024))+'KB';
+const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+const parseD = s => { const [y,m,d]=s.split('-').map(Number); return new Date(y,m-1,d); };
 
-let db, auth;
-let entries = {}; // id -> entry
-let firebaseReady = false;
-let entriesListenerAttached = false;
+$('verLabel').textContent = APP_VER;
 
-function initFirebase(){
-  try{
-    firebase.initializeApp(firebaseConfig);
-    db = firebase.database();
-    auth = firebase.auth();
-    firebaseReady = true;
-
-    auth.onAuthStateChanged(user => {
-      if(user){
-        document.getElementById('loginScreen').style.display = 'none';
-        document.getElementById('appRoot').style.display = 'block';
-        document.getElementById('loginAs').textContent = "ログイン中：" + user.email;
-        setSyncStatus("接続済み・同期中", "ok");
-        if(!entriesListenerAttached){
-          listenEntries();
-          entriesListenerAttached = true;
-        }
-      }else{
-        document.getElementById('appRoot').style.display = 'none';
-        document.getElementById('loginScreen').style.display = 'flex';
-      }
-    });
-  }catch(e){
-    console.error(e);
-    setSyncStatus("Firebase設定を確認してください", "err");
-  }
+/* ---------- 初期化 ---------- */
+if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes('ここに')) {
+  $('setupView').classList.remove('hidden');
+  throw new Error('firebaseConfig未設定');
 }
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.database();
+const storage = firebase.storage();
+auth.languageCode = 'ja';
 
-function setSyncStatus(msg, cls){
-  const el = document.getElementById('syncStatus');
-  el.textContent = msg;
-  el.className = cls || '';
+let user = null, records = {}, recRef = null, connRef = null;
+let curYear = new Date().getFullYear();
+let editingId = null, pendingFile = null, removePdf = false;
+
+/* ---------- 画面表示 ---------- */
+function show(view){
+  $('loginView').classList.toggle('hidden', view !== 'login');
+  $('appView').classList.toggle('hidden', view !== 'app');
 }
-
-function listenEntries(){
-  db.ref(DB_PATH).on('value', snap => {
-    entries = snap.val() || {};
-    renderList();
-    renderYearly();
-  }, err => {
-    console.error(err);
-    setSyncStatus("同期エラー：" + err.message, "err");
-  });
-}
-
-/* ---------- ログイン / ログアウト ---------- */
-document.getElementById('loginBtn').addEventListener('click', ()=>{
-  const email = document.getElementById('loginEmail').value.trim();
-  const password = document.getElementById('loginPassword').value;
-  const errEl = document.getElementById('loginError');
-  errEl.style.display = 'none';
-
-  if(!email || !password){
-    errEl.textContent = "メールアドレスとパスワードを入力してください";
-    errEl.style.display = 'block';
-    return;
-  }
-  const loginBtn = document.getElementById('loginBtn');
-  loginBtn.disabled = true;
-  loginBtn.textContent = "ログイン中...";
-
-  auth.signInWithEmailAndPassword(email, password)
-    .catch(e=>{
-      console.error(e);
-      const codeMap = {
-        'auth/user-not-found': 'このメールアドレスのユーザーが見つかりません（Authenticationの「Users」タブでユーザーが作成されているか確認してください）',
-        'auth/wrong-password': 'パスワードが違います',
-        'auth/invalid-email': 'メールアドレスの形式が正しくありません',
-        'auth/invalid-credential': 'メールアドレスまたはパスワードが正しくありません',
-        'auth/unauthorized-domain': 'このドメインからのログインが許可されていません（Authentication→Settings→Authorized domainsに追加してください）',
-        'auth/too-many-requests': '試行回数が多すぎます。しばらく待ってから再度お試しください',
-        'auth/network-request-failed': 'ネットワークエラーです。通信環境を確認してください',
-        'auth/operation-not-allowed': 'メール/パスワードでのログインが有効になっていません（Authentication→Sign-in methodで有効化してください）'
-      };
-      errEl.textContent = "ログインに失敗しました：" + (codeMap[e.code] || (e.code + " " + e.message));
-      errEl.style.display = 'block';
-    })
-    .finally(()=>{
-      loginBtn.disabled = false;
-      loginBtn.textContent = "ログイン";
-    });
-});
-
-document.getElementById('loginPassword').addEventListener('keydown', e=>{
-  if(e.key === 'Enter') document.getElementById('loginBtn').click();
-});
-
-document.getElementById('logoutBtn').addEventListener('click', ()=>{
-  if(!confirm("ログアウトしますか？")) return;
-  auth.signOut();
-});
-
-/* ---------- タブ切替 ---------- */
-document.querySelectorAll('nav.tabs button').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    ['input','list','yearly','settings'].forEach(t=>{
-      document.getElementById('tab-'+t).style.display = (t===btn.dataset.tab) ? 'block':'none';
-    });
-  });
-});
-
-/* ---------- 区分ピッカー（入力） ---------- */
-let selectedType = "給与";
-document.querySelectorAll('#typePicker button').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    document.querySelectorAll('#typePicker button').forEach(b=>b.classList.remove('sel'));
-    btn.classList.add('sel');
-    selectedType = btn.dataset.t;
-  });
-});
-
-/* ---------- 初期日付 ---------- */
-document.getElementById('inDate').valueAsDate = new Date();
-
-/* ---------- トースト ---------- */
 function toast(msg){
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'), 2000);
+  const t=$('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'),2600);
+}
+function busy(on, text='処理中…'){ $('busyText').textContent=text; $('busy').classList.toggle('hidden',!on); }
+
+/* ---------- ログイン ---------- */
+const LOCK_KEY='salary_login_lock';
+function lockState(){ try{return JSON.parse(localStorage.getItem(LOCK_KEY))||{n:0,until:0};}catch(e){return {n:0,until:0};} }
+function setLock(s){ try{localStorage.setItem(LOCK_KEY,JSON.stringify(s));}catch(e){} }
+
+function authMsg(code){
+  return ({
+    'auth/invalid-credential':'メールアドレスまたはパスワードが違います。',
+    'auth/wrong-password':'メールアドレスまたはパスワードが違います。',
+    'auth/user-not-found':'メールアドレスまたはパスワードが違います。',
+    'auth/invalid-email':'メールアドレスの形式が正しくありません。',
+    'auth/too-many-requests':'試行回数が多すぎます。しばらく待ってから再度お試しください。',
+    'auth/network-request-failed':'通信できません。電波状況を確認してください。',
+    'auth/user-disabled':'このアカウントは無効化されています。'
+  })[code] || 'ログインできませんでした。('+code+')';
 }
 
-/* ---------- ファイルをBase64に変換 ---------- */
-function readFileAsDataURL(file){
-  return new Promise((resolve, reject)=>{
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(new Error("PDFの読み込みに失敗しました"));
-    reader.readAsDataURL(file);
-  });
-}
-
-/* ---------- 保存 ---------- */
-document.getElementById('saveBtn').addEventListener('click', async ()=>{
-  if(!firebaseReady){ toast("Firebase未接続です"); return; }
-  const date = document.getElementById('inDate').value;
-  const amount = parseInt(document.getElementById('inAmount').value, 10);
-  const file = document.getElementById('inFile').files[0];
-
-  if(!date){ toast("給与日を入力してください"); return; }
-  if(!amount || amount <= 0){ toast("金額を入力してください"); return; }
-  if(file && file.size > MAX_PDF_BYTES){
-    toast("PDFが大きすぎます（4MB以下にしてください）");
+$('loginBtn').onclick = async () => {
+  const s = lockState();
+  if (Date.now() < s.until) {
+    $('loginErr').textContent = `ログインを一時停止しています。あと${Math.ceil((s.until-Date.now())/60000)}分お待ちください。`;
     return;
   }
-
-  const saveBtn = document.getElementById('saveBtn');
-  saveBtn.disabled = true;
-  saveBtn.textContent = "保存中...";
-
-  const withTimeout = (promise, ms, label) => {
-    return Promise.race([
-      promise,
-      new Promise((_, reject) => setTimeout(()=>reject(new Error(label + "がタイムアウトしました。Firebaseのdatabase URLやルール設定を確認してください。")), ms))
-    ]);
-  };
-
+  const email=$('email').value.trim(), pw=$('password').value;
+  if(!email||!pw){ $('loginErr').textContent='メールアドレスとパスワードを入力してください。'; return; }
+  $('loginBtn').disabled=true; $('loginErr').textContent='';
   try{
-    const newRef = db.ref(DB_PATH).push();
-    let pdfData = null, pdfName = null;
-
-    if(file){
-      pdfData = await withTimeout(readFileAsDataURL(file), 10000, "PDF読み込み");
-      pdfName = file.name;
-    }
-
-    await withTimeout(newRef.set({
-      date, type: selectedType, amount,
-      pdfData, pdfName,
-      createdAt: Date.now()
-    }), 10000, "データ保存");
-
-    document.getElementById('inAmount').value = '';
-    document.getElementById('inFile').value = '';
-    toast("保存しました");
+    await auth.signInWithEmailAndPassword(email,pw);
+    setLock({n:0,until:0});
+    $('password').value='';
   }catch(e){
-    console.error(e);
-    toast("保存に失敗しました: " + e.message);
-  }finally{
-    saveBtn.disabled = false;
-    saveBtn.textContent = "保存する";
+    const n=s.n+1;
+    setLock(n>=5 ? {n:0,until:Date.now()+5*60000} : {n,until:0});
+    $('loginErr').textContent = n>=5 ? '5回失敗したため、5分間ログインを停止します。' : authMsg(e.code);
+  }finally{ $('loginBtn').disabled=false; }
+};
+$('password').addEventListener('keydown',e=>{ if(e.key==='Enter') $('loginBtn').click(); });
+$('resetBtn').onclick = async () => {
+  const email=$('email').value.trim();
+  if(!email){ $('loginErr').textContent='先にメールアドレスを入力してください。'; return; }
+  try{ await auth.sendPasswordResetEmail(email); }catch(e){}
+  $('loginErr').textContent='登録済みのアドレスであれば、再設定メールを送信しました。';
+};
+
+auth.onAuthStateChanged(u => {
+  if (u) {
+    if (idleExpired()) { auth.signOut(); return; }
+    user=u; touch(); $('userEmail').textContent=u.email||'';
+    show('app'); subscribe();
+  } else {
+    user=null; unsubscribe(); records={}; closeSheet(true); show('login');
   }
 });
 
-/* ---------- PDFを開く（Base64→Blobに変換してから開く） ---------- */
-function dataURLtoBlob(dataurl){
-  const parts = dataurl.split(',');
-  const mimeMatch = parts[0].match(/:(.*?);/);
-  const mime = mimeMatch ? mimeMatch[1] : 'application/pdf';
-  const bstr = atob(parts[1]);
-  let n = bstr.length;
-  const u8arr = new Uint8Array(n);
-  while(n--){ u8arr[n] = bstr.charCodeAt(n); }
-  return new Blob([u8arr], { type: mime });
+function subscribe(){
+  unsubscribe();
+  recRef = db.ref(`${ROOT}/${user.uid}/records`);
+  recRef.on('value', snap => { records = snap.val() || {}; render(); },
+    err => toast('データを読み込めません:'+(err.code||err.message)));
+  connRef = db.ref('.info/connected');
+  connRef.on('value', s => {
+    const on=!!s.val(); $('sync').classList.toggle('off',!on);
+    $('sync').querySelector('span').textContent = on ? '同期中' : 'オフライン';
+  });
+}
+function unsubscribe(){ if(recRef){recRef.off();recRef=null;} if(connRef){connRef.off();connRef=null;} }
+
+$('logoutBtn').onclick = () => { if(confirm('ログアウトしますか?')) auth.signOut(); };
+
+/* ---------- 自動ログアウト ---------- */
+const IDLE_KEY='salary_idle_min', LAST_KEY='salary_last_active';
+const idleMin = () => { const v=localStorage.getItem(IDLE_KEY); return v===null?30:Number(v); };
+$('idleSel').value = String(idleMin());
+$('idleSel').onchange = e => { localStorage.setItem(IDLE_KEY,e.target.value); touch(); toast('自動ログアウトを変更しました'); };
+function touch(){ try{localStorage.setItem(LAST_KEY,String(Date.now()));}catch(e){} }
+function idleExpired(){
+  const m=idleMin(); if(!m) return false;
+  const last=Number(localStorage.getItem(LAST_KEY)||0);
+  return last>0 && Date.now()-last > m*60000;
+}
+['pointerdown','keydown','scroll'].forEach(ev=>addEventListener(ev,()=>{ if(user){ const n=Date.now(); if(!touch._t||n-touch._t>15000){touch._t=n;touch();} } },{passive:true}));
+function idleCheck(){ if(user && idleExpired()){ auth.signOut(); toast('一定時間操作がなかったためログアウトしました'); } }
+setInterval(idleCheck,30000);
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') idleCheck(); });
+
+/* ---------- 集計 ---------- */
+function list(){ return Object.entries(records).map(([id,r])=>({id,...r})).filter(r=>r&&r.date); }
+function totalsFor(items){
+  const t={salary:0,bonus:0,dividend:0,all:0};
+  items.forEach(r=>{ const a=Number(r.amount)||0; if(t[r.type]!==undefined) t[r.type]+=a; t.all+=a; });
+  return t;
 }
 
-function openPdf(id){
-  const e = entries[id];
-  if(!e || !e.pdfData){ toast("PDFがありません"); return; }
-  try{
-    const blob = dataURLtoBlob(e.pdfData);
-    const url = URL.createObjectURL(blob);
-    const win = window.open(url, '_blank');
-    if(!win){
-      toast("ポップアップがブロックされました。設定を確認してください");
-    }
-    setTimeout(()=>URL.revokeObjectURL(url), 60000);
-  }catch(err){
-    console.error(err);
-    toast("PDFを開けませんでした");
-  }
+/* ---------- 描画 ---------- */
+let tab='list';
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
+  tab=b.dataset.tab;
+  document.querySelectorAll('.tabs button').forEach(x=>x.setAttribute('aria-selected',x===b));
+  ['list','summary','settings'].forEach(k=>$('tab-'+k).classList.toggle('hidden',k!==tab));
+  $('fabWrap').classList.toggle('hidden',tab==='settings');
+  render();
+});
+$('prevY').onclick=()=>{curYear--;render();};
+$('nextY').onclick=()=>{curYear++;render();};
+
+function render(){
+  const all=list();
+  const yearItems=all.filter(r=>r.date.startsWith(curYear+'-'));
+  const t=totalsFor(yearItems);
+  $('yearNum').textContent=curYear;
+  $('yearTotal').textContent=yen(t.all);
+  $('compBar').innerHTML = t.all>0
+    ? Object.keys(TYPES).map(k=>`<span style="width:${t[k]/t.all*100}%;background:${TYPES[k].color}"></span>`).join('')
+    : '';
+  $('legend').innerHTML = Object.keys(TYPES).map(k=>
+    `<div><b><i style="background:${TYPES[k].color}"></i>${TYPES[k].label}</b><span class="num">${yen(t[k])}</span></div>`).join('');
+
+  if(tab==='list') renderList(yearItems);
+  if(tab==='summary') renderSummary(all,yearItems);
 }
 
-/* ---------- 一覧描画 ---------- */
-function fmtYen(n){ return "¥" + Number(n).toLocaleString('ja-JP'); }
-function fmtDate(d){
-  const dt = new Date(d + "T00:00:00");
-  return dt.getFullYear() + "/" + (dt.getMonth()+1) + "/" + dt.getDate();
-}
-
-function renderList(){
-  const body = document.getElementById('listBody');
-  const empty = document.getElementById('listEmpty');
-  const ids = Object.keys(entries).sort((a,b)=> entries[b].date.localeCompare(entries[a].date));
-
-  if(ids.length === 0){
-    body.innerHTML = '';
-    empty.style.display = 'block';
+function renderList(items){
+  const el=$('tab-list');
+  if(!items.length){
+    el.innerHTML=`<div class="empty"><p>${curYear}年の記録はまだありません。</p><button class="btn primary small" onclick="openSheet()">最初の記録を追加</button></div>`;
     return;
   }
-  empty.style.display = 'none';
-
-  body.innerHTML = ids.map(id=>{
-    const e = entries[id];
-    const pdfLink = e.pdfData
-      ? `<button class="pdf-link" onclick="openPdf('${id}')">明細書PDF</button>`
-      : `<span class="pdf-link" style="color:#b0b6bd;">PDFなし</span>`;
-    return `
-      <div class="entry">
-        <span class="badge ${e.type}">${e.type}</span>
-        <div class="info">
-          <div class="date">${fmtDate(e.date)}</div>
-          <div class="amount">${fmtYen(e.amount)}</div>
-          ${pdfLink}
-        </div>
-        <div class="actions">
-          <button onclick="openEdit('${id}')">✎</button>
-          <button onclick="deleteEntry('${id}')">🗑</button>
-        </div>
-      </div>`;
+  items.sort((a,b)=>b.date.localeCompare(a.date)||(b.createdAt||0)-(a.createdAt||0));
+  const byM={};
+  items.forEach(r=>{ const m=Number(r.date.slice(5,7)); (byM[m]=byM[m]||[]).push(r); });
+  el.innerHTML = Object.keys(byM).map(Number).sort((a,b)=>b-a).map(m=>{
+    const rows=byM[m], sum=rows.reduce((s,r)=>s+(Number(r.amount)||0),0);
+    return `<section class="month">
+      <div class="month-head"><strong>${m}月</strong><span class="num">${yen(sum)}</span></div>
+      <div class="list">${rows.map(rowHtml).join('')}</div></section>`;
   }).join('');
 }
-
-/* ---------- 削除 ---------- */
-async function deleteEntry(id){
-  if(!confirm("この記録を削除しますか？（PDFも削除されます）")) return;
-  try{
-    await db.ref(DB_PATH + "/" + id).remove();
-    toast("削除しました");
-  }catch(e){
-    console.error(e);
-    toast("削除に失敗しました");
-  }
+function rowHtml(r){
+  const d=parseD(r.date), ty=TYPES[r.type]||TYPES.salary;
+  return `<button class="row" onclick="openSheet('${r.id}')">
+    <span class="d"><b class="num">${d.getDate()}</b><small>${d.getMonth()+1}月・${WD[d.getDay()]}</small></span>
+    <span class="mid"><span class="chip ${ty.cls}">${ty.label}</span><span class="memo">${esc(r.memo||'')}</span></span>
+    <span><span class="amt num">${yen(r.amount)}</span>${r.pdf?'<span class="pdf-mark">PDF</span>':''}</span>
+  </button>`;
 }
 
-/* ---------- 編集 ---------- */
-let editingId = null;
-let editingType = "給与";
+function renderSummary(all,yearItems){
+  const months=Array.from({length:12},(_,i)=>totalsFor(yearItems.filter(r=>Number(r.date.slice(5,7))===i+1)));
+  const max=Math.max(1,...months.map(m=>m.all));
+  const monthHtml=months.map((m,i)=>`<div class="mrow">
+      <span class="m">${i+1}月</span>
+      <span class="mbar">${Object.keys(TYPES).map(k=>m[k]?`<span style="width:${m[k]/max*100}%;background:${TYPES[k].color}"></span>`:'').join('')}</span>
+      <span class="v num">${m.all?yen(m.all):'—'}</span></div>`).join('');
 
-function openEdit(id){
-  editingId = id;
-  const e = entries[id];
-  document.getElementById('editDate').value = e.date;
-  document.getElementById('editAmount').value = e.amount;
-  editingType = e.type;
-  document.querySelectorAll('#editTypePicker button').forEach(b=>{
-    b.classList.toggle('sel', b.dataset.t === editingType);
-  });
-  document.getElementById('editFile').value = '';
-  document.getElementById('editModalBg').classList.add('show');
-}
-document.querySelectorAll('#editTypePicker button').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    document.querySelectorAll('#editTypePicker button').forEach(b=>b.classList.remove('sel'));
-    btn.classList.add('sel');
-    editingType = btn.dataset.t;
-  });
-});
-document.getElementById('editCancel').addEventListener('click', ()=>{
-  document.getElementById('editModalBg').classList.remove('show');
-});
-document.getElementById('editSave').addEventListener('click', async ()=>{
-  const date = document.getElementById('editDate').value;
-  const amount = parseInt(document.getElementById('editAmount').value, 10);
-  const file = document.getElementById('editFile').files[0];
-  if(!date || !amount){ toast("入力内容を確認してください"); return; }
-  if(file && file.size > MAX_PDF_BYTES){
-    toast("PDFが大きすぎます（4MB以下にしてください）");
-    return;
-  }
-
-  try{
-    const update = { date, type: editingType, amount };
-    if(file){
-      update.pdfData = await readFileAsDataURL(file);
-      update.pdfName = file.name;
-    }
-    await db.ref(DB_PATH + "/" + editingId).update(update);
-    document.getElementById('editModalBg').classList.remove('show');
-    toast("更新しました");
-  }catch(e){
-    console.error(e);
-    toast("更新に失敗しました");
-  }
-});
-
-/* ---------- 年別集計 ---------- */
-function renderYearly(){
-  const wrap = document.getElementById('yearlyBody');
-  const empty = document.getElementById('yearlyEmpty');
-  const ids = Object.keys(entries);
-
-  if(ids.length === 0){
-    wrap.innerHTML = '';
-    empty.style.display = 'block';
-    return;
-  }
-  empty.style.display = 'none';
-
-  const byYear = {};
-  ids.forEach(id=>{
-    const e = entries[id];
-    const y = e.date.slice(0,4);
-    if(!byYear[y]) byYear[y] = {給与:0, 賞与:0, 配当:0, total:0};
-    byYear[y][e.type] += Number(e.amount);
-    byYear[y].total += Number(e.amount);
-  });
-
-  const years = Object.keys(byYear).sort((a,b)=> b - a);
-  wrap.innerHTML = years.map(y=>{
-    const d = byYear[y];
-    return `
-      <div class="card year-block">
-        <h3>${y}年 <span class="total">${fmtYen(d.total)}</span></h3>
-        <table class="year-table">
-          <tr><td class="label">給与</td><td class="num">${fmtYen(d.給与)}</td></tr>
-          <tr><td class="label">賞与</td><td class="num">${fmtYen(d.賞与)}</td></tr>
-          <tr><td class="label">配当</td><td class="num">${fmtYen(d.配当)}</td></tr>
-          <tr class="total-row"><td class="label">合計</td><td class="num">${fmtYen(d.total)}</td></tr>
-        </table>
-      </div>`;
+  const years=[...new Set(all.map(r=>Number(r.date.slice(0,4))).concat(curYear))].sort((a,b)=>b-a);
+  const yearHtml=years.map(y=>{
+    const t=totalsFor(all.filter(r=>r.date.startsWith(y+'-')));
+    return `<button class="yrow ${y===curYear?'cur':''}" onclick="curYear=${y};render();scrollTo({top:0,behavior:'smooth'})">
+      <div class="top"><b class="num">${y}年</b><strong class="num">${yen(t.all)}</strong></div>
+      <div class="ysub">${Object.keys(TYPES).map(k=>`<span class="num"><i style="background:${TYPES[k].color}"></i>${TYPES[k].label} ${yen(t[k])}</span>`).join('')}</div>
+    </button>`;
   }).join('');
+
+  $('tab-summary').innerHTML=
+    `<h2 class="sec-title">${curYear}年の月別</h2><div class="card">${monthHtml}</div>
+     <h2 class="sec-title">年別の合計</h2><div class="card" style="padding-top:2px;padding-bottom:2px">${yearHtml}</div>`;
 }
 
-/* ---------- バックアップ / 復元 ---------- */
-document.getElementById('backupBtn').addEventListener('click', ()=>{
-  if(Object.keys(entries).length === 0){ toast("バックアップする記録がありません"); return; }
-  const payload = {
-    app: "salary-tracker",
-    exportedAt: new Date().toISOString(),
-    entries
-  };
-  const json = JSON.stringify(payload, null, 2);
-  const blob = new Blob([json], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const now = new Date();
-  const pad = n => String(n).padStart(2,'0');
-  const filename = `salary-backup-${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}.json`;
+/* ---------- 入力シート ---------- */
+function setDateText(v){
+  const el=$('dateText');
+  if(!v){ el.textContent='日付を選ぶ'; el.classList.add('ph'); return; }
+  const d=parseD(v);
+  el.textContent=`${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日(${WD[d.getDay()]})`;
+  el.classList.remove('ph');
+}
+$('fDate').addEventListener('change',e=>setDateText(e.target.value));
+$('fDate').addEventListener('input',e=>setDateText(e.target.value));
+$('fDate').addEventListener('click',e=>{ try{ e.target.showPicker && e.target.showPicker(); }catch(_){} });
 
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(()=>URL.revokeObjectURL(url), 30000);
-  toast("バックアップを書き出しました");
+$('fAmount').addEventListener('input',e=>{
+  const digits=e.target.value.replace(/[^\d]/g,'').replace(/^0+(?=\d)/,'').slice(0,12);
+  e.target.value = digits ? Number(digits).toLocaleString('ja-JP') : '';
 });
 
-document.getElementById('restoreBtn').addEventListener('click', async ()=>{
-  if(!firebaseReady){ toast("Firebase未接続です"); return; }
-  const file = document.getElementById('restoreFile').files[0];
-  if(!file){ toast("復元用のファイルを選択してください"); return; }
+function openSheet(id){
+  editingId=id||null; pendingFile=null; removePdf=false;
+  const r=id?records[id]:null;
+  $('sheetTitle').textContent = r ? '記録を編集' : '記録を追加';
+  const def = String(curYear)===todayStr().slice(0,4) ? todayStr() : `${curYear}-01-25`;
+  $('fDate').value = r ? r.date : def; setDateText($('fDate').value);
+  document.querySelector(`input[name=fType][value=${r?r.type:'salary'}]`).checked=true;
+  $('fAmount').value = r ? Number(r.amount).toLocaleString('ja-JP') : '';
+  $('fMemo').value = r ? (r.memo||'') : '';
+  $('delWrap').classList.toggle('hidden',!r);
+  renderPdfBox();
+  $('overlay').classList.add('open'); $('overlay').setAttribute('aria-hidden','false');
+  document.body.style.overflow='hidden';
+}
+window.openSheet=openSheet;
+function closeSheet(force){
+  if(!force && $('saveBtn').disabled) return;
+  $('overlay').classList.remove('open'); $('overlay').setAttribute('aria-hidden','true');
+  document.body.style.overflow=''; editingId=null; pendingFile=null;
+}
+$('addBtn').onclick=()=>openSheet();
+$('closeSheet').onclick=()=>closeSheet();
+$('cancelBtn').onclick=()=>closeSheet();
+$('overlay').addEventListener('click',e=>{ if(e.target===$('overlay')) closeSheet(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeSheet(); });
 
+function renderPdfBox(progress){
+  const box=$('pdfBox');
+  const existing = editingId && records[editingId] && records[editingId].pdf && !removePdf ? records[editingId].pdf : null;
+  let html='';
+  if(pendingFile){
+    html=`<div class="pdf-file"><span class="pdf-ico">PDF</span><span class="pdf-meta"><b>${esc(pendingFile.name)}</b><small>${fmtSize(pendingFile.size)}・保存時にアップロード</small></span></div>
+      <div class="pdf-actions"><button class="btn small" data-a="pick">選び直す</button><button class="btn small" data-a="cancel">取り消す</button></div>`;
+  }else if(existing){
+    html=`<div class="pdf-file"><span class="pdf-ico">PDF</span><span class="pdf-meta"><b>${esc(existing.name||'給与明細書.pdf')}</b><small>${existing.size?fmtSize(existing.size):''}</small></span></div>
+      <div class="pdf-actions"><a class="btn small primary" id="pdfOpen" target="_blank" rel="noopener" aria-disabled="true">読み込み中…</a>
+      <button class="btn small" data-a="pick">差し替え</button><button class="btn small" data-a="remove">添付を外す</button></div>`;
+  }else{
+    html=`<div class="pdf-actions" style="margin-top:0"><button class="btn small" data-a="pick">PDFを選ぶ</button></div>
+      <div style="font-size:12px;color:var(--sub);margin-top:8px">10MBまで。${removePdf?'保存すると添付が削除されます。':''}</div>`;
+  }
+  if(progress!==undefined) html+=`<div class="progress"><span style="width:${progress}%"></span></div>`;
+  box.innerHTML=html;
+  box.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{
+    const a=b.dataset.a;
+    if(a==='pick') $('fPdf').click();
+    if(a==='cancel'){ pendingFile=null; renderPdfBox(); }
+    if(a==='remove'){ removePdf=true; renderPdfBox(); }
+  });
+  if(existing && !pendingFile){
+    const link=$('pdfOpen');
+    storage.ref(existing.path).getDownloadURL()
+      .then(url=>{ if(link&&link.isConnected){ link.href=url; link.textContent='開く'; link.removeAttribute('aria-disabled'); } })
+      .catch(()=>{ if(link&&link.isConnected){ link.textContent='取得できません'; } });
+  }
+}
+$('fPdf').addEventListener('change',e=>{
+  const f=e.target.files[0]; e.target.value='';
+  if(!f) return;
+  const isPdf=f.type==='application/pdf'||/\.pdf$/i.test(f.name);
+  if(!isPdf){ toast('PDFファイルを選んでください'); return; }
+  if(f.size>MAX_PDF){ toast('10MB以下のPDFを選んでください'); return; }
+  pendingFile=f; renderPdfBox();
+});
+
+function uploadPdf(path,fileOrBlob,onProgress){
+  return new Promise((res,rej)=>{
+    const task=storage.ref(path).put(fileOrBlob,{contentType:'application/pdf'});
+    task.on('state_changed',s=>onProgress&&onProgress(Math.round(s.bytesTransferred/s.totalBytes*100)),rej,()=>res());
+  });
+}
+async function deletePdf(path){
+  try{ await storage.ref(path).delete(); }
+  catch(e){ if(e.code!=='storage/object-not-found') console.warn(e); }
+}
+const newPdfPath = id => `${ROOT}/${user.uid}/payslips/${id}_${Date.now()}.pdf`;
+
+$('saveBtn').onclick = async () => {
+  const date=$('fDate').value;
+  const type=document.querySelector('input[name=fType]:checked').value;
+  const amount=Number($('fAmount').value.replace(/[^\d]/g,''));
+  const memo=$('fMemo').value.trim().slice(0,200);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){ toast('給与日を選んでください'); return; }
+  if(!$('fAmount').value){ toast('金額を入力してください'); return; }
+
+  const id = editingId || recRef.push().key;
+  const prev = editingId ? records[editingId] : null;
+  let pdf = prev && prev.pdf ? prev.pdf : null;
+  $('saveBtn').disabled=true; $('cancelBtn').disabled=true;
   try{
-    const text = await file.text();
-    const payload = JSON.parse(text);
-    const restoredEntries = payload && payload.entries ? payload.entries : payload;
-
-    if(!restoredEntries || typeof restoredEntries !== 'object'){
-      toast("ファイルの形式が正しくありません");
-      return;
+    if(pendingFile){
+      const path=newPdfPath(id);
+      await uploadPdf(path,pendingFile,p=>renderPdfBox(p));
+      if(pdf) await deletePdf(pdf.path);
+      pdf={path,name:pendingFile.name.slice(0,120),size:pendingFile.size};
+    }else if(removePdf && pdf){
+      await deletePdf(pdf.path); pdf=null;
     }
-
-    const count = Object.keys(restoredEntries).length;
-    if(!confirm(`現在のデータを削除して、${count}件の記録で上書きします。よろしいですか？`)) return;
-
-    const restoreBtn = document.getElementById('restoreBtn');
-    restoreBtn.disabled = true;
-    restoreBtn.textContent = "復元中...";
-
-    await db.ref(DB_PATH).set(restoredEntries);
-
-    document.getElementById('restoreFile').value = '';
-    toast("復元しました");
+    const now=Date.now();
+    const data={date,type,amount,createdAt:prev&&prev.createdAt?prev.createdAt:now,updatedAt:now};
+    if(memo) data.memo=memo;
+    if(pdf) data.pdf=pdf;
+    await db.ref(`${ROOT}/${user.uid}/records/${id}`).set(data);
+    const y=Number(date.slice(0,4)); if(y!==curYear){ curYear=y; render(); }
+    $('saveBtn').disabled=false; $('cancelBtn').disabled=false;
+    closeSheet(true); toast(prev?'更新しました':'保存しました');
   }catch(e){
     console.error(e);
-    toast("復元に失敗しました: " + e.message);
-  }finally{
-    const restoreBtn = document.getElementById('restoreBtn');
-    restoreBtn.disabled = false;
-    restoreBtn.textContent = "このファイルで復元する";
-  }
-});
+    toast('保存できませんでした:'+(e.code||e.message));
+    renderPdfBox();
+  }finally{ $('saveBtn').disabled=false; $('cancelBtn').disabled=false; }
+};
 
-/* ---------- 起動 ---------- */
-initFirebase();
+$('deleteBtn').onclick = async () => {
+  const r=records[editingId]; if(!r) return;
+  if(!confirm(`${r.date} ${TYPES[r.type]?.label||''} ${yen(r.amount)} を削除しますか?\n添付のPDFも削除されます。`)) return;
+  busy(true,'削除中…');
+  try{
+    if(r.pdf) await deletePdf(r.pdf.path);
+    await db.ref(`${ROOT}/${user.uid}/records/${editingId}`).remove();
+    closeSheet(true); toast('削除しました');
+  }catch(e){ toast('削除できませんでした:'+(e.code||e.message)); }
+  finally{ busy(false); }
+};
+
+/* ---------- バックアップ ---------- */
+function blobToB64(blob){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]); r.onerror=rej; r.readAsDataURL(blob); }); }
+function b64ToBlob(b64){ const bin=atob(b64); const u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i); return new Blob([u],{type:'application/pdf'}); }
+
+$('backupBtn').onclick = async () => {
+  const withPdf=$('bkPdf').checked;
+  const out={app:'salary-tracker',version:APP_VER,exportedAt:new Date().toISOString(),includesPdf:withPdf,records:{}};
+  busy(true,'バックアップを作成中…');
+  let failed=0;
+  try{
+    const entries=Object.entries(records);
+    for(let i=0;i<entries.length;i++){
+      const [id,r]=entries[i]; const copy={...r};
+      if(withPdf && r.pdf){
+        $('busyText').textContent=`PDFを取得中… ${i+1}/${entries.length}`;
+        try{
+          const url=await storage.ref(r.pdf.path).getDownloadURL();
+          const resp=await fetch(url); if(!resp.ok) throw new Error(resp.status);
+          copy.pdfData=await blobToB64(await resp.blob());
+        }catch(e){ failed++; }
+      }
+      out.records[id]=copy;
+    }
+    const blob=new Blob([JSON.stringify(out)],{type:'application/json'});
+    const a=document.createElement('a');
+    const d=todayStr().replace(/-/g,'');
+    a.href=URL.createObjectURL(blob); a.download=`salary-backup-${d}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+    toast(failed?`保存しました(PDF ${failed}件は取得できませんでした)`:'バックアップを保存しました');
+  }catch(e){ toast('バックアップできませんでした:'+e.message); }
+  finally{ busy(false); }
+};
+
+/* ===== バックアップの読み取り(新版・旧版Ver1.x 両対応) ===== */
+const pick = (o, keys) => { for (const k of keys) { if (o && o[k] !== undefined && o[k] !== null && o[k] !== '') return o[k]; } return undefined; };
+
+function normDate(v){
+  if (v === undefined) return null;
+  if (typeof v === 'number' || /^\d{10,13}$/.test(String(v))) {
+    let n = Number(v); if (n < 1e12) n *= 1000;
+    const d = new Date(n); if (isNaN(d)) return null;
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+  const s = String(v).trim().replace(/[年月\/\.]/g,'-').replace(/日.*$/,'').replace(/T.*$/,'');
+  const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (!m) return null;
+  const y=+m[1], mo=+m[2], d=+m[3];
+  if (mo<1||mo>12||d<1||d>31) return null;
+  return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+function normType(v){
+  const s = String(v ?? '').trim().toLowerCase();
+  if (!s) return 'salary';
+  if (s.includes('賞与') || s.includes('ボーナス') || s.includes('bonus')) return 'bonus';
+  if (s.includes('配当') || s.includes('divid')) return 'dividend';
+  if (s.includes('給与') || s.includes('給料') || s.includes('salary') || s.includes('pay')) return 'salary';
+  return TYPES[s] ? s : null;
+}
+function normAmount(v){
+  if (v === undefined) return null;
+  const n = Number(String(v).replace(/[^\d.\-]/g,''));
+  return Number.isFinite(n) && n >= 0 ? Math.round(n) : null;
+}
+/* PDFのBase64を取り出す(文字列 / data:URL / {data,name} など) */
+function extractPdf(r){
+  let src = pick(r, ['pdfData','pdfBase64','pdf','payslip','slip','file','attachment','meisai','明細書','給与明細書']);
+  let name = pick(r, ['pdfName','fileName','filename','payslipName']);
+  if (src && typeof src === 'object') {
+    name = name || src.name || src.fileName;
+    src = pick(src, ['data','base64','dataUrl','dataURL','content','url']);
+  }
+  if (typeof src !== 'string' || !src) return null;
+  let b64 = src;
+  if (b64.startsWith('data:')) { const i = b64.indexOf(','); if (i < 0) return null; b64 = b64.slice(i+1); }
+  b64 = b64.replace(/\s/g,'');
+  if (b64.length < 100 || !/^[A-Za-z0-9+/=_-]+$/.test(b64)) return null;   // Base64以外(パス等)は対象外
+  b64 = b64.replace(/-/g,'+').replace(/_/g,'/');
+  return { b64, name: String(name || '給与明細書.pdf') };
+}
+/* ファイル内から「記録の集まり」を探す */
+function findRecords(data){
+  const looksLike = o => o && typeof o === 'object' && !Array.isArray(o) &&
+    pick(o,['date','payDate','paydate','payday','day','給与日','日付']) !== undefined &&
+    pick(o,['amount','value','money','金額']) !== undefined;
+  const asList = c => Array.isArray(c) ? c.map((r,i)=>[String(i),r]) : Object.entries(c);
+  const seen = new Set();
+  const walk = (node, depth) => {
+    if (!node || typeof node !== 'object' || depth > 6 || seen.has(node)) return null;
+    seen.add(node);
+    const list = asList(node);
+    if (list.length && list.filter(([,v])=>looksLike(v)).length >= Math.ceil(list.length/2)) return list;
+    for (const [,v] of list) { const f = walk(v, depth+1); if (f) return f; }
+    return null;
+  };
+  return walk(data, 0) || [];
+}
+function parseBackup(data){
+  const isNew = data && data.app === 'salary-tracker' && /^Ver2/.test(String(data.version||''));
+  const out = [];
+  let skip = 0;
+  for (const [rawId, r] of findRecords(data)) {
+    const date = normDate(pick(r,['date','payDate','paydate','payday','day','給与日','日付']));
+    const type = normType(pick(r,['type','category','kind','kubun','division','区分','給与区分']));
+    const amount = normAmount(pick(r,['amount','value','money','金額']));
+    if (!date || !type || amount === null) { skip++; continue; }
+    const memo = pick(r,['memo','note','notes','comment','remarks','メモ','備考']);
+    const rec = { date, type, amount };
+    if (typeof memo === 'string' && memo.trim()) rec.memo = memo.trim().slice(0,200);
+    const created = Number(pick(r,['createdAt','created','timestamp']));
+    const item = { id: /^[A-Za-z0-9_-]{1,64}$/.test(rawId) && !/^\d+$/.test(rawId) ? rawId : null,
+                   rec, created: Number.isFinite(created) && created > 0 ? created : null,
+                   pdf: extractPdf(r), keepPath: null };
+    if (!item.pdf && isNew && r.pdf && typeof r.pdf.path === 'string') item.keepPath = r.pdf;
+    out.push(item);
+  }
+  return { items: out, skip, isNew };
+}
+
+/* ---------- 復元 ---------- */
+$('restoreBtn').onclick=()=>$('restoreFile').click();
+$('restoreFile').addEventListener('change',async e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f) return;
+  let data;
+  try{ data=JSON.parse(await f.text()); }catch(_){ toast('JSON形式のバックアップファイルを選んでください'); return; }
+
+  const { items, skip, isNew } = parseBackup(data);
+  if(!items.length){
+    alert('このファイルから給与の記録を見つけられませんでした。\n給与管理アプリ(旧版Ver1.x または Ver2.x)のバックアップか確認してください。');
+    return;
+  }
+  const withPdf = items.filter(i=>i.pdf).length;
+  const years = [...new Set(items.map(i=>i.rec.date.slice(0,4)))].sort();
+  const mode=document.querySelector('input[name=rsMode]:checked').value;
+  const head = isNew ? 'バックアップ' : '旧版(Ver1.x)のバックアップ';
+  const msg = `${head}を読み込みます。\n\n記録:${items.length}件(${years[0]}年〜${years[years.length-1]}年)\nPDF付き:${withPdf}件` +
+    (skip?`\n読み込めない記録:${skip}件(除外します)`:'') +
+    (mode==='replace' ? '\n\n今のデータとPDFはすべて削除されます。よろしいですか?' : '\n\n今のデータに統合します。よろしいですか?');
+  if(!confirm(msg)) return;
+
+  busy(true,'復元中…');
+  let ok=0, pdfNg=0;
+  try{
+    const base=`${ROOT}/${user.uid}/records`;
+    if(mode==='replace'){
+      for(const r of Object.values(records)){ if(r&&r.pdf) await deletePdf(r.pdf.path); }
+      await db.ref(base).remove();
+    }
+    for(let i=0;i<items.length;i++){
+      const it=items[i];
+      $('busyText').textContent=`復元中… ${i+1}/${items.length}`;
+      const id = it.id || db.ref(base).push().key;
+      const now = Date.now();
+      const rec = { ...it.rec, createdAt: it.created || now, updatedAt: now };
+      const current = mode==='merge' ? records[id] : null;
+      if(it.pdf){
+        try{
+          const blob=b64ToBlob(it.pdf.b64);
+          if(blob.size>MAX_PDF) throw new Error('size');
+          const path=newPdfPath(id);
+          await uploadPdf(path,blob);
+          if(current && current.pdf) await deletePdf(current.pdf.path);
+          let name = it.pdf.name.slice(0,120); if(!/\.pdf$/i.test(name)) name += '.pdf';
+          rec.pdf={path,name,size:blob.size};
+        }catch(err){ pdfNg++; if(current && current.pdf) rec.pdf=current.pdf; }
+      }else if(it.keepPath && mode==='merge' && it.keepPath.path.startsWith(`${ROOT}/${user.uid}/payslips/`)){
+        rec.pdf={path:it.keepPath.path,name:String(it.keepPath.name||'給与明細書.pdf').slice(0,120),size:Number(it.keepPath.size)||0};
+      }else if(current && current.pdf){
+        rec.pdf=current.pdf;
+      }
+      await db.ref(`${base}/${id}`).set(rec); ok++;
+    }
+    const y = Number(years[years.length-1]); if (y) { curYear = y; render(); }
+    toast(`${ok}件を復元しました` + (pdfNg?`(PDF ${pdfNg}件は取り込めませんでした)`:'') + (skip?`(${skip}件除外)`:''));
+  }catch(err){ toast('復元に失敗しました:'+(err.code||err.message)); }
+  finally{ busy(false); }
+});
 </script>
 </body>
 </html>
