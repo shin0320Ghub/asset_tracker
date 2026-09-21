@@ -251,9 +251,29 @@
 </head>
 <body>
 
+<!-- ログイン画面 -->
+<div id="loginScreen" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;">
+  <div class="card" style="width:100%;max-width:360px;">
+    <h1 style="font-size:19px;margin:0 0 4px;">給与管理 <span class="ver">Ver1.1</span></h1>
+    <p style="font-size:13px;color:var(--sub);margin-top:0;margin-bottom:16px;">ログインしてください</p>
+    <div class="field">
+      <label>メールアドレス</label>
+      <input type="email" id="loginEmail" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>パスワード</label>
+      <input type="password" id="loginPassword" autocomplete="current-password">
+    </div>
+    <div id="loginError" style="font-size:12px;color:var(--danger);margin-bottom:10px;display:none;"></div>
+    <button class="primary" id="loginBtn">ログイン</button>
+  </div>
+</div>
+
+<div id="appRoot" style="display:none;">
+
 <header>
   <div class="inner">
-    <h1>給与管理 <span class="ver">Ver1.0.1</span></h1>
+    <h1>給与管理 <span class="ver">Ver1.1</span></h1>
     <div id="syncStatus">Firebase 接続中...</div>
   </div>
 </header>
@@ -329,9 +349,16 @@
       </div>
       <button class="primary" id="restoreBtn" style="margin-top:10px;">このファイルで復元する</button>
     </div>
+    <div class="card">
+      <h3 style="margin-top:0;font-size:15px;">アカウント</h3>
+      <p style="font-size:13px;color:var(--sub);margin-top:0;" id="loginAs"></p>
+      <button class="secondary" id="logoutBtn">ログアウト</button>
+    </div>
   </section>
 
 </main>
+
+</div><!-- /appRoot -->
 
 <div class="modal-bg" id="editModalBg">
   <div class="modal">
@@ -368,6 +395,7 @@
 <!-- ▼▼▼ Firebase SDK（compat版） ▼▼▼ -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 
 <script>
 /* ==========================================================
@@ -395,17 +423,33 @@ const DB_PATH = "salary-tracker/entries";
 // PDFファイルサイズの上限（Base64化するとサイズが約1.33倍になるため余裕を持たせる）
 const MAX_PDF_BYTES = 4 * 1024 * 1024; // 4MB
 
-let db;
+let db, auth;
 let entries = {}; // id -> entry
 let firebaseReady = false;
+let entriesListenerAttached = false;
 
 function initFirebase(){
   try{
     firebase.initializeApp(firebaseConfig);
     db = firebase.database();
+    auth = firebase.auth();
     firebaseReady = true;
-    setSyncStatus("接続済み・同期中", "ok");
-    listenEntries();
+
+    auth.onAuthStateChanged(user => {
+      if(user){
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('appRoot').style.display = 'block';
+        document.getElementById('loginAs').textContent = "ログイン中：" + user.email;
+        setSyncStatus("接続済み・同期中", "ok");
+        if(!entriesListenerAttached){
+          listenEntries();
+          entriesListenerAttached = true;
+        }
+      }else{
+        document.getElementById('appRoot').style.display = 'none';
+        document.getElementById('loginScreen').style.display = 'flex';
+      }
+    });
   }catch(e){
     console.error(e);
     setSyncStatus("Firebase設定を確認してください", "err");
@@ -428,6 +472,43 @@ function listenEntries(){
     setSyncStatus("同期エラー：" + err.message, "err");
   });
 }
+
+/* ---------- ログイン / ログアウト ---------- */
+document.getElementById('loginBtn').addEventListener('click', ()=>{
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  errEl.style.display = 'none';
+
+  if(!email || !password){
+    errEl.textContent = "メールアドレスとパスワードを入力してください";
+    errEl.style.display = 'block';
+    return;
+  }
+  const loginBtn = document.getElementById('loginBtn');
+  loginBtn.disabled = true;
+  loginBtn.textContent = "ログイン中...";
+
+  auth.signInWithEmailAndPassword(email, password)
+    .catch(e=>{
+      console.error(e);
+      errEl.textContent = "ログインに失敗しました：メールアドレスまたはパスワードが違います";
+      errEl.style.display = 'block';
+    })
+    .finally(()=>{
+      loginBtn.disabled = false;
+      loginBtn.textContent = "ログイン";
+    });
+});
+
+document.getElementById('loginPassword').addEventListener('keydown', e=>{
+  if(e.key === 'Enter') document.getElementById('loginBtn').click();
+});
+
+document.getElementById('logoutBtn').addEventListener('click', ()=>{
+  if(!confirm("ログアウトしますか？")) return;
+  auth.signOut();
+});
 
 /* ---------- タブ切替 ---------- */
 document.querySelectorAll('nav.tabs button').forEach(btn=>{
