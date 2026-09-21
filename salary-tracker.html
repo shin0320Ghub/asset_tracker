@@ -492,7 +492,17 @@ document.getElementById('loginBtn').addEventListener('click', ()=>{
   auth.signInWithEmailAndPassword(email, password)
     .catch(e=>{
       console.error(e);
-      errEl.textContent = "ログインに失敗しました：メールアドレスまたはパスワードが違います";
+      const codeMap = {
+        'auth/user-not-found': 'このメールアドレスのユーザーが見つかりません（Authenticationの「Users」タブでユーザーが作成されているか確認してください）',
+        'auth/wrong-password': 'パスワードが違います',
+        'auth/invalid-email': 'メールアドレスの形式が正しくありません',
+        'auth/invalid-credential': 'メールアドレスまたはパスワードが正しくありません',
+        'auth/unauthorized-domain': 'このドメインからのログインが許可されていません（Authentication→Settings→Authorized domainsに追加してください）',
+        'auth/too-many-requests': '試行回数が多すぎます。しばらく待ってから再度お試しください',
+        'auth/network-request-failed': 'ネットワークエラーです。通信環境を確認してください',
+        'auth/operation-not-allowed': 'メール/パスワードでのログインが有効になっていません（Authentication→Sign-in methodで有効化してください）'
+      };
+      errEl.textContent = "ログインに失敗しました：" + (codeMap[e.code] || (e.code + " " + e.message));
       errEl.style.display = 'block';
     })
     .finally(()=>{
