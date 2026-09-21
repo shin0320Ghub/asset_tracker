@@ -47,9 +47,9 @@ button{cursor:pointer}
 .shell{width:100%;max-width:var(--shell);margin:0 auto;padding:0 12px}
 
 /* ===== ログイン ===== */
-#loginView{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px;
+#loginView{min-height:100vh;min-height:100svh;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;
   padding-top:calc(24px + env(safe-area-inset-top,0px))}
-.login-card{width:100%;max-width:380px;background:var(--card);border-radius:var(--r-lg);overflow:hidden;
+.login-card{width:100%;max-width:380px;margin-top:8vh;background:var(--card);border-radius:var(--r-lg);overflow:hidden;
   box-shadow:0 12px 32px -18px rgba(23,34,52,.45)}
 .login-head{background:var(--band);color:var(--band-ink);padding:26px 24px 22px}
 .login-head h1{margin:0;font-size:22px;font-weight:700;letter-spacing:.04em}
@@ -255,14 +255,19 @@ window.__bootFail = function(title, html){
   ['loginView','appView'].forEach(function(id){ var e=document.getElementById(id); if(e) e.classList.add('hidden'); });
 };
 window.addEventListener('error', function(e){
-  if (window.__booted) { console.error('salary-tracker error:', e.error || e.message); return; } // 起動完了後は画面を消さない
+  if (window.__booted) { console.error('salary-tracker error:', e.error || e.message); return; } // 起動後は画面を消さない
   if (e.target && e.target.tagName === 'SCRIPT') {
-    __bootFail('部品を読み込めませんでした', 'Firebaseのプログラムを取得できませんでした。<br>インターネット接続、またはコンテンツブロッカー(広告ブロック)を確認してください。');
+    if (String(e.target.src||'').indexOf('gstatic.com/firebasejs') >= 0) {
+      __bootFail('部品を読み込めませんでした', 'Firebaseのプログラムを取得できませんでした。<br>インターネット接続、またはコンテンツブロッカー(広告ブロック)を確認してください。');
+    }
     return;
   }
+  var here = location.href.split('#')[0].split('?')[0];
+  var file = String(e.filename||'').split('#')[0].split('?')[0];
+  if (!file || file !== here) return;   // 「Script error.」や他所のスクリプトの誤りは無視
   var m = String(e.message||'');
   var hint = /firebaseConfig|Unexpected|Identifier|SyntaxError|missing/i.test(m)
-    ? '<br><br>多くの場合、<b>firebaseConfig の貼り付け部分</b>の書式の誤りです。<br>・「const firebaseConfig =」が二重になっていないか<br>・{ } の中だけを置き換え、カンマ(,)や " が欠けていないか<br>を確認してください。'
+    ? '<br><br>多くの場合、<b>firebaseConfig の貼り付け部分</b>の書式の誤りです。'
     : '';
   __bootFail('エラーのため起動できませんでした', '内容:<code>'+m.replace(/</g,'&lt;')+'</code>'+(e.lineno?'('+e.lineno+'行目)':'')+hint);
 }, true);
@@ -276,7 +281,7 @@ window.addEventListener('unhandledrejection', function(e){
   <div class="login-card">
     <div class="login-head">
       <h1>給与管理</h1>
-      <p>登録済みのメールアドレスでログインしてください</p>
+      <p>登録済みのメールアドレスでログインしてください<span id="loginVer" style="float:right;opacity:.8"></span></p>
     </div>
     <div class="login-body">
       <div class="field">
@@ -431,10 +436,10 @@ window.addEventListener('unhandledrejection', function(e){
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="busy hidden" id="busy"><div id="busyText">処理中…</div></div>
 
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<script crossorigin="anonymous" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script crossorigin="anonymous" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script crossorigin="anonymous" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script crossorigin="anonymous" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <script>
 /* =========================================================
    ここに asset-tracker プロジェクトの設定を貼り付けてください
@@ -452,7 +457,7 @@ const firebaseConfig = {
 
 </script>
 <script>
-const APP_VER = 'Ver2.3';
+const APP_VER = 'Ver2.4';
 const MAX_PDF = 10 * 1024 * 1024;          // PDFは10MBまで
 const ROOT = 'salary';                      // データベース上の保存場所
 const TYPES = {
@@ -470,6 +475,7 @@ const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${String
 const parseD = s => { const [y,m,d]=s.split('-').map(Number); return new Date(y,m-1,d); };
 
 $('verLabel').textContent = APP_VER;
+$('loginVer').textContent = APP_VER;
 
 /* ---------- 初期化 ---------- */
 if (typeof firebase === 'undefined') {
