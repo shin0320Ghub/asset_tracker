@@ -284,7 +284,7 @@ window.__bootFail = function(title, html){
 window.addEventListener('error', function(e){
   if (window.__booted) { console.error('salary-tracker error:', e.error || e.message); return; } // 起動後は画面を消さない
   if (e.target && e.target.tagName === 'SCRIPT') {
-    if (String(e.target.src||'').indexOf('gstatic.com/firebasejs') >= 0) {
+    if (String(e.target.src||'').indexOf('gstatic.com/firebasejs') >= 0 || e.target.type === 'module') {
       __bootFail('部品を読み込めませんでした', 'Firebaseのプログラムを取得できませんでした。<br>インターネット接続、またはコンテンツブロッカー(広告ブロック)を確認してください。');
     }
     return;
@@ -464,10 +464,50 @@ window.addEventListener('unhandledrejection', function(e){
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="busy hidden" id="busy"><div id="busyText">処理中…</div></div>
 
-<script crossorigin="anonymous" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script crossorigin="anonymous" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script crossorigin="anonymous" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script crossorigin="anonymous" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<script type="module">
+/* ===== Firebase(新方式):ログイン用の隠しフレームを読み込まない軽量な方式 ===== */
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, signInWithEmailAndPassword,
+         onAuthStateChanged, signOut, sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { getDatabase, ref as dRef, onValue, push as dPush, set as dSet, remove as dRemove } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
+import { getStorage, ref as sRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
+
+window.__fbInit = function(config){
+  const app = initializeApp(config);
+  const A = initializeAuth(app, { persistence: [indexedDBLocalPersistence, browserLocalPersistence] });
+  A.languageCode = 'ja';
+  const D = getDatabase(app);
+  const S = getStorage(app);
+
+  const auth = {
+    signInWithEmailAndPassword: (e,p) => signInWithEmailAndPassword(A,e,p),
+    sendPasswordResetEmail: e => sendPasswordResetEmail(A,e),
+    onAuthStateChanged: cb => onAuthStateChanged(A,cb),
+    signOut: () => signOut(A)
+  };
+  const wrapDb = path => {
+    const r = dRef(D, path); let unsubs = [];
+    return {
+      child: p => wrapDb(path + '/' + p),
+      push: () => ({ key: dPush(r).key }),
+      set: v => dSet(r, v),
+      remove: () => dRemove(r),
+      on: (ev, cb, err) => { unsubs.push(onValue(r, cb, err)); },
+      off: () => { unsubs.forEach(u => u()); unsubs = []; }
+    };
+  };
+  const db = { ref: path => wrapDb(path) };
+  const storage = { ref: path => {
+    const r = sRef(S, path);
+    return {
+      put: (blob, meta) => uploadBytesResumable(r, blob, meta),
+      getDownloadURL: () => getDownloadURL(r),
+      delete: () => deleteObject(r)
+    };
+  } };
+  return { auth, db, storage };
+};
+</script>
 <script>
 /* =========================================================
    ここに asset-tracker プロジェクトの設定を貼り付けてください
@@ -484,8 +524,8 @@ const firebaseConfig = {
 };
 
 </script>
-<script>
-const APP_VER = 'Ver2.6';
+<script type="module">
+const APP_VER = 'Ver2.7';
 const MAX_PDF = 10 * 1024 * 1024;          // PDFは10MBまで
 const ROOT = 'salary';                      // データベース上の保存場所
 const TYPES = {
@@ -521,7 +561,7 @@ $('loginVer').textContent = APP_VER;
 })();
 
 /* ---------- 初期化 ---------- */
-if (typeof firebase === 'undefined') {
+if (typeof window.__fbInit !== 'function') {
   __bootFail('部品を読み込めませんでした', 'Firebaseのプログラムを取得できませんでした。<br>インターネット接続、またはコンテンツブロッカー(広告ブロック)を確認してください。');
   throw new Error('firebase SDK not loaded');
 }
@@ -545,11 +585,7 @@ if (location.protocol === 'file:') {
 }
 let auth, db, storage;
 try {
-  firebase.initializeApp(firebaseConfig);
-  auth = firebase.auth();
-  db = firebase.database();
-  storage = firebase.storage();
-  auth.languageCode = 'ja';
+  ({ auth, db, storage } = window.__fbInit(firebaseConfig));
 } catch (e) {
   __bootFail('Firebaseに接続できませんでした', '内容:<code>'+String(e.message).replace(/</g,'&lt;')+'</code><br>firebaseConfig の値(特に databaseURL)を確認してください。');
   throw e;
@@ -733,7 +769,7 @@ function renderSummary(all,yearItems){
   const years=[...new Set(all.map(r=>Number(r.date.slice(0,4))).concat(curYear))].sort((a,b)=>b-a);
   const yearHtml=years.map(y=>{
     const t=totalsFor(all.filter(r=>r.date.startsWith(y+'-')));
-    return `<button class="yrow ${y===curYear?'cur':''}" onclick="curYear=${y};render();scrollTo({top:0,behavior:'smooth'})">
+    return `<button class="yrow ${y===curYear?'cur':''}" onclick="__pickYear(${y})">
       <div class="top"><b class="num">${y}年</b><strong class="num">${yen(t.all)}</strong></div>
       <div class="ysub">${Object.keys(TYPES).map(k=>`<span class="num"><i style="background:${TYPES[k].color}"></i>${TYPES[k].label} ${yen(t[k])}</span>`).join('')}</div>
     </button>`;
@@ -776,6 +812,7 @@ function openSheet(id){
   document.body.style.overflow='hidden';
 }
 window.openSheet=openSheet;
+window.__pickYear = y => { curYear = y; render(); scrollTo({top:0,behavior:'smooth'}); };
 function closeSheet(force){
   if(!force && $('saveBtn').disabled) return;
   $('overlay').classList.remove('open'); $('overlay').setAttribute('aria-hidden','true');
