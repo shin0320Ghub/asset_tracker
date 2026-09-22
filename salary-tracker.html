@@ -243,8 +243,59 @@ select.inp{background-image:linear-gradient(45deg,transparent 50%,var(--sub) 50%
 </head>
 <body>
 <script>
+/* ===== 切り分けテスト:部品を外した状態で入力欄を試し、結果を自動記録 ===== */
+(function(){
+  var K='salary_bisect', t={};
+  try{ t=JSON.parse(localStorage.getItem(K))||{}; }catch(e){}
+  t.res=t.res||{};
+  var save=function(){ try{localStorage.setItem(K,JSON.stringify(t));}catch(e){} };
+  if(t.pending && Date.now()-t.pending.t<120000){ t.res[t.pending.id]='ng'; }
+  t.pending=null; save();
+  var TESTS={
+    T1:{f:'SDFG',label:'全部外す'},
+    T2:{f:'F',label:'Firebaseなし'},
+    T3:{f:'S',label:'見た目(CSS)なし'},
+    T4:{f:'D',label:'ログイン以外の画面なし'},
+    T5:{f:'G',label:'診断記録なし'},
+    T6:{f:'',label:'通常(何も外さない)'}
+  };
+  var cur=t.cur&&TESTS[t.cur]?t.cur:null, fl=cur?TESTS[cur].f:'';
+  window.__T={cur:cur,S:fl.indexOf('S')>=0,D:fl.indexOf('D')>=0,F:fl.indexOf('F')>=0,G:fl.indexOf('G')>=0};
+  if(__T.S){ var st=document.querySelector('head style'); if(st) st.remove(); }
+  if(cur){
+    var timer=null;
+    document.addEventListener('focusin',function(e){
+      var id=e.target&&e.target.id; if(id!=='email'&&id!=='password') return;
+      t.pending={id:cur,t:Date.now()}; save(); clearTimeout(timer);
+      timer=setTimeout(function(){ t.res[cur]='ok'; t.pending=null; save(); paint(); },4000);
+    },true);
+  }
+  function paint(){
+    var el=document.getElementById('testPanel'); if(!el) return;
+    var rows=Object.keys(TESTS).map(function(k){
+      var r=t.res[k], m=r==='ok'?'○':r==='ng'?'×':'-';
+      return '<button type="button" data-t="'+k+'" style="display:block;width:100%;text-align:left;margin:4px 0;padding:8px 10px;border-radius:8px;border:1px solid #DCE2EA;background:'+(k===cur?'#DDE6F7':'#fff')+';color:#172234;font:inherit;font-size:13px">'+
+        m+' '+k+':'+TESTS[k].label+(k===cur?'(実施中)':'')+'</button>';
+    }).join('');
+    el.innerHTML='<b>切り分けテスト</b><br>'+(cur?'<span style="color:#B3362D">いま '+cur+' を実施中:メールアドレス欄をタッチしてください(4秒待つ)</span>':'T1から順にボタンを押し、表示後にメールアドレス欄をタッチしてください')+
+      rows+'<button type="button" data-t="END" style="margin-top:6px;padding:8px 10px;border-radius:8px;border:0;background:#DCE2EA;color:#172234;font:inherit;font-size:13px">テストを終了して通常に戻す</button>';
+    el.querySelectorAll('[data-t]').forEach(function(b){ b.onclick=function(){
+      var k=b.getAttribute('data-t');
+      if(k==='END'){ t.cur=null; } else { t.cur=k; }
+      save(); location.reload();
+    };});
+  }
+  document.addEventListener('DOMContentLoaded',paint);
+  addEventListener('load',function(){
+    if(__T.D){ ['appView','overlay','toast','busy'].forEach(function(id){ var e=document.getElementById(id); if(e) e.remove(); }); }
+    paint();
+  });
+})();
+</script>
+<script>
 /* ===== 診断記録:画面が消える原因を特定するための記録 ===== */
 (function(){
+  if (window.__T && window.__T.G) return;
   var K='salary_diag', d={};
   try{ d=JSON.parse(localStorage.getItem(K))||{}; }catch(e){}
   var now=Date.now();
@@ -337,6 +388,7 @@ window.addEventListener('unhandledrejection', function(e){
       </div>
     </form>
     <div class="diag-box" id="diagBox"></div>
+    <div id="testPanel" style="margin:0 24px 20px;padding:10px 12px;border-radius:8px;background:#F6F8FB;font-size:12.5px;line-height:1.6;color:#5E6B80"></div>
   </div>
 </section>
 
@@ -477,13 +529,12 @@ window.addEventListener('unhandledrejection', function(e){
 
 <script type="module">
 /* ===== Firebase(新方式):ログイン用の隠しフレームを読み込まない軽量な方式 ===== */
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import { initializeAuth, browserLocalPersistence, signInWithEmailAndPassword,
-         onAuthStateChanged, signOut, sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import { getDatabase, ref as dRef, onValue, push as dPush, set as dSet, remove as dRemove } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
-import { getStorage, ref as sRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
-
-window.__fbInit = function(config){
+const B='https://www.gstatic.com/firebasejs/10.12.2/';
+window.__fbInit = async function(config){
+  const [{ initializeApp }, { initializeAuth, browserLocalPersistence, signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail },
+         { getDatabase, ref: dRef, onValue, push: dPush, set: dSet, remove: dRemove },
+         { getStorage, ref: sRef, uploadBytesResumable, getDownloadURL, deleteObject }] =
+    await Promise.all([import(B+'firebase-app.js'), import(B+'firebase-auth.js'), import(B+'firebase-database.js'), import(B+'firebase-storage.js')]);
   const app = initializeApp(config);
   const A = initializeAuth(app, { persistence: browserLocalPersistence });  // IndexedDBは使わない(Safariの保存領域の不具合対策)
   A.languageCode = 'ja';
@@ -536,7 +587,7 @@ const firebaseConfig = {
 
 </script>
 <script type="module">
-const APP_VER = 'Ver3.6';
+const APP_VER = 'Ver3.7';
 const MAX_PDF = 10 * 1024 * 1024;          // PDFは10MBまで
 const ROOT = 'salary';                      // データベース上の保存場所
 const TYPES = {
@@ -597,7 +648,16 @@ if (location.protocol === 'file:') {
 }
 let auth, db, storage;
 try {
-  ({ auth, db, storage } = window.__fbInit(firebaseConfig));
+  if (window.__T && window.__T.F) {
+    // 切り分けテスト:Firebaseを読み込まずに画面だけ動かす
+    const node = { on(){}, off(){}, push:()=>({key:'x'}), set:async()=>{}, remove:async()=>{}, child(){ return node; } };
+    auth = { onAuthStateChanged: cb => setTimeout(()=>cb(null),0), signInWithEmailAndPassword: () => Promise.reject({code:'テスト中はログインできません'}),
+             signOut: async()=>{}, sendPasswordResetEmail: async()=>{} };
+    db = { ref: () => node };
+    storage = { ref: () => ({ getDownloadURL: () => Promise.reject(new Error('test')), delete: async()=>{} }) };
+  } else {
+    ({ auth, db, storage } = await window.__fbInit(firebaseConfig));
+  }
 } catch (e) {
   __bootFail('Firebaseに接続できませんでした', '内容:<code>'+String(e.message).replace(/</g,'&lt;')+'</code><br>firebaseConfig の値(特に databaseURL)を確認してください。');
   throw e;
@@ -863,6 +923,7 @@ function openSheet(id){
 window.openSheet=openSheet;
 window.__pickYear = y => { curYear = y; render(); scrollTo({top:0,behavior:'smooth'}); };
 function closeSheet(force){
+  if(!$('overlay')) return;
   if(!force && $('saveBtn').disabled) return;
   const ov=$('overlay');
   if(document.activeElement && ov.contains(document.activeElement)) document.activeElement.blur();
