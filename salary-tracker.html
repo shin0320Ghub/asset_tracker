@@ -7,7 +7,6 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="給与管理">
-<meta name="theme-color" content="#1F3358">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="robots" content="noindex, nofollow">
 <title>給与管理</title>
@@ -162,14 +161,14 @@ main{padding:14px 0 110px}
 .field>label,.field>.lbl{display:block;font-size:12.5px;font-weight:600;color:var(--sub);margin-bottom:6px}
 .inp{display:block;width:100%;min-width:0;max-width:100%;height:48px;padding:0 14px;border:1px solid var(--line);
   border-radius:var(--r-sm);background:var(--field);font-size:16px;-webkit-appearance:none;appearance:none}
-.inp:focus{outline:none;border-color:var(--focus);box-shadow:0 0 0 3px var(--focus-ring)}
+.inp:focus{outline:none;border-color:var(--focus);border-width:2px;padding-left:13px}
 select.inp{background-image:linear-gradient(45deg,transparent 50%,var(--sub) 50%),linear-gradient(135deg,var(--sub) 50%,transparent 50%);
   background-position:calc(100% - 20px) 21px,calc(100% - 15px) 21px;background-size:5px 5px;background-repeat:no-repeat;padding-right:36px}
 
 /* 給与日：表示用ボックスの上に透明な日付入力を重ねる(はみ出し防止) */
 .date-box{position:relative;height:48px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--field);
   overflow:hidden;display:flex;align-items:center;gap:10px;padding:0 14px}
-.date-box:focus-within{border-color:var(--focus);box-shadow:0 0 0 3px var(--focus-ring)}
+.date-box:focus-within{border-color:var(--focus)}
 .date-box svg{flex:none;color:var(--sub)}
 .date-text{flex:1;min-width:0;font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .date-text.ph{color:var(--sub);font-weight:400}
@@ -212,8 +211,8 @@ select.inp{background-image:linear-gradient(45deg,transparent 50%,var(--sub) 50%
 /* ===== 入力シート ===== */
 .overlay{position:fixed;inset:0;background:rgba(10,16,28,.5);z-index:40;display:flex;align-items:flex-end;justify-content:center;
   opacity:0;pointer-events:none;transition:opacity .2s}
-.overlay{visibility:hidden;transition:opacity .2s,visibility 0s linear .2s}
-.overlay.open{opacity:1;pointer-events:auto;visibility:visible;transition:opacity .2s,visibility 0s}
+.overlay:not(.show){display:none}
+.overlay.open{opacity:1;pointer-events:auto}
 .sheet{width:100%;max-width:var(--shell);max-height:92vh;overflow-y:auto;background:var(--card);border-radius:var(--r-lg) var(--r-lg) 0 0;
   padding:8px 18px calc(20px + env(safe-area-inset-bottom,0px));transform:translateY(24px);transition:transform .22s ease;
   -webkit-overflow-scrolling:touch;overscroll-behavior:contain}
@@ -422,7 +421,7 @@ window.addEventListener('unhandledrejection', function(e){
 </div>
 
 <!-- ===== 入力シート ===== -->
-<div class="overlay" id="overlay" aria-hidden="true" inert>
+<div class="overlay" id="overlay" aria-hidden="true">
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
     <div class="grab"></div>
     <div class="sheet-head">
@@ -537,7 +536,7 @@ const firebaseConfig = {
 
 </script>
 <script type="module">
-const APP_VER = 'Ver3.5';
+const APP_VER = 'Ver3.6';
 const MAX_PDF = 10 * 1024 * 1024;          // PDFは10MBまで
 const ROOT = 'salary';                      // データベース上の保存場所
 const TYPES = {
@@ -857,14 +856,18 @@ function openSheet(id){
   $('fMemo').value = r ? (r.memo||'') : '';
   $('delWrap').classList.toggle('hidden',!r);
   renderPdfBox();
-  $('overlay').inert=false; $('overlay').removeAttribute('inert'); $('overlay').classList.add('open'); $('overlay').setAttribute('aria-hidden','false');
+  const ov=$('overlay'); clearTimeout(ov._t);
+  ov.classList.add('show'); void ov.offsetWidth; ov.classList.add('open'); ov.setAttribute('aria-hidden','false');
   document.body.style.overflow='hidden';
 }
 window.openSheet=openSheet;
 window.__pickYear = y => { curYear = y; render(); scrollTo({top:0,behavior:'smooth'}); };
 function closeSheet(force){
   if(!force && $('saveBtn').disabled) return;
-  $('overlay').classList.remove('open'); $('overlay').setAttribute('aria-hidden','true'); $('overlay').setAttribute('inert',''); if(document.activeElement && $('overlay').contains(document.activeElement)) document.activeElement.blur();
+  const ov=$('overlay');
+  if(document.activeElement && ov.contains(document.activeElement)) document.activeElement.blur();
+  ov.classList.remove('open'); ov.setAttribute('aria-hidden','true');
+  clearTimeout(ov._t); ov._t=setTimeout(()=>{ if(!ov.classList.contains('open')) ov.classList.remove('show'); },220);
   document.body.style.overflow=''; editingId=null; pendingFile=null;
 }
 $('addBtn').onclick=()=>openSheet();
