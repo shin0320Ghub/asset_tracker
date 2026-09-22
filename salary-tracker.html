@@ -57,8 +57,6 @@ button{cursor:pointer}
 .login-body .field+.field{margin-top:14px}
 .login-err{min-height:20px;margin:12px 0 0;color:var(--danger);font-size:13px}
 .inp.masked{-webkit-text-security:disc;text-security:disc;font-family:var(--font);letter-spacing:.12em}
-.diag-box{margin:0 24px 20px;padding:10px 12px;border-radius:8px;background:var(--field);font-size:11.5px;line-height:1.6;color:var(--sub);word-break:break-all}
-.diag-box:empty{display:none}
 .linkbtn{background:none;border:0;padding:6px 0;color:var(--salary);font-size:13px;text-decoration:underline;text-underline-offset:3px}
 
 /* ===== ヘッダー(通帳の帯) ===== */
@@ -242,92 +240,6 @@ select.inp{background-image:linear-gradient(45deg,transparent 50%,var(--sub) 50%
 </style>
 </head>
 <body>
-<script>
-/* ===== 切り分けテスト:部品を外した状態で入力欄を試し、結果を自動記録 ===== */
-(function(){
-  var K='salary_bisect', t={};
-  try{ t=JSON.parse(localStorage.getItem(K))||{}; }catch(e){}
-  t.res=t.res||{};
-  var save=function(){ try{localStorage.setItem(K,JSON.stringify(t));}catch(e){} };
-  if(t.pending && Date.now()-t.pending.t<120000){ t.res[t.pending.id]='ng'; }
-  t.pending=null; save();
-  var TESTS={
-    T1:{f:'SDFG',label:'全部外す'},
-    T2:{f:'F',label:'Firebaseなし'},
-    T3:{f:'S',label:'見た目(CSS)なし'},
-    T4:{f:'D',label:'ログイン以外の画面なし'},
-    T5:{f:'G',label:'診断記録なし'},
-    T6:{f:'',label:'通常(何も外さない)'}
-  };
-  var cur=t.cur&&TESTS[t.cur]?t.cur:null, fl=cur?TESTS[cur].f:'';
-  window.__T={cur:cur,S:fl.indexOf('S')>=0,D:fl.indexOf('D')>=0,F:fl.indexOf('F')>=0,G:fl.indexOf('G')>=0};
-  if(__T.S){ var st=document.querySelector('head style'); if(st) st.remove(); }
-  if(cur){
-    var timer=null;
-    document.addEventListener('focusin',function(e){
-      var id=e.target&&e.target.id; if(id!=='email'&&id!=='password') return;
-      t.pending={id:cur,t:Date.now()}; save(); clearTimeout(timer);
-      timer=setTimeout(function(){ t.res[cur]='ok'; t.pending=null; save(); paint(); },4000);
-    },true);
-  }
-  function paint(){
-    var el=document.getElementById('testPanel'); if(!el) return;
-    var rows=Object.keys(TESTS).map(function(k){
-      var r=t.res[k], m=r==='ok'?'○':r==='ng'?'×':'-';
-      return '<button type="button" data-t="'+k+'" style="display:block;width:100%;text-align:left;margin:4px 0;padding:8px 10px;border-radius:8px;border:1px solid #DCE2EA;background:'+(k===cur?'#DDE6F7':'#fff')+';color:#172234;font:inherit;font-size:13px">'+
-        m+' '+k+':'+TESTS[k].label+(k===cur?'(実施中)':'')+'</button>';
-    }).join('');
-    el.innerHTML='<b>切り分けテスト</b><br>'+(cur?'<span style="color:#B3362D">いま '+cur+' を実施中:メールアドレス欄をタッチしてください(4秒待つ)</span>':'T1から順にボタンを押し、表示後にメールアドレス欄をタッチしてください')+
-      rows+'<button type="button" data-t="END" style="margin-top:6px;padding:8px 10px;border-radius:8px;border:0;background:#DCE2EA;color:#172234;font:inherit;font-size:13px">テストを終了して通常に戻す</button>';
-    el.querySelectorAll('[data-t]').forEach(function(b){ b.onclick=function(){
-      var k=b.getAttribute('data-t');
-      if(k==='END'){ t.cur=null; } else { t.cur=k; }
-      save(); location.reload();
-    };});
-  }
-  document.addEventListener('DOMContentLoaded',paint);
-  addEventListener('load',function(){
-    if(__T.D){ ['appView','overlay','toast','busy'].forEach(function(id){ var e=document.getElementById(id); if(e) e.remove(); }); }
-    paint();
-  });
-})();
-</script>
-<script>
-/* ===== 診断記録:画面が消える原因を特定するための記録 ===== */
-(function(){
-  if (window.__T && window.__T.G) return;
-  var K='salary_diag', d={};
-  try{ d=JSON.parse(localStorage.getItem(K))||{}; }catch(e){}
-  var now=Date.now();
-  var save=function(){ try{ localStorage.setItem(K,JSON.stringify(d)); }catch(e){} };
-  var nav=''; try{ var n=performance.getEntriesByType('navigation')[0]; nav=n?n.type:''; }catch(e){}
-  var hadQuery = /[?&](email|password)=/.test(location.search);
-  // 万一ログイン内容がURLに付いていたら、すぐに消す(履歴にも残さない)
-  if (location.search) { try{ history.replaceState(null,'',location.pathname+location.hash); }catch(e){} }
-  var ago=function(t){ return t ? Math.round((now-t)/1000) : null; };
-  window.__diag = {
-    nav: nav,
-    loads: (d.loads||[]).filter(function(t){return now-t<120000;}).length + 1,
-    focusAgo: ago(d.lastFocus), focusId: d.lastFocusId || '',
-    hideAgo: ago(d.lastHide),
-    shown: d.lastHide && d.loadAt ? Math.round((d.lastHide-d.loadAt)/1000) : null,
-    submitAgo: ago(d.lastSubmit), pullAgo: ago(d.lastPull), tapAgo: ago(d.lastTap), tapWhat: d.lastTapWhat || '',
-    hadQuery: hadQuery, errs: (d.errs||[]).slice(-3)
-  };
-  d.loads=(d.loads||[]).filter(function(t){return now-t<120000;}); d.loads.push(now);
-  d.loadAt=now; d.lastFocus=0; d.lastFocusId=''; d.lastHide=0; d.lastSubmit=0; d.lastPull=0; d.lastTap=0; d.lastTapWhat=''; d.errs=[];
-  save();
-  document.addEventListener('focusin',function(e){ d.lastFocus=Date.now(); d.lastFocusId=(e.target&&e.target.id)||''; save(); },true);
-  document.addEventListener('submit',function(){ d.lastSubmit=Date.now(); save(); },true);
-  document.addEventListener('click',function(e){ var t=e.target&&e.target.closest?e.target.closest('button,a,input,label'):null; d.lastTap=Date.now(); d.lastTapWhat=t?(t.id||t.tagName):''; save(); },true);
-  var y0=null;
-  document.addEventListener('touchstart',function(e){ y0=(window.scrollY<=0&&e.touches[0])?e.touches[0].clientY:null; },{passive:true,capture:true});
-  document.addEventListener('touchmove',function(e){ if(y0!==null&&e.touches[0]&&e.touches[0].clientY-y0>60){ d.lastPull=Date.now(); y0=null; save(); } },{passive:true,capture:true});
-  addEventListener('pagehide',function(){ d.lastHide=Date.now(); save(); });
-  addEventListener('error',function(e){ d.errs=(d.errs||[]).concat([String(e.message||'resource')+' '+String(e.filename||'').split('/').pop()+':'+(e.lineno||'')]).slice(-3); save(); },true);
-  addEventListener('unhandledrejection',function(e){ d.errs=(d.errs||[]).concat(['rej '+String(e.reason&&e.reason.message||e.reason)]).slice(-3); save(); });
-})();
-</script>
 
 <!-- ===== 起動中/エラー表示(何も出ない状態を防ぐ) ===== -->
 <div id="bootView" class="setup">
@@ -387,8 +299,6 @@ window.addEventListener('unhandledrejection', function(e){
         <button type="button" class="linkbtn" id="resetBtn">パスワードを再設定する</button>
       </div>
     </form>
-    <div class="diag-box" id="diagBox"></div>
-    <div id="testPanel" style="margin:0 24px 20px;padding:10px 12px;border-radius:8px;background:#F6F8FB;font-size:12.5px;line-height:1.6;color:#5E6B80"></div>
   </div>
 </section>
 
@@ -587,7 +497,7 @@ const firebaseConfig = {
 
 </script>
 <script type="module">
-const APP_VER = 'Ver3.7';
+const APP_VER = 'Ver3.8';
 const MAX_PDF = 10 * 1024 * 1024;          // PDFは10MBまで
 const ROOT = 'salary';                      // データベース上の保存場所
 const TYPES = {
@@ -606,22 +516,7 @@ const parseD = s => { const [y,m,d]=s.split('-').map(Number); return new Date(y,
 
 $('verLabel').textContent = APP_VER;
 $('loginVer').textContent = APP_VER;
-(function(){
-  const g = window.__diag || {};
-  const standalone = (window.navigator.standalone === true) || matchMedia('(display-mode: standalone)').matches;
-  const ios = (navigator.userAgent.match(/OS (\d+)_(\d+)/) || []).slice(1).join('.');
-  const browser = /CriOS/.test(navigator.userAgent) ? 'Chrome' : /FxiOS/.test(navigator.userAgent) ? 'Firefox' : 'Safari';
-  if (!(g.loads > 1)) return;
-  const sec = v => v === null || v === undefined ? '-' : v + '秒前';
-  $('diagBox').innerHTML =
-    '<b>診断情報</b>(この内容をそのまま送ってください)<br>' +
-    `${APP_VER} / ${standalone ? 'ホーム画面' : browser} / iOS ${ios || '不明'}<br>` +
-    `読込:${g.nav || '-'} / 2分内の読込:${g.loads}回 / 前回の表示時間:${g.shown ?? '-'}秒<br>` +
-    `終了処理:${sec(g.hideAgo)} / URL付加:${g.hadQuery ? 'あり' : 'なし'}<br>` +
-    `入力欄:${sec(g.focusAgo)}(${g.focusId || '-'}) / 送信:${sec(g.submitAgo)}<br>` +
-    `タップ:${sec(g.tapAgo)}(${esc(g.tapWhat || '-')}) / 引っ張り:${sec(g.pullAgo)}<br>` +
-    `エラー:${(g.errs && g.errs.length) ? esc(g.errs.join(' | ')) : 'なし'}`;
-})();
+try{ localStorage.removeItem('salary_diag'); localStorage.removeItem('salary_bisect'); }catch(_){}
 
 /* ---------- 初期化 ---------- */
 if (typeof window.__fbInit !== 'function') {
@@ -648,16 +543,7 @@ if (location.protocol === 'file:') {
 }
 let auth, db, storage;
 try {
-  if (window.__T && window.__T.F) {
-    // 切り分けテスト:Firebaseを読み込まずに画面だけ動かす
-    const node = { on(){}, off(){}, push:()=>({key:'x'}), set:async()=>{}, remove:async()=>{}, child(){ return node; } };
-    auth = { onAuthStateChanged: cb => setTimeout(()=>cb(null),0), signInWithEmailAndPassword: () => Promise.reject({code:'テスト中はログインできません'}),
-             signOut: async()=>{}, sendPasswordResetEmail: async()=>{} };
-    db = { ref: () => node };
-    storage = { ref: () => ({ getDownloadURL: () => Promise.reject(new Error('test')), delete: async()=>{} }) };
-  } else {
-    ({ auth, db, storage } = await window.__fbInit(firebaseConfig));
-  }
+  ({ auth, db, storage } = await window.__fbInit(firebaseConfig));
 } catch (e) {
   __bootFail('Firebaseに接続できませんでした', '内容:<code>'+String(e.message).replace(/</g,'&lt;')+'</code><br>firebaseConfig の値(特に databaseURL)を確認してください。');
   throw e;
@@ -742,7 +628,6 @@ async function doLogin(){
   }catch(e){
     justLoggedIn = false;
     const code = e && (e.code || e.message) || 'unknown';
-    try{ const d=JSON.parse(localStorage.getItem('salary_diag'))||{}; d.errs=(d.errs||[]).concat(['login '+code]).slice(-3); localStorage.setItem('salary_diag',JSON.stringify(d)); }catch(_){}
     if(code==='auth/timeout' || code==='auth/network-request-failed'){ $('loginErr').textContent=authMsg(code); return; }
     const n=s.n+1;
     setLock(n>=5 ? {n:0,until:Date.now()+5*60000} : {n,until:0});
