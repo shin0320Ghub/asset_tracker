@@ -238,7 +238,7 @@
   <header>
     <div class="title-row">
       <h1>家計・年金シミュレーター</h1>
-      <span class="version">Ver1.3</span>
+      <span class="version">Ver1.4</span>
     </div>
     <div class="summary">
       <div class="box"><div class="label">貯蓄額</div><div class="val" id="hdr-savings">¥0</div></div>
@@ -325,7 +325,7 @@ function defaultState(){
     bigExpenses: [],  // {id, ym:'2028-05', label:'自動車購入', amount:2500000}
     settings: { birthDate:'', pensionBase65:0, startAge:65, simEndAge:90, monthlyBudget:0 },
     simInputs: { salary:0, dividend:0, expenses:{} },
-    auth: { passwordHash:'' }
+    auth: { passwordHash:'', recoveryQuestion:'', recoveryAnswerHash:'' }
   };
 }
 function normalizeState(parsed){
@@ -415,6 +415,10 @@ async function sha256Hex(text){
   const buf = await crypto.subtle.digest('SHA-256', enc);
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
 }
+function normalizeAnswer(a){ return String(a||'').trim().toLowerCase(); }
+function escapeHtml(s){
+  return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 
 function checkAuthAndInit(){
   if(state.auth && state.auth.passwordHash){
@@ -455,16 +459,30 @@ function showAuthScreen(mode){
       <input type="password" id="auth-pw1" autocomplete="new-password">
       <label>確認のため再入力</label>
       <input type="password" id="auth-pw2" autocomplete="new-password">
+      <div class="divider"></div>
+      <div class="field-note">パスワードを忘れた場合に備えて、秘密の質問を設定してください。</div>
+      <label>秘密の質問</label>
+      <input type="text" id="auth-q" placeholder="例：初めて飼ったペットの名前は？">
+      <label>答え</label>
+      <input type="text" id="auth-a" autocomplete="off">
       <button class="btn" id="auth-setup-btn">パスワードを設定してはじめる</button>
       <div class="field-note" id="auth-error" style="color:var(--red);"></div>
     `;
     document.getElementById('auth-setup-btn').addEventListener('click', async ()=>{
       const p1 = document.getElementById('auth-pw1').value;
       const p2 = document.getElementById('auth-pw2').value;
+      const q = document.getElementById('auth-q').value.trim();
+      const a = document.getElementById('auth-a').value;
       const err = document.getElementById('auth-error');
-      if(p1.length < 4){ err.textContent = '4文字以上で入力してください'; return; }
+      if(p1.length < 4){ err.textContent = 'パスワードは4文字以上で入力してください'; return; }
       if(p1 !== p2){ err.textContent = 'パスワードが一致しません'; return; }
-      state.auth = { passwordHash: await sha256Hex(p1) };
+      if(!q){ err.textContent = '秘密の質問を入力してください'; return; }
+      if(!a.trim()){ err.textContent = '秘密の質問の答えを入力してください'; return; }
+      state.auth = {
+        passwordHash: await sha256Hex(p1),
+        recoveryQuestion: q,
+        recoveryAnswerHash: await sha256Hex(normalizeAnswer(a))
+      };
       saveState();
       localStorage.setItem(AUTH_LOCAL_KEY, '1');
       unlockApp();
@@ -477,6 +495,7 @@ function showAuthScreen(mode){
       <label>パスワード</label>
       <input type="password" id="auth-pw" autocomplete="current-password">
       <button class="btn" id="auth-login-btn">ログイン</button>
+      <button class="btn secondary" id="auth-forgot-btn">パスワードを忘れた場合</button>
       <div class="field-note" id="auth-error" style="color:var(--red);"></div>
     `;
     const tryLogin = async ()=>{
@@ -492,7 +511,65 @@ function showAuthScreen(mode){
     };
     document.getElementById('auth-login-btn').addEventListener('click', tryLogin);
     document.getElementById('auth-pw').addEventListener('keydown', e=>{ if(e.key === 'Enter') tryLogin(); });
+    document.getElementById('auth-forgot-btn').addEventListener('click', ()=>{
+      if(state.auth && state.auth.recoveryQuestion && state.auth.recoveryAnswerHash){
+        showAuthScreen('recover');
+      } else {
+        alert('秘密の質問が設定されていないため、この画面からの復旧はできません。データを保持したまま復旧するには、以前保存したバックアップファイルがあれば「Claudeに相談して復旧を手伝ってもらう」などの方法をご検討ください。');
+      }
+    });
     document.getElementById('auth-pw').focus();
+    return;
+  }
+
+  if(mode === 'recover'){
+    body.innerHTML = `
+      <div class="field-note">秘密の質問</div>
+      <div class="stat-line" style="border-bottom:none;"><span style="font-weight:600;color:var(--ink);">${escapeHtml(state.auth.recoveryQuestion||'')}</span></div>
+      <label>答え</label>
+      <input type="text" id="auth-recover-answer" autocomplete="off">
+      <button class="btn" id="auth-recover-btn">確認する</button>
+      <button class="btn secondary" id="auth-back-btn">ログイン画面に戻る</button>
+      <div class="field-note" id="auth-error" style="color:var(--red);"></div>
+    `;
+    const tryRecover = async ()=>{
+      const ans = document.getElementById('auth-recover-answer').value;
+      const err = document.getElementById('auth-error');
+      const hash = await sha256Hex(normalizeAnswer(ans));
+      if(hash === state.auth.recoveryAnswerHash){
+        showAuthScreen('reset');
+      } else {
+        err.textContent = '答えが正しくありません';
+      }
+    };
+    document.getElementById('auth-recover-btn').addEventListener('click', tryRecover);
+    document.getElementById('auth-recover-answer').addEventListener('keydown', e=>{ if(e.key === 'Enter') tryRecover(); });
+    document.getElementById('auth-back-btn').addEventListener('click', ()=> showAuthScreen('login'));
+    document.getElementById('auth-recover-answer').focus();
+    return;
+  }
+
+  if(mode === 'reset'){
+    body.innerHTML = `
+      <div class="field-note">本人確認ができました。新しいパスワードを設定してください（4文字以上）。</div>
+      <label>新しいパスワード</label>
+      <input type="password" id="auth-pw1" autocomplete="new-password">
+      <label>確認のため再入力</label>
+      <input type="password" id="auth-pw2" autocomplete="new-password">
+      <button class="btn" id="auth-reset-btn">パスワードを再設定してログイン</button>
+      <div class="field-note" id="auth-error" style="color:var(--red);"></div>
+    `;
+    document.getElementById('auth-reset-btn').addEventListener('click', async ()=>{
+      const p1 = document.getElementById('auth-pw1').value;
+      const p2 = document.getElementById('auth-pw2').value;
+      const err = document.getElementById('auth-error');
+      if(p1.length < 4){ err.textContent = '4文字以上で入力してください'; return; }
+      if(p1 !== p2){ err.textContent = 'パスワードが一致しません'; return; }
+      state.auth.passwordHash = await sha256Hex(p1);
+      saveState();
+      localStorage.setItem(AUTH_LOCAL_KEY, '1');
+      unlockApp();
+    });
     return;
   }
 }
@@ -517,6 +594,24 @@ async function changePassword(){
   state.auth.passwordHash = await sha256Hex(next1);
   saveState();
   alert('パスワードを変更しました');
+}
+
+async function changeRecoveryQuestion(){
+  if(!state.auth || !state.auth.passwordHash){ alert('パスワードが未設定です'); return; }
+  const current = prompt('本人確認のため、現在のパスワードを入力してください');
+  if(current === null) return;
+  const curHash = await sha256Hex(current);
+  if(curHash !== state.auth.passwordHash){ alert('パスワードが違います'); return; }
+  const q = prompt('秘密の質問を入力してください（例：初めて飼ったペットの名前は？）', state.auth.recoveryQuestion || '');
+  if(q === null) return;
+  if(!q.trim()){ alert('質問を入力してください'); return; }
+  const a = prompt('答えを入力してください');
+  if(a === null) return;
+  if(!a.trim()){ alert('答えを入力してください'); return; }
+  state.auth.recoveryQuestion = q.trim();
+  state.auth.recoveryAnswerHash = await sha256Hex(normalizeAnswer(a));
+  saveState();
+  alert('秘密の質問を更新しました');
 }
 
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
@@ -873,8 +968,9 @@ function renderSettingsTab(){
 
     <div class="card">
       <h2>セキュリティ</h2>
-      <div class="field-note">ログインパスワードの変更や、この端末のログイン状態の解除ができます。</div>
+      <div class="field-note">ログインパスワードの変更、秘密の質問（パスワードを忘れた場合の復旧用）の設定、この端末のログイン状態の解除ができます。</div>
       <button class="btn secondary" id="auth-change-btn" style="margin-top:12px;">パスワードを変更</button>
+      <button class="btn secondary" id="auth-question-btn">秘密の質問を設定・変更</button>
       <button class="btn secondary" id="auth-logout-btn">ログアウト</button>
     </div>
   `;
@@ -897,6 +993,7 @@ function renderSettingsTab(){
     e.target.value = '';
   });
   document.getElementById('auth-change-btn').addEventListener('click', changePassword);
+  document.getElementById('auth-question-btn').addEventListener('click', changeRecoveryQuestion);
   document.getElementById('auth-logout-btn').addEventListener('click', ()=>{
     if(confirm('ログアウトしますか？次回はパスワードの入力が必要になります。')) logoutApp();
   });
@@ -907,7 +1004,7 @@ function renderSettingsTab(){
 function exportBackup(){
   const payload = {
     app: 'kakei-sim',
-    version: 'Ver1.3',
+    version: 'Ver1.4',
     exportedAt: new Date().toISOString(),
     data: state
   };
