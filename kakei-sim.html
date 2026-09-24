@@ -238,7 +238,7 @@
   <header>
     <div class="title-row">
       <h1>家計・年金シミュレーター</h1>
-      <span class="version">Ver1.2</span>
+      <span class="version">Ver1.3</span>
     </div>
     <div class="summary">
       <div class="box"><div class="label">貯蓄額</div><div class="val" id="hdr-savings">¥0</div></div>
@@ -322,6 +322,7 @@ function defaultState(){
   return {
     entries: [],      // {ym:'2026-09', income:{...}, expenses:{...}}
     assets: { savings:0, investment:0, history:[] }, // history: {id,date,type,amount,note}
+    bigExpenses: [],  // {id, ym:'2028-05', label:'自動車購入', amount:2500000}
     settings: { birthDate:'', pensionBase65:0, startAge:65, simEndAge:90, monthlyBudget:0 },
     simInputs: { salary:0, dividend:0, expenses:{} },
     auth: { passwordHash:'' }
@@ -333,6 +334,7 @@ function normalizeState(parsed){
   return {
     entries: parsed.entries || d.entries,
     assets: Object.assign(d.assets, parsed.assets||{}),
+    bigExpenses: parsed.bigExpenses || d.bigExpenses,
     settings: Object.assign(d.settings, parsed.settings||{}),
     simInputs: Object.assign(d.simInputs, parsed.simInputs||{}, {expenses: Object.assign({}, (parsed.simInputs&&parsed.simInputs.expenses)||{})}),
     auth: Object.assign(d.auth, parsed.auth||{})
@@ -683,6 +685,7 @@ function renderEntryList(){
 /* ============ 資産管理タブ ============ */
 function renderAssetsTab(){
   const main = document.getElementById('tab-content');
+  const beOpts = yearMonthOptions(null);
   main.innerHTML = `
     <div class="card">
       <h2>貯蓄額</h2>
@@ -706,6 +709,24 @@ function renderAssetsTab(){
       <h2>更新履歴</h2>
       <div id="asset-history"></div>
     </div>
+
+    <div class="card">
+      <h2>大きな支出の予定<span class="sec-note">自動車購入・リフォームなど</span></h2>
+      <div class="field-note">単発の大きな支出をあらかじめ登録すると、その予定年月にシミュレーション上で貯蓄・投資運用額から一括で差し引かれます。</div>
+      <label style="margin-top:12px;">項目名</label>
+      <input type="text" id="be-label" placeholder="例：自動車購入、キッチンリフォーム">
+      <label>予定年月</label>
+      <div class="grid2">
+        <select id="be-year">${beOpts.yearOpts}</select>
+        <select id="be-month">${beOpts.monthOpts}</select>
+      </div>
+      <label>金額</label>
+      <input type="text" inputmode="numeric" class="money-input" id="be-amount" placeholder="0">
+      <button class="btn gold" id="be-save">追加する</button>
+
+      <div class="divider"></div>
+      <div id="be-list"></div>
+    </div>
   `;
   document.getElementById('as-savings-save').addEventListener('click', ()=>{
     const v = num(document.getElementById('as-savings').value);
@@ -717,7 +738,45 @@ function renderAssetsTab(){
     const note = document.getElementById('as-invest-note').value;
     updateAsset('investment', v, note);
   });
+  document.getElementById('be-save').addEventListener('click', addBigExpense);
   renderAssetHistory();
+  renderBigExpenseList();
+}
+
+function addBigExpense(){
+  const label = document.getElementById('be-label').value.trim();
+  const year = document.getElementById('be-year').value;
+  const month = document.getElementById('be-month').value;
+  const amount = num(document.getElementById('be-amount').value);
+  if(!label){ alert('項目名を入力してください'); return; }
+  if(!amount){ alert('金額を入力してください'); return; }
+  const ym = `${year}-${String(month).padStart(2,'0')}`;
+  state.bigExpenses.push({id:uid(), ym, label, amount});
+  saveState();
+  renderAssetsTab();
+}
+
+function renderBigExpenseList(){
+  const box = document.getElementById('be-list');
+  const list = [...state.bigExpenses].sort((a,b)=> a.ym.localeCompare(b.ym));
+  if(list.length===0){ box.innerHTML = '<div class="empty">登録された予定はありません</div>'; return; }
+  box.innerHTML = list.map(e=>`
+    <div class="hist-item">
+      <div>
+        <div class="meta">${monthLabel(e.ym)} ・ ${e.label}</div>
+      </div>
+      <div class="figs">
+        <div>${yen(e.amount)}</div>
+      </div>
+      <div class="acts">
+        <button class="icon-btn" data-delbe="${e.id}" title="削除">🗑</button>
+      </div>
+    </div>
+  `).join('');
+  box.querySelectorAll('[data-delbe]').forEach(b=> b.addEventListener('click', ()=>{
+    state.bigExpenses = state.bigExpenses.filter(e=>e.id!==b.dataset.delbe);
+    saveState(); renderBigExpenseList();
+  }));
 }
 
 function updateAsset(type, value, note){
@@ -848,7 +907,7 @@ function renderSettingsTab(){
 function exportBackup(){
   const payload = {
     app: 'kakei-sim',
-    version: 'Ver1.2',
+    version: 'Ver1.3',
     exportedAt: new Date().toISOString(),
     data: state
   };
@@ -970,6 +1029,9 @@ function renderSimTab(){
   const defSalary = si.salary != null ? si.salary : 0;
   const defDividend = si.dividend != null && si.dividend !== 0 ? si.dividend : averageOf('dividend','income');
 
+  const bigExpenseTotal = state.bigExpenses.reduce((a,e)=>a+num(e.amount),0);
+  const bigExpenseCount = state.bigExpenses.length;
+
   main.innerHTML = `
     <div class="card">
       <h2>前提条件</h2>
@@ -978,7 +1040,8 @@ function renderSimTab(){
       <div class="stat-line"><span>シミュレーション終了</span><span class="v">${s.simEndAge}歳まで</span></div>
       <div class="stat-line"><span>毎月の利用可能額（目標）</span><span class="v">${yen(s.monthlyBudget)}</span></div>
       <div class="stat-line"><span>現在の収支（月平均）</span><span class="v">${preNet>=0?'+':''}${yen(preNet)}</span></div>
-      <div class="field-note">受給開始日までは、収支入力の記録から算出した上記の月平均差額を毎月貯蓄額へ加算してシミュレーションします。</div>
+      <div class="stat-line"><span>大きな支出の予定</span><span class="v">${bigExpenseCount}件 ／ 合計${yen(bigExpenseTotal)}</span></div>
+      <div class="field-note">受給開始日までは、収支入力の記録から算出した上記の月平均差額を毎月貯蓄額へ加算します。自動車購入・リフォームなど「資産管理」タブに登録した大きな支出は、予定年月に一括で貯蓄・投資運用額から差し引いてシミュレーションします。</div>
     </div>
 
     <div class="card">
@@ -1027,6 +1090,11 @@ function runSimulation(){
 
   const preNetMonthly = computeMonthlyNetFromEntries(); // 受給開始前：現在の収支入力の月平均差額
 
+  const bigExpenseByYm = {};
+  state.bigExpenses.forEach(e=>{
+    bigExpenseByYm[e.ym] = (bigExpenseByYm[e.ym]||0) + num(e.amount);
+  });
+
   let savings = state.assets.savings;
   let investment = state.assets.investment;
 
@@ -1042,31 +1110,45 @@ function runSimulation(){
 
   points.push({date:new Date(cursor), balance: savings+investment});
 
+  function drawDown(amount){
+    // 貯蓄→投資運用額の順に取り崩す。両方尽きたらtrueを返す
+    if(amount <= 0) return false;
+    if(savings >= amount){ savings -= amount; return false; }
+    const remaining = amount - savings;
+    savings = 0;
+    if(investment >= remaining){ investment -= remaining; return false; }
+    investment = 0;
+    return true;
+  }
+
   let guardMonths = 0;
   while(cursor < endDate && guardMonths < 2400){
     guardMonths++;
+    const cursorYm = `${cursor.getFullYear()}-${String(cursor.getMonth()+1).padStart(2,'0')}`;
     const inPensionPhase = cursor >= startDate;
+
+    // 自動車購入・リフォームなど、単発の大きな支出（予定年月が一致する月に一括で取り崩す）
+    if(bigExpenseByYm[cursorYm]){
+      if(drawDown(bigExpenseByYm[cursorYm])){
+        depletedAt = new Date(cursor);
+        depletedAt.setMonth(depletedAt.getMonth()+1);
+        cursor.setMonth(cursor.getMonth()+1);
+        points.push({date:new Date(cursor), balance: savings+investment});
+        break;
+      }
+    }
 
     if(!inPensionPhase){
       // 年金受給開始日まで：現在の収支の差額を貯蓄額へ加算（マイナス収支ならその分減額）
       savings += preNetMonthly;
       if(savings < 0) savings = 0;
     } else if(shortfall > 0){
-      if(savings >= shortfall){
-        savings -= shortfall;
-      } else {
-        const remaining = shortfall - savings;
-        savings = 0;
-        if(investment >= remaining){
-          investment -= remaining;
-        } else {
-          investment = 0;
-          depletedAt = new Date(cursor);
-          depletedAt.setMonth(depletedAt.getMonth()+1);
-          cursor.setMonth(cursor.getMonth()+1);
-          points.push({date:new Date(cursor), balance: savings+investment});
-          break;
-        }
+      if(drawDown(shortfall)){
+        depletedAt = new Date(cursor);
+        depletedAt.setMonth(depletedAt.getMonth()+1);
+        cursor.setMonth(cursor.getMonth()+1);
+        points.push({date:new Date(cursor), balance: savings+investment});
+        break;
       }
     } else {
       savings += (-shortfall);
