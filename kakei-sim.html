@@ -61,6 +61,17 @@
   .auth-card h1{font-size:19px;color:var(--ink);text-align:center;margin-bottom:18px;}
   .auth-card .btn{margin-top:16px;}
   .auth-card .btn.secondary{margin-top:10px;}
+  .pin-dots{display:flex;justify-content:center;gap:16px;margin:8px 0 22px;}
+  .pin-dots .dot{width:16px;height:16px;border-radius:50%;border:1.5px solid var(--line);background:#fff;transition:background .1s,border-color .1s;}
+  .pin-dots .dot.filled{background:var(--teal);border-color:var(--teal);}
+  .pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:260px;margin:0 auto;}
+  .pin-pad button{
+    aspect-ratio:1;border-radius:50%;border:1.5px solid var(--line);background:#FCFBF8;
+    font-size:22px;font-family:inherit;color:var(--ink);cursor:pointer;
+  }
+  .pin-pad button:active{background:var(--teal-soft);}
+  .pin-pad button.empty{border:none;background:none;cursor:default;}
+  .pin-pad button.pin-del{font-size:16px;color:var(--ink-soft);}
 
   header{
     padding:calc(env(safe-area-inset-top) + 18px) 20px 16px;
@@ -238,7 +249,7 @@
   <header>
     <div class="title-row">
       <h1>家計・年金シミュレーター</h1>
-      <span class="version">Ver1.4</span>
+      <span class="version">Ver1.5</span>
     </div>
     <div class="summary">
       <div class="box"><div class="label">貯蓄額</div><div class="val" id="hdr-savings">¥0</div></div>
@@ -325,7 +336,7 @@ function defaultState(){
     bigExpenses: [],  // {id, ym:'2028-05', label:'自動車購入', amount:2500000}
     settings: { birthDate:'', pensionBase65:0, startAge:65, simEndAge:90, monthlyBudget:0 },
     simInputs: { salary:0, dividend:0, expenses:{} },
-    auth: { passwordHash:'', recoveryQuestion:'', recoveryAnswerHash:'' }
+    auth: { pinHash:'', recoveryQuestion:'', recoveryAnswerHash:'' }
   };
 }
 function normalizeState(parsed){
@@ -421,7 +432,7 @@ function escapeHtml(s){
 }
 
 function checkAuthAndInit(){
-  if(state.auth && state.auth.passwordHash){
+  if(state.auth && state.auth.pinHash){
     if(localStorage.getItem(AUTH_LOCAL_KEY) === '1'){
       unlockApp();
     } else {
@@ -440,6 +451,40 @@ function unlockApp(){
   setTab(currentTab || 'input');
 }
 
+function pinPadHtml(){
+  return `
+    <div class="pin-dots" id="pin-dots">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    </div>
+    <div class="pin-pad" id="pin-pad">
+      <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+      <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+      <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+      <button class="empty" tabindex="-1"></button><button data-k="0">0</button><button class="pin-del" data-k="del">⌫</button>
+    </div>
+  `;
+}
+function mountPinPad(onComplete){
+  const pad = document.getElementById('pin-pad');
+  const dots = document.getElementById('pin-dots');
+  let buf = '';
+  function update(){
+    dots.querySelectorAll('.dot').forEach((d,i)=> d.classList.toggle('filled', i < buf.length));
+  }
+  pad.querySelectorAll('button[data-k]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const k = btn.dataset.k;
+      if(k === 'del'){ buf = buf.slice(0,-1); update(); return; }
+      if(buf.length >= 4) return;
+      buf += k;
+      update();
+      if(buf.length === 4){
+        setTimeout(()=>{ const val = buf; buf=''; update(); onComplete(val); }, 150);
+      }
+    });
+  });
+}
+
 function showAuthScreen(mode){
   appUnlocked = false;
   document.getElementById('app').style.display = 'none';
@@ -454,71 +499,36 @@ function showAuthScreen(mode){
 
   if(mode === 'setup'){
     body.innerHTML = `
-      <div class="field-note">はじめに、このアプリを開く際のパスワードを設定してください（4文字以上）。設定後は他の端末でも同じパスワードでログインできます。</div>
-      <label>新しいパスワード</label>
-      <input type="password" id="auth-pw1" autocomplete="new-password">
-      <label>確認のため再入力</label>
-      <input type="password" id="auth-pw2" autocomplete="new-password">
-      <div class="divider"></div>
-      <div class="field-note">パスワードを忘れた場合に備えて、秘密の質問を設定してください。</div>
-      <label>秘密の質問</label>
-      <input type="text" id="auth-q" placeholder="例：初めて飼ったペットの名前は？">
-      <label>答え</label>
-      <input type="text" id="auth-a" autocomplete="off">
-      <button class="btn" id="auth-setup-btn">パスワードを設定してはじめる</button>
-      <div class="field-note" id="auth-error" style="color:var(--red);"></div>
+      <div class="field-note" style="text-align:center;">はじめに、このアプリを開く際の暗証番号（4桁）を設定してください。</div>
+      ${pinPadHtml()}
     `;
-    document.getElementById('auth-setup-btn').addEventListener('click', async ()=>{
-      const p1 = document.getElementById('auth-pw1').value;
-      const p2 = document.getElementById('auth-pw2').value;
-      const q = document.getElementById('auth-q').value.trim();
-      const a = document.getElementById('auth-a').value;
-      const err = document.getElementById('auth-error');
-      if(p1.length < 4){ err.textContent = 'パスワードは4文字以上で入力してください'; return; }
-      if(p1 !== p2){ err.textContent = 'パスワードが一致しません'; return; }
-      if(!q){ err.textContent = '秘密の質問を入力してください'; return; }
-      if(!a.trim()){ err.textContent = '秘密の質問の答えを入力してください'; return; }
-      state.auth = {
-        passwordHash: await sha256Hex(p1),
-        recoveryQuestion: q,
-        recoveryAnswerHash: await sha256Hex(normalizeAnswer(a))
-      };
-      saveState();
-      localStorage.setItem(AUTH_LOCAL_KEY, '1');
-      unlockApp();
-    });
+    mountPinPad(pin1 => showSetupConfirm(pin1));
     return;
   }
 
   if(mode === 'login'){
     body.innerHTML = `
-      <label>パスワード</label>
-      <input type="password" id="auth-pw" autocomplete="current-password">
-      <button class="btn" id="auth-login-btn">ログイン</button>
-      <button class="btn secondary" id="auth-forgot-btn">パスワードを忘れた場合</button>
-      <div class="field-note" id="auth-error" style="color:var(--red);"></div>
+      <div class="field-note" style="text-align:center;">暗証番号（4桁）を入力してください</div>
+      ${pinPadHtml()}
+      <div class="field-note" id="auth-error" style="color:var(--red);text-align:center;"></div>
+      <button class="btn secondary" id="auth-forgot-btn">暗証番号を忘れた場合</button>
     `;
-    const tryLogin = async ()=>{
-      const pw = document.getElementById('auth-pw').value;
-      const err = document.getElementById('auth-error');
-      const hash = await sha256Hex(pw);
-      if(hash === state.auth.passwordHash){
+    mountPinPad(async pin => {
+      const hash = await sha256Hex(pin);
+      if(hash === state.auth.pinHash){
         localStorage.setItem(AUTH_LOCAL_KEY, '1');
         unlockApp();
       } else {
-        err.textContent = 'パスワードが違います';
+        document.getElementById('auth-error').textContent = '暗証番号が違います';
       }
-    };
-    document.getElementById('auth-login-btn').addEventListener('click', tryLogin);
-    document.getElementById('auth-pw').addEventListener('keydown', e=>{ if(e.key === 'Enter') tryLogin(); });
+    });
     document.getElementById('auth-forgot-btn').addEventListener('click', ()=>{
       if(state.auth && state.auth.recoveryQuestion && state.auth.recoveryAnswerHash){
         showAuthScreen('recover');
       } else {
-        alert('秘密の質問が設定されていないため、この画面からの復旧はできません。データを保持したまま復旧するには、以前保存したバックアップファイルがあれば「Claudeに相談して復旧を手伝ってもらう」などの方法をご検討ください。');
+        alert('秘密の質問が設定されていないため、この画面からの復旧はできません。復旧するには改めてご相談ください。');
       }
     });
-    document.getElementById('auth-pw').focus();
     return;
   }
 
@@ -537,7 +547,7 @@ function showAuthScreen(mode){
       const err = document.getElementById('auth-error');
       const hash = await sha256Hex(normalizeAnswer(ans));
       if(hash === state.auth.recoveryAnswerHash){
-        showAuthScreen('reset');
+        showResetPin();
       } else {
         err.textContent = '答えが正しくありません';
       }
@@ -548,30 +558,79 @@ function showAuthScreen(mode){
     document.getElementById('auth-recover-answer').focus();
     return;
   }
+}
 
-  if(mode === 'reset'){
-    body.innerHTML = `
-      <div class="field-note">本人確認ができました。新しいパスワードを設定してください（4文字以上）。</div>
-      <label>新しいパスワード</label>
-      <input type="password" id="auth-pw1" autocomplete="new-password">
-      <label>確認のため再入力</label>
-      <input type="password" id="auth-pw2" autocomplete="new-password">
-      <button class="btn" id="auth-reset-btn">パスワードを再設定してログイン</button>
-      <div class="field-note" id="auth-error" style="color:var(--red);"></div>
-    `;
-    document.getElementById('auth-reset-btn').addEventListener('click', async ()=>{
-      const p1 = document.getElementById('auth-pw1').value;
-      const p2 = document.getElementById('auth-pw2').value;
-      const err = document.getElementById('auth-error');
-      if(p1.length < 4){ err.textContent = '4文字以上で入力してください'; return; }
-      if(p1 !== p2){ err.textContent = 'パスワードが一致しません'; return; }
-      state.auth.passwordHash = await sha256Hex(p1);
-      saveState();
-      localStorage.setItem(AUTH_LOCAL_KEY, '1');
-      unlockApp();
-    });
-    return;
-  }
+function showSetupConfirm(pin1){
+  const body = document.getElementById('auth-body');
+  body.innerHTML = `
+    <div class="field-note" style="text-align:center;">確認のため、もう一度入力してください</div>
+    ${pinPadHtml()}
+    <div class="field-note" id="auth-error" style="color:var(--red);text-align:center;"></div>
+  `;
+  mountPinPad(pin2 => {
+    if(pin2 !== pin1){
+      document.getElementById('auth-error').textContent = '一致しません。最初からやり直してください';
+      setTimeout(()=> showAuthScreen('setup'), 900);
+      return;
+    }
+    showSetupQuestion(pin1);
+  });
+}
+
+function showSetupQuestion(pin1){
+  const body = document.getElementById('auth-body');
+  body.innerHTML = `
+    <div class="field-note">暗証番号を忘れた場合に備えて、秘密の質問を設定してください。</div>
+    <label>秘密の質問</label>
+    <input type="text" id="auth-q" placeholder="例：初めて飼ったペットの名前は？">
+    <label>答え</label>
+    <input type="text" id="auth-a" autocomplete="off">
+    <button class="btn" id="auth-setup-btn">設定してはじめる</button>
+    <div class="field-note" id="auth-error" style="color:var(--red);"></div>
+  `;
+  document.getElementById('auth-setup-btn').addEventListener('click', async ()=>{
+    const q = document.getElementById('auth-q').value.trim();
+    const a = document.getElementById('auth-a').value;
+    const err = document.getElementById('auth-error');
+    if(!q){ err.textContent = '秘密の質問を入力してください'; return; }
+    if(!a.trim()){ err.textContent = '秘密の質問の答えを入力してください'; return; }
+    state.auth = {
+      pinHash: await sha256Hex(pin1),
+      recoveryQuestion: q,
+      recoveryAnswerHash: await sha256Hex(normalizeAnswer(a))
+    };
+    saveState();
+    localStorage.setItem(AUTH_LOCAL_KEY, '1');
+    unlockApp();
+  });
+}
+
+function showResetPin(){
+  const body = document.getElementById('auth-body');
+  body.innerHTML = `
+    <div class="field-note" style="text-align:center;">本人確認ができました。新しい暗証番号（4桁）を入力してください</div>
+    ${pinPadHtml()}
+  `;
+  mountPinPad(pin1 => showResetConfirm(pin1));
+}
+function showResetConfirm(pin1){
+  const body = document.getElementById('auth-body');
+  body.innerHTML = `
+    <div class="field-note" style="text-align:center;">確認のため、もう一度入力してください</div>
+    ${pinPadHtml()}
+    <div class="field-note" id="auth-error" style="color:var(--red);text-align:center;"></div>
+  `;
+  mountPinPad(async pin2 => {
+    if(pin2 !== pin1){
+      document.getElementById('auth-error').textContent = '一致しません。最初からやり直してください';
+      setTimeout(()=> showResetPin(), 900);
+      return;
+    }
+    state.auth.pinHash = await sha256Hex(pin1);
+    saveState();
+    localStorage.setItem(AUTH_LOCAL_KEY, '1');
+    unlockApp();
+  });
 }
 
 function logoutApp(){
@@ -579,29 +638,29 @@ function logoutApp(){
   showAuthScreen('login');
 }
 
-async function changePassword(){
-  if(!state.auth || !state.auth.passwordHash){ alert('パスワードが未設定です'); return; }
-  const current = prompt('現在のパスワードを入力してください');
+async function changePin(){
+  if(!state.auth || !state.auth.pinHash){ alert('暗証番号が未設定です'); return; }
+  const current = prompt('現在の暗証番号（4桁）を入力してください');
   if(current === null) return;
   const curHash = await sha256Hex(current);
-  if(curHash !== state.auth.passwordHash){ alert('現在のパスワードが違います'); return; }
-  const next1 = prompt('新しいパスワードを入力してください（4文字以上）');
+  if(curHash !== state.auth.pinHash){ alert('現在の暗証番号が違います'); return; }
+  const next1 = prompt('新しい暗証番号（4桁の数字）を入力してください');
   if(next1 === null) return;
-  if(next1.length < 4){ alert('4文字以上で入力してください'); return; }
+  if(!/^[0-9]{4}$/.test(next1)){ alert('4桁の数字で入力してください'); return; }
   const next2 = prompt('確認のため、もう一度入力してください');
   if(next2 === null) return;
-  if(next1 !== next2){ alert('パスワードが一致しません'); return; }
-  state.auth.passwordHash = await sha256Hex(next1);
+  if(next1 !== next2){ alert('一致しません'); return; }
+  state.auth.pinHash = await sha256Hex(next1);
   saveState();
-  alert('パスワードを変更しました');
+  alert('暗証番号を変更しました');
 }
 
 async function changeRecoveryQuestion(){
-  if(!state.auth || !state.auth.passwordHash){ alert('パスワードが未設定です'); return; }
-  const current = prompt('本人確認のため、現在のパスワードを入力してください');
+  if(!state.auth || !state.auth.pinHash){ alert('暗証番号が未設定です'); return; }
+  const current = prompt('本人確認のため、現在の暗証番号（4桁）を入力してください');
   if(current === null) return;
   const curHash = await sha256Hex(current);
-  if(curHash !== state.auth.passwordHash){ alert('パスワードが違います'); return; }
+  if(curHash !== state.auth.pinHash){ alert('暗証番号が違います'); return; }
   const q = prompt('秘密の質問を入力してください（例：初めて飼ったペットの名前は？）', state.auth.recoveryQuestion || '');
   if(q === null) return;
   if(!q.trim()){ alert('質問を入力してください'); return; }
@@ -968,8 +1027,8 @@ function renderSettingsTab(){
 
     <div class="card">
       <h2>セキュリティ</h2>
-      <div class="field-note">ログインパスワードの変更、秘密の質問（パスワードを忘れた場合の復旧用）の設定、この端末のログイン状態の解除ができます。</div>
-      <button class="btn secondary" id="auth-change-btn" style="margin-top:12px;">パスワードを変更</button>
+      <div class="field-note">暗証番号（4桁）の変更、秘密の質問（暗証番号を忘れた場合の復旧用）の設定、この端末のログイン状態の解除ができます。</div>
+      <button class="btn secondary" id="auth-change-btn" style="margin-top:12px;">暗証番号を変更</button>
       <button class="btn secondary" id="auth-question-btn">秘密の質問を設定・変更</button>
       <button class="btn secondary" id="auth-logout-btn">ログアウト</button>
     </div>
@@ -992,10 +1051,10 @@ function renderSettingsTab(){
     if(file) importBackupFile(file);
     e.target.value = '';
   });
-  document.getElementById('auth-change-btn').addEventListener('click', changePassword);
+  document.getElementById('auth-change-btn').addEventListener('click', changePin);
   document.getElementById('auth-question-btn').addEventListener('click', changeRecoveryQuestion);
   document.getElementById('auth-logout-btn').addEventListener('click', ()=>{
-    if(confirm('ログアウトしますか？次回はパスワードの入力が必要になります。')) logoutApp();
+    if(confirm('ログアウトしますか？次回は暗証番号の入力が必要になります。')) logoutApp();
   });
   renderSettingsPreview(s.startAge || 65);
 }
@@ -1004,7 +1063,7 @@ function renderSettingsTab(){
 function exportBackup(){
   const payload = {
     app: 'kakei-sim',
-    version: 'Ver1.4',
+    version: 'Ver1.5',
     exportedAt: new Date().toISOString(),
     data: state
   };
