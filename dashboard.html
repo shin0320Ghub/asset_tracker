@@ -134,6 +134,19 @@ header{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:20p
 .login-card label{display:block;font-size:14px;color:var(--sub);margin:14px 0 6px}
 .login-card input{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);background:#0E1722;font-size:17px}
 .login-card .go{width:100%;margin-top:22px;border:0;border-radius:999px;padding:14px;font-weight:700;font-size:17px;background:linear-gradient(90deg,var(--salary),var(--dividend));color:#0B121B}
+.login-card .go:disabled{opacity:.5}
+.sr-pin{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;left:-9999px}
+.pin-dots{display:flex;justify-content:center;gap:18px;margin:10px 0 4px;padding:10px 0}
+.pin-dots .dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--line);background:transparent;transition:background .12s,border-color .12s,transform .12s}
+.pin-dots .dot.on{background:var(--dividend);border-color:var(--dividend);transform:scale(1.12)}
+.pin-dots.shake{animation:shake .38s}
+@keyframes shake{20%{transform:translateX(-8px)}40%{transform:translateX(7px)}60%{transform:translateX(-5px)}80%{transform:translateX(3px)}100%{transform:translateX(0)}}
+.pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:6px}
+.pin-pad button{padding:16px 0;border-radius:14px;border:1px solid var(--line);background:#0E1722;font-size:21px;font-weight:600;color:var(--ink)}
+.pin-pad button:active{background:#18293C}
+.pin-pad button.del{font-size:18px;color:var(--sub);background:none;border-color:transparent}
+.pin-pad span{visibility:hidden}
+@media (prefers-reduced-motion:reduce){.pin-dots.shake{animation:none}}
 .err{color:var(--neg);font-size:14px;margin-top:12px;min-height:1.4em}
 .loading{min-height:100vh;display:flex;align-items:center;justify-content:center;color:var(--sub)}
 
@@ -159,16 +172,25 @@ body.sheet-open{overflow:hidden}
 <div class="loading" id="scrLoading">読み込み中…</div>
 
 <div class="login hidden" id="scrLogin">
-  <form class="login-card" id="loginForm" autocomplete="on">
+  <div class="login-card" id="loginForm">
     <h1>マイ資産ダッシュボード</h1>
-    <p>給与管理アプリと同じメールアドレスとパスワードでログインしてください。</p>
+    <p>給与管理アプリと同じメールアドレス・暗証番号(4桁)でログインしてください。</p>
     <label for="email">メールアドレス</label>
     <input id="email" type="email" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false">
-    <label for="pw">パスワード</label>
-    <input id="pw" type="password" autocomplete="current-password">
-    <button class="go" type="submit" id="loginBtn">ログイン</button>
+    <label>暗証番号(4桁)</label>
+    <div class="pin-dots" id="pinDots" aria-hidden="true">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    </div>
+    <input id="pw" class="sr-pin" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="current-password" aria-label="暗証番号4桁">
+    <div class="pin-pad" id="pinPad">
+      <button type="button" data-k="1">1</button><button type="button" data-k="2">2</button><button type="button" data-k="3">3</button>
+      <button type="button" data-k="4">4</button><button type="button" data-k="5">5</button><button type="button" data-k="6">6</button>
+      <button type="button" data-k="7">7</button><button type="button" data-k="8">8</button><button type="button" data-k="9">9</button>
+      <span></span><button type="button" data-k="0">0</button><button type="button" class="del" data-k="del" aria-label="1文字削除">⌫</button>
+    </div>
+    <button class="go" type="button" id="loginBtn">ログイン</button>
     <div class="err" id="loginErr"></div>
-  </form>
+  </div>
 </div>
 
 <div class="wrap hidden" id="scrDash">
@@ -651,26 +673,57 @@ function subscribe(uid){
 
 if (fb){
   try{ $('email').value = localStorage.getItem('salary_email') || ''; }catch(e){}
-  $('loginForm').onsubmit = async ev => {
-    ev.preventDefault();
-    const email=$('email').value.trim(), pw=$('pw').value;
-    if(!email||!pw){ $('loginErr').textContent='メールアドレスとパスワードを入力してください。'; return; }
-    $('loginBtn').disabled=true; $('loginBtn').textContent='ログイン中…'; $('loginErr').textContent='';
+
+  /* ---- 暗証番号(4桁)パッド ---- */
+  const dots = [...$('pinDots').querySelectorAll('.dot')];
+  const pinInput = $('pw');
+  function renderPin(){ const n=pinInput.value.length; dots.forEach((d,i)=>d.classList.toggle('on', i<n)); }
+  function shakePin(msg){
+    $('pinDots').classList.remove('shake'); void $('pinDots').offsetWidth; $('pinDots').classList.add('shake');
+    pinInput.value=''; renderPin();
+    if (msg) $('loginErr').textContent = msg;
+  }
+  $('pinPad').addEventListener('click', e => {
+    const b = e.target.closest('button[data-k]'); if (!b || b.disabled) return;
+    const k = b.dataset.k;
+    if (k === 'del') pinInput.value = pinInput.value.slice(0,-1);
+    else if (pinInput.value.length < 4) pinInput.value += k;
+    renderPin();
+    $('loginErr').textContent = '';
+    if (pinInput.value.length === 4) doLogin();
+  });
+  pinInput.addEventListener('input', () => {
+    pinInput.value = pinInput.value.replace(/[^0-9]/g,'').slice(0,4);
+    renderPin();
+    if (pinInput.value.length === 4) doLogin();
+  });
+  $('email').addEventListener('input', () => { pinInput.value=''; renderPin(); });
+
+  async function doLogin(){
+    const email=$('email').value.trim(), pin=pinInput.value;
+    if(!email){ shakePin('先にメールアドレスを入力してください。'); return; }
+    if(pin.length!==4){ return; }
+    $('loginBtn').disabled=true; $('pinPad').querySelectorAll('button').forEach(b=>b.disabled=true);
+    $('loginBtn').textContent='ログイン中…'; $('loginErr').textContent='';
     try{
-      await fb.signInWithEmailAndPassword(fb.auth, email, pw);
+      await fb.signInWithEmailAndPassword(fb.auth, email, pin);
       try{ localStorage.setItem('salary_email', email); }catch(e){}
-      $('pw').value='';
+      pinInput.value=''; renderPin();
     }catch(e){
       const c=e&&e.code||'';
-      $('loginErr').textContent = c.includes('network') ? '通信できませんでした。電波の状態を確認してください。'
+      shakePin(c.includes('network') ? '通信できませんでした。電波の状態を確認してください。'
         : c.includes('too-many') ? '試行回数が多すぎます。しばらく待ってからお試しください。'
-        : 'メールアドレスまたはパスワードが違います。';
-    }finally{ $('loginBtn').disabled=false; $('loginBtn').textContent='ログイン'; }
-  };
+        : 'メールアドレスまたは暗証番号が違います。');
+    }finally{
+      $('loginBtn').disabled=false; $('loginBtn').textContent='ログイン';
+      $('pinPad').querySelectorAll('button').forEach(b=>b.disabled=false);
+    }
+  }
+  $('loginBtn').onclick = doLogin;
   $('logout').onclick = () => { if(confirm('ログアウトしますか?')) fb.signOut(fb.auth); };
   fb.onAuthStateChanged(fb.auth, u => {
     if (u){ show('scrDash'); renderAll(); subscribe(u.uid); }
-    else { unsubs.forEach(x=>x()); unsubs=[]; Object.keys(D).forEach(k=>D[k]=null); closeApp(); show('scrLogin'); }
+    else { unsubs.forEach(x=>x()); unsubs=[]; Object.keys(D).forEach(k=>D[k]=null); closeApp(); pinInput.value=''; renderPin(); show('scrLogin'); }
   });
 }
 
