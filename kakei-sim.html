@@ -6,25 +6,29 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="家計シミュレーター">
-<meta name="theme-color" content="#1B2A38">
+<meta name="theme-color" content="#0B121B">
 <title>家計・年金シミュレーター</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@600;700&family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=DM+Sans:opsz,wght@9..40,500;9..40,700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#F4F1E8;
-    --card:#FFFFFF;
-    --ink:#1B2A38;
-    --ink-soft:#5B6B78;
-    --line:#E3DED0;
-    --gold:#9A7B2E;
-    --gold-soft:#F1E9D2;
-    --teal:#2E5266;
-    --teal-soft:#E3EDF0;
-    --red:#A6503B;
-    --red-soft:#F5E6E0;
-    --radius-card: 14px;
+    --bg:#0B121B;
+    --panel:#101A26;
+    --card:#131D29;
+    --ink:#EDF2F7;
+    --ink-soft:#94A5B8;
+    --dim:#62748A;
+    --line:#223246;
+    --gold:#7AA7FF;
+    --gold-soft:rgba(122,167,255,.14);
+    --teal:#F2B84B;
+    --teal-soft:rgba(242,184,75,.14);
+    --red:#FF6B6B;
+    --red-soft:rgba(255,107,107,.14);
+    --pos:#3ECF8E;
+    --neg:#FF6B6B;
+    --radius-card: 22px;
     --radius-pill: 999px;
     --app-max: 520px;
   }
@@ -32,82 +36,91 @@
   @media (min-width:900px){ :root{ --app-max: 780px; } }
   @media (min-width:1200px){ :root{ --app-max: 880px; } }
   *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;}
+  html,body{margin:0;padding:0;min-height:100%;}
   body{
-    background:var(--bg);
+    background:radial-gradient(1200px 600px at 10% -10%,#15263A 0%,transparent 60%),radial-gradient(900px 500px at 110% 10%,#2A1E14 0%,transparent 55%),var(--bg);
+    background-attachment:fixed;
     color:var(--ink);
-    font-family:'Noto Sans JP',-apple-system,BlinkMacSystemFont,sans-serif;
+    font-family:'Zen Kaku Gothic New','Hiragino Sans','Hiragino Kaku Gothic ProN',-apple-system,BlinkMacSystemFont,sans-serif;
     -webkit-font-smoothing:antialiased;
     padding-bottom:env(safe-area-inset-bottom);
   }
   h1,h2,h3{
-    font-family:'Zen Old Mincho', serif;
+    font-family:'Zen Kaku Gothic New',sans-serif;
     font-weight:700;
     margin:0;
-    letter-spacing:.02em;
+    letter-spacing:.01em;
   }
+  .num{font-family:'DM Sans','Zen Kaku Gothic New',sans-serif;font-variant-numeric:tabular-nums;}
   #app{max-width:var(--app-max);margin:0 auto;min-height:100vh;display:flex;flex-direction:column;}
 
   .auth-screen{
     display:flex;align-items:center;justify-content:center;
-    min-height:100vh;background:var(--ink);
+    min-height:100vh;
     padding:calc(env(safe-area-inset-top) + 24px) 20px calc(env(safe-area-inset-bottom) + 24px);
   }
   .auth-card{
-    width:100%;max-width:360px;
-    background:var(--card);border-radius:var(--radius-card);
-    padding:26px 22px;
+    width:100%;max-width:380px;
+    background:var(--card);border:1px solid var(--line);border-radius:24px;
+    padding:32px 26px;
   }
-  .auth-card h1{font-size:19px;color:var(--ink);text-align:center;margin-bottom:18px;}
+  .auth-card h1{font-size:22px;color:var(--ink);text-align:center;margin-bottom:6px;}
+  .auth-card .field-note{font-size:14.5px;color:var(--ink-soft);text-align:center;margin:0 0 18px;line-height:1.55;}
   .auth-card .btn{margin-top:16px;}
   .auth-card .btn.secondary{margin-top:10px;}
-  .pin-dots{display:flex;justify-content:center;gap:16px;margin:8px 0 22px;}
-  .pin-dots .dot{width:16px;height:16px;border-radius:50%;border:1.5px solid var(--line);background:#fff;transition:background .1s,border-color .1s;}
-  .pin-dots .dot.filled{background:var(--teal);border-color:var(--teal);}
+  .pin-dots{display:flex;justify-content:center;gap:18px;margin:8px 0 22px;padding:6px 0;}
+  .pin-dots .dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--line);background:transparent;transition:background .12s,border-color .12s,transform .12s;}
+  .pin-dots .dot.filled{background:var(--teal);border-color:var(--teal);transform:scale(1.12);}
+  .pin-dots.shake{animation:pinshake .38s;}
+  @keyframes pinshake{20%{transform:translateX(-8px)}40%{transform:translateX(7px)}60%{transform:translateX(-5px)}80%{transform:translateX(3px)}100%{transform:translateX(0)}}
   .pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:260px;margin:0 auto;}
   .pin-pad button{
-    aspect-ratio:1;border-radius:50%;border:1.5px solid var(--line);background:#FCFBF8;
+    aspect-ratio:1;border-radius:50%;border:1px solid var(--line);background:#0E1722;
     font-size:22px;font-family:inherit;color:var(--ink);cursor:pointer;
   }
-  .pin-pad button:active{background:var(--teal-soft);}
+  .pin-pad button:active{background:#18293C;}
   .pin-pad button.empty{border:none;background:none;cursor:default;}
   .pin-pad button.pin-del{font-size:16px;color:var(--ink-soft);}
 
   header{
     padding:calc(env(safe-area-inset-top) + 18px) 20px 16px;
-    background:var(--ink);
-    color:#F4F1E8;
+    background:var(--panel);
+    border-bottom:1px solid var(--line);
+    color:var(--ink);
     position:relative;
   }
   header .title-row{display:flex;align-items:baseline;justify-content:space-between;gap:10px;}
-  header h1{font-size:20px;color:#F4F1E8;}
-  header .version{font-size:12px;color:#9FB0BB;font-family:'Noto Sans JP',sans-serif;white-space:nowrap;}
+  header h1{font-size:20px;color:var(--ink);}
+  header .version{font-size:12px;color:var(--dim);font-weight:500;white-space:nowrap;}
   header .summary{
     display:flex;gap:10px;margin-top:16px;
   }
   header .summary .box{
-    flex:1;background:rgba(255,255,255,.07);
-    border:1px solid rgba(255,255,255,.12);
-    border-radius:var(--radius-card);
-    padding:10px 12px;
+    flex:1;background:rgba(255,255,255,.035);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:10px 14px;
   }
-  header .summary .box .label{font-size:11px;color:#9FB0BB;}
-  header .summary .box .val{font-size:16px;font-weight:600;margin-top:2px;font-variant-numeric:tabular-nums;}
-  header .sync-status{font-size:11px;color:#9FB0BB;margin-top:10px;}
-  header .sync-status.ok{color:#9FD6B5;}
-  header .sync-status.error{color:#E3A98E;}
+  header .summary .box .label{font-size:12px;color:var(--ink-soft);}
+  header .summary .box .val{font-size:19px;font-weight:700;margin-top:2px;font-family:'DM Sans','Zen Kaku Gothic New',sans-serif;font-variant-numeric:tabular-nums;}
+  header .sync-status{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink-soft);margin-top:12px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;}
+  header .sync-status::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--pos);box-shadow:0 0 8px var(--pos);flex:none;}
+  header .sync-status.error::before{background:var(--neg);box-shadow:0 0 8px var(--neg);}
 
   main{flex:1;padding:16px 16px 90px;}
 
   .card{
-    background:var(--card);
+    position:relative;
+    background:linear-gradient(180deg,#16212F 0%,#121B26 100%);
     border:1px solid var(--line);
     border-radius:var(--radius-card);
-    padding:16px;
+    padding:18px 18px 20px;
     margin-bottom:14px;
+    overflow:hidden;
   }
+  .card::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:linear-gradient(90deg,var(--teal),transparent 85%);}
   .card h2{font-size:16px;margin-bottom:12px;color:var(--ink);}
-  .card h2 .sec-note{font-family:'Noto Sans JP',sans-serif;font-weight:400;font-size:12px;color:var(--ink-soft);margin-left:6px;}
+  .card h2 .sec-note{font-family:'Zen Kaku Gothic New',sans-serif;font-weight:400;font-size:12px;color:var(--ink-soft);margin-left:6px;}
 
   label{display:block;font-size:12.5px;color:var(--ink-soft);margin:10px 0 4px;}
   label:first-child{margin-top:0;}
@@ -117,7 +130,7 @@
     font-size:15px;
     border:1px solid var(--line);
     border-radius:10px;
-    background:#FCFBF8;
+    background:#0E1722;
     color:var(--ink);
     font-family:inherit;
   }
@@ -132,17 +145,17 @@
     padding:12px;
     margin-top:14px;
     background:var(--teal);
-    color:#fff;
+    color:#0B121B;
     border:none;
     border-radius:var(--radius-pill);
-    font-size:15px;font-weight:600;
+    font-size:15px;font-weight:700;
     font-family:inherit;
     cursor:pointer;
   }
-  .btn.secondary{background:transparent;color:var(--teal);border:1.5px solid var(--teal);}
-  .btn.gold{background:var(--gold);}
+  .btn.secondary{background:none;color:var(--ink-soft);border:1px solid var(--line);font-weight:600;}
+  .btn.gold{background:var(--gold);color:#0B121B;}
   .btn.small{width:auto;padding:7px 14px;font-size:13px;margin-top:0;}
-  .btn.danger{background:var(--red);}
+  .btn.danger{background:var(--red);color:#fff;}
 
   .row-flex{display:flex;gap:8px;}
   .row-flex .btn{margin-top:8px;}
@@ -152,12 +165,14 @@
     padding:11px 0;border-bottom:1px solid var(--line);
   }
   .entry-item:last-child, .hist-item:last-child{border-bottom:none;}
-  .entry-item .meta{font-size:13.5px;font-weight:600;}
+  .entry-item .meta{font-size:13.5px;font-weight:600;color:var(--ink);}
   .entry-item .sub{font-size:11.5px;color:var(--ink-soft);margin-top:2px;}
-  .entry-item .figs{text-align:right;font-variant-numeric:tabular-nums;}
-  .entry-item .figs .net.pos{color:var(--teal);}
-  .entry-item .figs .net.neg{color:var(--red);}
+  .entry-item .figs{text-align:right;font-family:'DM Sans','Zen Kaku Gothic New',sans-serif;font-variant-numeric:tabular-nums;}
+  .entry-item .figs .net.pos{color:var(--pos);}
+  .entry-item .figs .net.neg{color:var(--neg);}
   .entry-item .acts{display:flex;gap:6px;margin-left:10px;}
+  .hist-item .meta{color:var(--ink);}
+  .hist-item .figs{font-family:'DM Sans','Zen Kaku Gothic New',sans-serif;font-variant-numeric:tabular-nums;}
   .icon-btn{
     background:none;border:none;color:var(--ink-soft);font-size:16px;padding:4px 6px;cursor:pointer;
   }
@@ -165,25 +180,29 @@
   .pill-select{display:flex;gap:8px;margin-top:4px;}
   .pill-select button{
     flex:1;padding:10px 4px;border-radius:var(--radius-pill);
-    border:1.5px solid var(--line);background:#FCFBF8;color:var(--ink-soft);
+    border:1px solid var(--line);background:#0E1722;color:var(--ink-soft);
     font-size:13.5px;font-family:inherit;cursor:pointer;
   }
   .pill-select button.active{
-    background:var(--teal);border-color:var(--teal);color:#fff;font-weight:600;
+    background:var(--teal);border-color:var(--teal);color:#0B121B;font-weight:700;
   }
 
-  .stat-line{display:flex;justify-content:space-between;padding:7px 0;font-size:14px;border-bottom:1px dashed var(--line);}
+  .stat-line{display:flex;justify-content:space-between;padding:7px 0;font-size:14px;border-bottom:1px dashed var(--line);color:var(--ink);}
   .stat-line:last-child{border-bottom:none;}
-  .stat-line .v{font-weight:600;font-variant-numeric:tabular-nums;}
+  .stat-line span:first-child{color:var(--ink-soft);}
+  .stat-line .v{font-weight:700;font-family:'DM Sans','Zen Kaku Gothic New',sans-serif;font-variant-numeric:tabular-nums;color:var(--ink);}
 
   .result-banner{
     border-radius:var(--radius-card);
-    padding:16px;
+    padding:18px;
     margin-bottom:14px;
+    border:1px solid var(--line);
   }
-  .result-banner.ok{background:var(--teal-soft);border:1px solid #C6D9DF;}
-  .result-banner.warn{background:var(--red-soft);border:1px solid #E7CCC2;}
-  .result-banner .headline{font-size:17px;font-weight:700;font-family:'Zen Old Mincho',serif;}
+  .result-banner.ok{background:rgba(62,207,142,.12);}
+  .result-banner.warn{background:rgba(255,107,107,.12);}
+  .result-banner.ok .headline{color:var(--pos);}
+  .result-banner.warn .headline{color:var(--neg);}
+  .result-banner .headline{font-size:17px;font-weight:700;font-family:'Zen Kaku Gothic New',sans-serif;}
   .result-banner .detail{font-size:13px;color:var(--ink-soft);margin-top:6px;line-height:1.6;}
 
   .empty{color:var(--ink-soft);font-size:13.5px;padding:14px 2px;text-align:center;}
@@ -191,7 +210,7 @@
   nav#bottom-nav{
     position:fixed;bottom:0;left:0;right:0;
     max-width:var(--app-max);margin:0 auto;
-    background:#fff;border-top:1px solid var(--line);
+    background:var(--panel);border-top:1px solid var(--line);
     display:flex;
     padding-bottom:env(safe-area-inset-bottom);
   }
@@ -201,11 +220,11 @@
     color:var(--ink-soft);font-family:inherit;font-size:11px;cursor:pointer;
   }
   nav#bottom-nav button .ic{font-size:19px;line-height:1;}
-  nav#bottom-nav button.active{color:var(--teal);font-weight:600;}
+  nav#bottom-nav button.active{color:var(--teal);font-weight:700;}
 
   .field-note{font-size:11px;color:var(--ink-soft);margin-top:4px;}
   .divider{height:1px;background:var(--line);margin:14px 0;}
-  .footer-ver{text-align:center;font-size:11px;color:var(--ink-soft);padding:6px 0 0;}
+  .footer-ver{text-align:center;font-size:11px;color:var(--dim);padding:6px 0 0;}
 
   svg.chart{width:100%;height:auto;display:block;}
   .chart-legend{display:flex;gap:14px;font-size:11.5px;color:var(--ink-soft);margin-top:8px;}
@@ -217,8 +236,8 @@
     main{padding:20px 24px 96px;}
     header{padding-left:26px;padding-right:26px;}
     header h1{font-size:23px;}
-    header .summary .box .val{font-size:18px;}
-    .card{padding:20px 22px;}
+    header .summary .box .val{font-size:21px;}
+    .card{padding:22px 24px;}
     .card h2{font-size:17px;}
     input[type=number],input[type=date],input[type=month],input[type=text],input[type=password],select,textarea{font-size:16px;padding:11px 12px;}
     .grid3{grid-template-columns:repeat(4,1fr);gap:0 12px;}
@@ -249,13 +268,13 @@
   <header>
     <div class="title-row">
       <h1>家計・年金シミュレーター</h1>
-      <span class="version">Ver1.5</span>
+      <span class="version">Ver1.6</span>
     </div>
     <div class="summary">
       <div class="box"><div class="label">貯蓄額</div><div class="val" id="hdr-savings">¥0</div></div>
       <div class="box"><div class="label">投資運用額</div><div class="val" id="hdr-investment">¥0</div></div>
     </div>
-    <div class="sync-status" id="sync-status">🔄 同期中…</div>
+    <div class="sync-status" id="sync-status"><span>同期中…</span></div>
   </header>
   <main id="tab-content"></main>
   <nav id="bottom-nav">
@@ -297,11 +316,11 @@ try{
 function setSyncStatus(mode){
   const el = document.getElementById('sync-status');
   if(!el) return;
-  el.classList.remove('ok','error');
-  if(mode==='syncing'){ el.textContent = '🔄 同期中…'; }
-  else if(mode==='ok'){ el.textContent = '✅ 同期済み'; el.classList.add('ok'); }
-  else if(mode==='offline'){ el.textContent = '📴 オフライン（この端末のみ）'; el.classList.add('error'); }
-  else if(mode==='error'){ el.textContent = '⚠️ 同期エラー'; el.classList.add('error'); }
+  el.classList.remove('error');
+  if(mode==='syncing'){ el.innerHTML = '<span>同期中…</span>'; }
+  else if(mode==='ok'){ el.innerHTML = '<span>同期済み</span>'; }
+  else if(mode==='offline'){ el.innerHTML = '<span>オフライン（この端末のみ）</span>'; el.classList.add('error'); }
+  else if(mode==='error'){ el.innerHTML = '<span>同期エラー</span>'; el.classList.add('error'); }
 }
 
 /* ============ カテゴリ定義 ============ */
@@ -520,6 +539,8 @@ function showAuthScreen(mode){
         unlockApp();
       } else {
         document.getElementById('auth-error').textContent = '暗証番号が違います';
+        const dots = document.getElementById('pin-dots');
+        if(dots){ dots.classList.add('shake'); setTimeout(()=> dots.classList.remove('shake'), 400); }
       }
     });
     document.getElementById('auth-forgot-btn').addEventListener('click', ()=>{
@@ -1063,7 +1084,7 @@ function renderSettingsTab(){
 function exportBackup(){
   const payload = {
     app: 'kakei-sim',
-    version: 'Ver1.5',
+    version: 'Ver1.6',
     exportedAt: new Date().toISOString(),
     data: state
   };
@@ -1358,7 +1379,7 @@ function renderSimResult({shortfall, depletedAt, birthDate, endAgeSetting, final
     <div class="card">
       <h2>資産残高の推移</h2>
       <div id="chart-holder"></div>
-      <div class="chart-legend"><span><i style="background:#2E5266"></i>貯蓄＋投資の合計残高</span></div>
+      <div class="chart-legend"><span><i style="background:#F2B84B"></i>貯蓄＋投資の合計残高</span></div>
     </div>
   `;
   drawChart(points, birthDate);
@@ -1392,18 +1413,18 @@ function drawChart(points, birthDate){
   const labelIdxs = [0, Math.floor((points.length-1)/2), points.length-1];
   const xLabels = labelIdxs.map(i=>{
     const age = ageAt(birthDate, points[i].date);
-    return `<text x="${xForIndex(i)}" y="${H-12}" font-size="15" fill="#5B6B78" text-anchor="middle">${age}歳</text>`;
+    return `<text x="${xForIndex(i)}" y="${H-12}" font-size="15" fill="#94A5B8" text-anchor="middle">${age}歳</text>`;
   }).join('');
 
-  const yTop = `<text x="${padL-10}" y="${padT+14}" font-size="15" fill="#5B6B78" text-anchor="end">${topLabel}</text>`;
-  const yBottom = `<text x="${padL-10}" y="${H-padB}" font-size="15" fill="#5B6B78" text-anchor="end">¥0</text>`;
+  const yTop = `<text x="${padL-10}" y="${padT+14}" font-size="15" fill="#94A5B8" text-anchor="end">${topLabel}</text>`;
+  const yBottom = `<text x="${padL-10}" y="${H-padB}" font-size="15" fill="#94A5B8" text-anchor="end">¥0</text>`;
 
   holder.innerHTML = `
     <svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
-      <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${H-padB}" stroke="#E3DED0"/>
-      <line x1="${padL}" y1="${H-padB}" x2="${W-padR}" y2="${H-padB}" stroke="#E3DED0"/>
-      <path d="${areaD}" fill="#E3EDF0" stroke="none"/>
-      <path d="${pathD}" fill="none" stroke="#2E5266" stroke-width="2.2"/>
+      <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${H-padB}" stroke="#223246"/>
+      <line x1="${padL}" y1="${H-padB}" x2="${W-padR}" y2="${H-padB}" stroke="#223246"/>
+      <path d="${areaD}" fill="rgba(242,184,75,.14)" stroke="none"/>
+      <path d="${pathD}" fill="none" stroke="#F2B84B" stroke-width="2.2"/>
       ${yTop}${yBottom}${xLabels}
     </svg>
   `;
