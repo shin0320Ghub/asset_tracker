@@ -174,21 +174,17 @@ body.sheet-open{overflow:hidden}
 <div class="login hidden" id="scrLogin">
   <div class="login-card" id="loginForm">
     <h1>マイ資産ダッシュボード</h1>
-    <p>給与管理アプリと同じメールアドレス・暗証番号(4桁)でログインしてください。</p>
-    <label for="email">メールアドレス</label>
-    <input id="email" type="email" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false">
-    <label>暗証番号(4桁)</label>
+    <p id="loginLead">給与管理アプリと同じ4桁の暗証番号を入力してください。</p>
     <div class="pin-dots" id="pinDots" aria-hidden="true">
       <span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
     </div>
-    <input id="pw" class="sr-pin" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="current-password" aria-label="暗証番号4桁">
+    <input id="pw" class="sr-pin" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" aria-label="暗証番号4桁">
     <div class="pin-pad" id="pinPad">
       <button type="button" data-k="1">1</button><button type="button" data-k="2">2</button><button type="button" data-k="3">3</button>
       <button type="button" data-k="4">4</button><button type="button" data-k="5">5</button><button type="button" data-k="6">6</button>
       <button type="button" data-k="7">7</button><button type="button" data-k="8">8</button><button type="button" data-k="9">9</button>
       <span></span><button type="button" data-k="0">0</button><button type="button" class="del" data-k="del" aria-label="1文字削除">⌫</button>
     </div>
-    <button class="go" type="button" id="loginBtn">ログイン</button>
     <div class="err" id="loginErr"></div>
   </div>
 </div>
@@ -645,23 +641,23 @@ $('sheetReload').onclick = () => { if(openId && frames[openId]) frames[openId].s
 const B='https://www.gstatic.com/firebasejs/10.12.2/';
 let fb;
 try{
-  const [{ initializeApp }, { initializeAuth, browserLocalPersistence, signInWithEmailAndPassword, onAuthStateChanged, signOut }, { getDatabase, ref, onValue }] =
+  const [{ initializeApp }, { initializeAuth, browserLocalPersistence, signInAnonymously, onAuthStateChanged }, { getDatabase, ref, onValue }] =
     await Promise.all([import(B+'firebase-app.js'), import(B+'firebase-auth.js'), import(B+'firebase-database.js')]);
   const app = initializeApp(firebaseConfig);
-  const auth = initializeAuth(app, { persistence: browserLocalPersistence });  // 給与管理アプリとログイン状態を共有
+  const auth = initializeAuth(app, { persistence: browserLocalPersistence });
   auth.languageCode = 'ja';
   const db = getDatabase(app);
-  fb = { auth, db, ref, onValue, signInWithEmailAndPassword, onAuthStateChanged, signOut };
+  fb = { auth, db, ref, onValue, signInAnonymously, onAuthStateChanged };
 }catch(e){
   console.error(e);
   $('scrLoading').textContent = 'Firebaseを読み込めませんでした。通信状態を確認して再読み込みしてください。';
 }
 
 let unsubs = [];
-function subscribe(uid){
+function subscribe(){
   unsubs.forEach(u=>u()); unsubs=[];
   const on = (path, cb) => unsubs.push(fb.onValue(fb.ref(fb.db, path), s=>cb(s.val()), err=>{ console.error(path, err); cb(undefined); }));
-  on(`salary/${uid}/records`, v=>{ D.salary = v||{}; renderSalary(); });
+  on('salary/records', v=>{ D.salary = v||{}; renderSalary(); });
   on('subscriptions', v=>{ D.subs = v||{}; renderCost(); });
   on('costCategories', v=>{ D.cats = v||null; renderCost(); });
   on('stockPortfolio/holdings', v=>{ D.holdings = v||{}; renderStock(); });
@@ -671,12 +667,19 @@ function subscribe(uid){
   on('.info/connected', v=>{ $('sync').classList.toggle('off', !v); $('sync').querySelector('span').textContent = v ? '同期中' : 'オフライン'; });
 }
 
-if (fb){
-  try{ $('email').value = localStorage.getItem('salary_email') || ''; }catch(e){}
+async function hashPin(pin){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('salary-tracker:'+pin));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+const TRY_KEY = 'dash_pin_try';
+const tryState = () => { try{ return JSON.parse(localStorage.getItem(TRY_KEY))||{n:0,until:0}; }catch(e){ return {n:0,until:0}; } };
+const setTry = v => { try{ localStorage.setItem(TRY_KEY, JSON.stringify(v)); }catch(e){} };
 
+if (fb){
   /* ---- 暗証番号(4桁)パッド ---- */
   const dots = [...$('pinDots').querySelectorAll('.dot')];
   const pinInput = $('pw');
+  let pinStored = null; // 給与管理アプリが salary/pin に保存している暗証番号のハッシュ
   function renderPin(){ const n=pinInput.value.length; dots.forEach((d,i)=>d.classList.toggle('on', i<n)); }
   function shakePin(msg){
     $('pinDots').classList.remove('shake'); void $('pinDots').offsetWidth; $('pinDots').classList.add('shake');
@@ -690,40 +693,56 @@ if (fb){
     else if (pinInput.value.length < 4) pinInput.value += k;
     renderPin();
     $('loginErr').textContent = '';
-    if (pinInput.value.length === 4) doLogin();
+    if (pinInput.value.length === 4) checkPin();
   });
   pinInput.addEventListener('input', () => {
     pinInput.value = pinInput.value.replace(/[^0-9]/g,'').slice(0,4);
     renderPin();
-    if (pinInput.value.length === 4) doLogin();
+    if (pinInput.value.length === 4) checkPin();
   });
-  $('email').addEventListener('input', () => { pinInput.value=''; renderPin(); });
 
-  async function doLogin(){
-    const email=$('email').value.trim(), pin=pinInput.value;
-    if(!email){ shakePin('先にメールアドレスを入力してください。'); return; }
-    if(pin.length!==4){ return; }
-    $('loginBtn').disabled=true; $('pinPad').querySelectorAll('button').forEach(b=>b.disabled=true);
-    $('loginBtn').textContent='ログイン中…'; $('loginErr').textContent='';
+  async function checkPin(){
+    const pin = pinInput.value;
+    if (pin.length !== 4) return;
+    if (!pinStored){ shakePin('給与管理アプリで暗証番号が設定されていません。先にそちらで設定してください。'); return; }
+    const st = tryState();
+    if (Date.now() < st.until){ shakePin(`しばらく待ってからお試しください(あと${Math.ceil((st.until-Date.now())/60000)}分)`); return; }
+    $('pinPad').querySelectorAll('button').forEach(b=>b.disabled=true);
     try{
-      await fb.signInWithEmailAndPassword(fb.auth, email, pin);
-      try{ localStorage.setItem('salary_email', email); }catch(e){}
-      pinInput.value=''; renderPin();
-    }catch(e){
-      const c=e&&e.code||'';
-      shakePin(c.includes('network') ? '通信できませんでした。電波の状態を確認してください。'
-        : c.includes('too-many') ? '試行回数が多すぎます。しばらく待ってからお試しください。'
-        : 'メールアドレスまたは暗証番号が違います。');
-    }finally{
-      $('loginBtn').disabled=false; $('loginBtn').textContent='ログイン';
-      $('pinPad').querySelectorAll('button').forEach(b=>b.disabled=false);
-    }
+      if (await hashPin(pin) === pinStored){
+        setTry({n:0,until:0});
+        pinInput.value=''; renderPin();
+        show('scrDash'); renderAll(); subscribe();
+      } else {
+        const n=(st.n||0)+1;
+        setTry(n>=5 ? {n:0,until:Date.now()+3*60000} : {n,until:0});
+        shakePin(n>=5 ? '5回間違えたため、3分間入力できません' : `暗証番号が違います(${n}回目)`);
+      }
+    }catch(e){ shakePin('確認できませんでした。通信状態を確認してください。'); }
+    finally{ $('pinPad').querySelectorAll('button').forEach(b=>b.disabled=false); }
   }
-  $('loginBtn').onclick = doLogin;
-  $('logout').onclick = () => { if(confirm('ログアウトしますか?')) fb.signOut(fb.auth); };
+
+  $('logout').onclick = () => {
+    if (!confirm('ロックしますか?')) return;
+    unsubs.forEach(x=>x()); unsubs=[]; Object.keys(D).forEach(k=>D[k]=null); closeApp();
+    pinInput.value=''; renderPin(); $('loginErr').textContent=''; show('scrLogin');
+  };
+
   fb.onAuthStateChanged(fb.auth, u => {
-    if (u){ show('scrDash'); renderAll(); subscribe(u.uid); }
-    else { unsubs.forEach(x=>x()); unsubs=[]; Object.keys(D).forEach(k=>D[k]=null); closeApp(); pinInput.value=''; renderPin(); show('scrLogin'); }
+    if (!u) return;
+    fb.onValue(fb.ref(fb.db, 'salary/pin'), s => {
+      pinStored = s.val();
+      $('loginLead').textContent = pinStored ? '給与管理アプリと同じ4桁の暗証番号を入力してください。' : '給与管理アプリで暗証番号がまだ設定されていません。先にそちらで設定してください。';
+      show('scrLogin');
+    }, err => {
+      console.error(err);
+      $('scrLoading').textContent = 'データベースを読み込めませんでした。通信状態を確認して再読み込みしてください。';
+      show('scrLoading');
+    });
+  });
+  fb.signInAnonymously(fb.auth).catch(e => {
+    console.error(e);
+    $('scrLoading').textContent = '接続できませんでした。通信状態を確認して再読み込みしてください。';
   });
 }
 
