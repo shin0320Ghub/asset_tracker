@@ -255,6 +255,7 @@ select.inp{background-image:linear-gradient(45deg,transparent 50%,var(--sub) 50%
 window.__booted = false;
 window.__bootFail = function(title, html){
   var v=document.getElementById('bootView'); if(!v) return;
+  window.__failShown = true;
   v.classList.remove('hidden');
   document.getElementById('bootTitle').textContent = title;
   document.getElementById('bootMsg').innerHTML = html;
@@ -491,7 +492,7 @@ const firebaseConfig = {
 
 </script>
 <script type="module">
-const APP_VER = 'Ver4.1';
+const APP_VER = 'Ver4.2';
 const MAX_PDF = 10 * 1024 * 1024;          // PDFは10MBまで
 const ROOT = 'salary';                      // データベース上の保存場所
 const TYPES = {
@@ -542,8 +543,13 @@ try {
   __bootFail('Firebaseに接続できませんでした', '内容:<code>'+String(e.message).replace(/</g,'&lt;')+'</code><br>firebaseConfig の値(特に databaseURL)を確認してください。');
   throw e;
 }
+window.__stage = '接続の準備';
 const bootTimer = setTimeout(() => {
-  __bootFail('応答がありません', 'Firebaseから応答がありません。<br>・通信状態<br>・Firebaseコンソール → Authentication → 設定 → 承認済みドメイン に「'+location.hostname+'」が入っているか<br>を確認してください。');
+  if (window.__failShown) return;
+  __bootFail('応答がありません', '「' + window.__stage + '」の途中で止まっています。<br><br>' +
+    '・Firebaseコンソール → Authentication → Sign-in method で<b>「匿名」が有効</b>か<br>' +
+    '・Realtime Database のルールに <code>"salary"</code> の項目があり、<code>auth != null</code> で読み書きを許可しているか<br>' +
+    '・通信状態<br>を確認してください。');
 }, 15000);
 
 let user = null, records = {}, recRef = null, connRef = null;
@@ -653,18 +659,21 @@ $('pinChangeBtn').onclick = () => { pinShow('change','今の暗証番号を入�
 auth.onAuthStateChanged(async u => {
   if (!u) return;
   user = u;
+  window.__stage = '暗証番号の読み込み';
   try{
     pinStored = await new Promise((res, rej) => {
       const r = db.ref(`${ROOT}/pin`);
       r.on('value', s => { r.off(); res(s.val()); }, e => { r.off(); rej(e); });
     });
   }catch(e){
-    __bootFail('接続できませんでした', '内容:<code>'+String(e.code||e.message).replace(/</g,'&lt;')+'</code>');
+    __bootFail('データベースを読めませんでした', '内容:<code>'+String(e.code||e.message).replace(/</g,'&lt;')+'</code><br><br>' +
+      'Realtime Database のルールで <code>"salary"</code> の読み書きが <code>auth != null</code> で許可されているか確認してください。');
     return;
   }
   if (!pinStored) pinShow('set','はじめに4桁の暗証番号を決めてください');
   else pinShow('unlock');
 });
+window.__stage = 'Firebaseへの接続';
 auth.signIn().catch(e => {
   __bootFail('接続できませんでした',
     '内容:<code>' + String(e.code || e.message).replace(/</g,'&lt;') + '</code><br>' +
