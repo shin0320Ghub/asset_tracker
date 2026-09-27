@@ -193,15 +193,18 @@
   .stat-line .v{font-weight:700;font-family:'DM Sans','Zen Kaku Gothic New',sans-serif;font-variant-numeric:tabular-nums;color:var(--ink);}
 
   .result-banner{
+    display:flex;gap:12px;align-items:flex-start;
     border-radius:var(--radius-card);
     padding:18px;
     margin-bottom:14px;
     border:1px solid var(--line);
   }
+  .result-banner svg{width:24px;height:24px;flex:none;margin-top:1px;}
+  .result-banner .content{flex:1;min-width:0;}
   .result-banner.ok{background:rgba(62,207,142,.12);}
   .result-banner.warn{background:rgba(255,107,107,.12);}
-  .result-banner.ok .headline{color:var(--pos);}
-  .result-banner.warn .headline{color:var(--neg);}
+  .result-banner.ok .headline, .result-banner.ok svg{color:var(--pos);}
+  .result-banner.warn .headline, .result-banner.warn svg{color:var(--neg);}
   .result-banner .headline{font-size:17px;font-weight:700;font-family:'Zen Kaku Gothic New',sans-serif;}
   .result-banner .detail{font-size:13px;color:var(--ink-soft);margin-top:6px;line-height:1.6;}
 
@@ -226,10 +229,30 @@
   .divider{height:1px;background:var(--line);margin:14px 0;}
   .footer-ver{text-align:center;font-size:11px;color:var(--dim);padding:6px 0 0;}
 
-  svg.chart{width:100%;height:auto;display:block;}
+  .chart-box{position:relative;height:230px;margin-top:6px;}
   .chart-legend{display:flex;gap:14px;font-size:11.5px;color:var(--ink-soft);margin-top:8px;}
   .chart-legend span{display:inline-flex;align-items:center;gap:5px;}
   .chart-legend i{width:10px;height:10px;border-radius:2px;display:inline-block;}
+
+  .c-head{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+  .c-head h2{margin:0;flex:1;}
+  .c-ico{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;background:var(--teal-soft);color:var(--teal);flex:none;}
+  .c-ico svg{width:20px;height:20px;}
+
+  .kpi{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;}
+  .kpi .lbl{font-size:12.5px;color:var(--ink-soft);}
+  .kpi .val{font-size:28px;font-weight:700;line-height:1.15;font-family:'DM Sans','Zen Kaku Gothic New',sans-serif;font-variant-numeric:tabular-nums;color:var(--ink);}
+
+  .chips{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;}
+  .chip{flex:1;min-width:112px;background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:14px;padding:10px 13px;}
+  .chip .lbl{font-size:12px;color:var(--ink-soft);display:flex;align-items:center;gap:6px;}
+  .chip .lbl i{width:8px;height:8px;border-radius:3px;background:var(--dot,var(--teal));flex:none;}
+  .chip .v{font-size:17px;font-weight:700;margin-top:3px;font-family:'DM Sans','Zen Kaku Gothic New',sans-serif;font-variant-numeric:tabular-nums;color:var(--ink);}
+
+  .legend{display:flex;flex-direction:column;gap:7px;margin-top:12px;}
+  .lg{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink);}
+  .lg i{width:10px;height:10px;border-radius:3px;flex:none;}
+  .lg b{margin-left:auto;font-weight:700;font-family:'DM Sans','Zen Kaku Gothic New',sans-serif;font-variant-numeric:tabular-nums;}
 
   /* ============ レスポンシブ対応（タブレット・横向き・大画面） ============ */
   @media (min-width:700px){
@@ -268,11 +291,14 @@
   <header>
     <div class="title-row">
       <h1>家計・年金シミュレーター</h1>
-      <span class="version">Ver1.6</span>
+      <span class="version">Ver1.7</span>
+    </div>
+    <div class="kpi" style="margin-top:14px;">
+      <div><div class="lbl">資産合計（貯蓄＋投資）</div><div class="val" id="hdr-total">¥0</div></div>
     </div>
     <div class="summary">
-      <div class="box"><div class="label">貯蓄額</div><div class="val" id="hdr-savings">¥0</div></div>
-      <div class="box"><div class="label">投資運用額</div><div class="val" id="hdr-investment">¥0</div></div>
+      <div class="box" style="--dot:var(--teal)"><div class="label"><i style="width:8px;height:8px;border-radius:3px;background:var(--dot);display:inline-block;margin-right:5px;"></i>貯蓄額</div><div class="val" id="hdr-savings">¥0</div></div>
+      <div class="box" style="--dot:var(--gold)"><div class="label"><i style="width:8px;height:8px;border-radius:3px;background:var(--dot);display:inline-block;margin-right:5px;"></i>投資運用額</div><div class="val" id="hdr-investment">¥0</div></div>
     </div>
     <div class="sync-status" id="sync-status"><span>同期中…</span></div>
   </header>
@@ -286,6 +312,7 @@
 
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script>
@@ -722,6 +749,7 @@ function todayISO(){ return new Date().toISOString().slice(0,10); }
 function renderHeader(){
   document.getElementById('hdr-savings').textContent = yen(state.assets.savings);
   document.getElementById('hdr-investment').textContent = yen(state.assets.investment);
+  document.getElementById('hdr-total').textContent = yen(state.assets.savings + state.assets.investment);
 }
 
 /* ============ タブ切替 ============ */
@@ -762,7 +790,10 @@ function renderInputTab(){
 
   main.innerHTML = `
     <div class="card">
-      <h2>${editingYm ? monthLabel(editingYm)+' を編集' : '想定収支を記録'}</h2>
+      <div class="c-head">
+        <span class="c-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="M8 14h.01M12 14h.01M16 14h.01"/></svg></span>
+        <h2>${editingYm ? monthLabel(editingYm)+' を編集' : '想定収支を記録'}</h2>
+      </div>
       <label>開始年月</label>
       <div class="grid2">
         <select id="f-year" ${draft ? 'disabled' : ''}>${yearOpts}</select>
@@ -863,7 +894,10 @@ function renderAssetsTab(){
   const beOpts = yearMonthOptions(null);
   main.innerHTML = `
     <div class="card">
-      <h2>貯蓄額</h2>
+      <div class="c-head">
+        <span class="c-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="14" rx="3"/><path d="M2 10h20"/><path d="M6 15h4"/></svg></span>
+        <h2>貯蓄額</h2>
+      </div>
       <label>現在の貯蓄額</label>
       <input type="text" inputmode="numeric" class="money-input" id="as-savings" value="${fmtInput(state.assets.savings)}">
       <label>メモ（任意）</label>
@@ -872,7 +906,10 @@ function renderAssetsTab(){
     </div>
 
     <div class="card">
-      <h2>投資運用額</h2>
+      <div class="c-head">
+        <span class="c-ico" style="background:var(--gold-soft);color:var(--gold);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18"/><path d="M4 16l5-5 4 3 7-8"/><path d="M15 6h5v5"/></svg></span>
+        <h2>投資運用額</h2>
+      </div>
       <label>現在の投資運用額</label>
       <input type="text" inputmode="numeric" class="money-input" id="as-invest" value="${fmtInput(state.assets.investment)}">
       <label>メモ（任意）</label>
@@ -1008,7 +1045,10 @@ function renderSettingsTab(){
   const s = state.settings;
   main.innerHTML = `
     <div class="card">
-      <h2>基本情報</h2>
+      <div class="c-head">
+        <span class="c-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></span>
+        <h2>基本情報</h2>
+      </div>
       <label>生年月日</label>
       <input type="date" id="st-birth" value="${s.birthDate||''}">
 
@@ -1084,7 +1124,7 @@ function renderSettingsTab(){
 function exportBackup(){
   const payload = {
     app: 'kakei-sim',
-    version: 'Ver1.6',
+    version: 'Ver1.7',
     exportedAt: new Date().toISOString(),
     data: state
   };
@@ -1211,7 +1251,10 @@ function renderSimTab(){
 
   main.innerHTML = `
     <div class="card">
-      <h2>前提条件</h2>
+      <div class="c-head">
+        <span class="c-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/></svg></span>
+        <h2>前提条件</h2>
+      </div>
       <div class="stat-line"><span>受給開始</span><span class="v">${fmtDate(startDate)}（${s.startAge}歳）</span></div>
       <div class="stat-line"><span>年金月額</span><span class="v">${yen(pensionMonthly)}</span></div>
       <div class="stat-line"><span>シミュレーション終了</span><span class="v">${s.simEndAge}歳まで</span></div>
@@ -1281,11 +1324,11 @@ function runSimulation(){
   const today = new Date();
   today.setDate(1);
 
-  const points = []; // {date, balance}
+  const points = []; // {date, savings, investment}
   let cursor = new Date(today < startDate ? today : startDate);
   let depletedAt = null;
 
-  points.push({date:new Date(cursor), balance: savings+investment});
+  points.push({date:new Date(cursor), savings, investment});
 
   function drawDown(amount){
     // 貯蓄→投資運用額の順に取り崩す。両方尽きたらtrueを返す
@@ -1310,7 +1353,7 @@ function runSimulation(){
         depletedAt = new Date(cursor);
         depletedAt.setMonth(depletedAt.getMonth()+1);
         cursor.setMonth(cursor.getMonth()+1);
-        points.push({date:new Date(cursor), balance: savings+investment});
+        points.push({date:new Date(cursor), savings, investment});
         break;
       }
     }
@@ -1324,7 +1367,7 @@ function runSimulation(){
         depletedAt = new Date(cursor);
         depletedAt.setMonth(depletedAt.getMonth()+1);
         cursor.setMonth(cursor.getMonth()+1);
-        points.push({date:new Date(cursor), balance: savings+investment});
+        points.push({date:new Date(cursor), savings, investment});
         break;
       }
     } else {
@@ -1334,11 +1377,11 @@ function runSimulation(){
     cursor.setMonth(cursor.getMonth()+1);
     // 12ヶ月に一度だけ記録（グラフを軽量化）
     if(guardMonths % 12 === 0){
-      points.push({date:new Date(cursor), balance: savings+investment});
+      points.push({date:new Date(cursor), savings, investment});
     }
   }
   if(!depletedAt){
-    points.push({date:new Date(cursor), balance: savings+investment});
+    points.push({date:new Date(cursor), savings, investment});
   }
 
   renderSimResult({shortfall, depletedAt, birthDate:s.birthDate, endAgeSetting:s.simEndAge, finalBalance: savings+investment, points, startDate});
@@ -1354,35 +1397,50 @@ function ageAt(birthDateStr, date){
 
 function renderSimResult({shortfall, depletedAt, birthDate, endAgeSetting, finalBalance, points, startDate}){
   const box = document.getElementById('si-result');
-  let bannerClass, headline, detail;
+  let bannerClass, headline, detail, iconSvg;
+  const okIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>';
+  const warnIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 3l10 18H2z"/><path d="M12 10v4M12 17v.5"/></svg>';
 
   if(depletedAt){
     const age = ageAt(birthDate, depletedAt);
     headline = `${age}歳ごろ（${fmtDate(depletedAt)}）に資金が枯渇する見込みです`;
     detail = `毎月の不足額は約${yen(shortfall)}です。不足分を貯蓄・投資運用額から取り崩しながら毎月の利用可能額（${yen(state.settings.monthlyBudget)}）を使い続けると、上記の時期に資産が尽きる計算になります。`;
-    bannerClass = 'warn';
+    bannerClass = 'warn'; iconSvg = warnIcon;
   } else if(shortfall > 0){
     headline = `${endAgeSetting}歳まで資金は維持できる見込みです`;
     detail = `毎月の不足額は約${yen(shortfall)}で、貯蓄・投資運用額から取り崩しますが、${endAgeSetting}歳の時点で約${yen(finalBalance)}が残る見込みです。`;
-    bannerClass = 'ok';
+    bannerClass = 'ok'; iconSvg = okIcon;
   } else {
     headline = `${endAgeSetting}歳まで資金は減らずに維持できる見込みです`;
     detail = `毎月の収支は目標の利用可能額を上回っており、余剰分は貯蓄に加算されます。${endAgeSetting}歳時点の資産見込みは約${yen(finalBalance)}です。`;
-    bannerClass = 'ok';
+    bannerClass = 'ok'; iconSvg = okIcon;
   }
+
+  const last = points[points.length-1];
 
   box.innerHTML = `
     <div class="result-banner ${bannerClass}">
-      <div class="headline">${headline}</div>
-      <div class="detail">${detail}</div>
+      ${iconSvg}
+      <div class="content">
+        <div class="headline">${headline}</div>
+        <div class="detail">${detail}</div>
+      </div>
     </div>
     <div class="card">
-      <h2>資産残高の推移</h2>
-      <div id="chart-holder"></div>
-      <div class="chart-legend"><span><i style="background:#F2B84B"></i>貯蓄＋投資の合計残高</span></div>
+      <div class="c-head">
+        <span class="c-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18"/><path d="M4 16l5-5 4 3 7-8"/><path d="M15 6h5v5"/></svg></span>
+        <h2>資産残高の推移<span class="sec-note">内訳つき</span></h2>
+      </div>
+      <div class="chips">
+        <div class="chip" style="--dot:var(--teal)"><div class="lbl"><i></i>貯蓄額</div><div class="v">${yen(last.savings)}</div></div>
+        <div class="chip" style="--dot:var(--gold)"><div class="lbl"><i></i>投資運用額</div><div class="v">${yen(last.investment)}</div></div>
+        <div class="chip" style="--dot:var(--pos)"><div class="lbl"><i></i>資産合計（${endAgeSetting}歳時点）</div><div class="v">${yen(last.savings+last.investment)}</div></div>
+      </div>
+      <div class="chart-box"><canvas id="sim-chart"></canvas></div>
+      <div class="field-note">積み上げ表示：下段が貯蓄額、上段が投資運用額です。点線は年金受給開始のタイミングを示します。</div>
     </div>
   `;
-  drawChart(points, birthDate);
+  drawBalanceChart(points, birthDate, startDate);
 }
 
 function yenCompact(n){
@@ -1392,43 +1450,82 @@ function yenCompact(n){
   return man.toLocaleString('ja-JP') + '万円';
 }
 
-function drawChart(points, birthDate){
-  const holder = document.getElementById('chart-holder');
-  if(points.length < 2){ holder.innerHTML = '<div class="empty">データが不足しています</div>'; return; }
+let simChartInstance = null;
+const pensionStartLinePlugin = {
+  id: 'pensionStartLine',
+  afterDatasetsDraw(chart, args, opts){
+    if(opts.index == null || opts.index < 0) return;
+    const xScale = chart.scales.x;
+    const x = xScale.getPixelForValue(opts.index);
+    const {top, bottom} = chart.chartArea;
+    const ctx = chart.ctx;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(242,184,75,.8)';
+    ctx.setLineDash([5,5]);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x, top+16);
+    ctx.lineTo(x, bottom);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#F2B84B';
+    ctx.font = '700 11px "Zen Kaku Gothic New",sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(opts.label||'', x, top+10);
+    ctx.restore();
+  }
+};
 
-  const W = 600, H = 240, padR = 16, padT = 16, padB = 36;
-  const maxVal = Math.max(...points.map(p=>p.balance), 1);
-  const minVal = 0;
-  const topLabel = yenCompact(maxVal);
-  // ラベルの文字数に応じて左余白を可変にし、はみ出し（見切れ）を防ぐ
-  const padL = Math.max(64, topLabel.length * 11 + 18);
+function drawBalanceChart(points, birthDate, startDate){
+  const canvas = document.getElementById('sim-chart');
+  if(!canvas || typeof Chart === 'undefined') return;
+  if(points.length < 2) return;
 
-  const xForIndex = i => padL + (i/(points.length-1)) * (W-padL-padR);
-  const yForVal = v => H - padB - ((v-minVal)/(maxVal-minVal || 1)) * (H-padT-padB);
+  if(!drawBalanceChart._defaultsSet){
+    Chart.defaults.color = '#94A5B8';
+    Chart.defaults.borderColor = 'rgba(255,255,255,.06)';
+    Chart.defaults.font.family = '"DM Sans","Zen Kaku Gothic New",sans-serif';
+    Chart.defaults.font.size = 12;
+    Chart.defaults.plugins.tooltip.backgroundColor = '#0B121B';
+    Chart.defaults.plugins.tooltip.borderColor = '#2B3D55';
+    Chart.defaults.plugins.tooltip.borderWidth = 1;
+    Chart.defaults.plugins.tooltip.padding = 10;
+    drawBalanceChart._defaultsSet = true;
+  }
 
-  const pathD = points.map((p,i)=> `${i===0?'M':'L'} ${xForIndex(i).toFixed(1)} ${yForVal(p.balance).toFixed(1)}`).join(' ');
-  const areaD = pathD + ` L ${xForIndex(points.length-1).toFixed(1)} ${H-padB} L ${xForIndex(0).toFixed(1)} ${H-padB} Z`;
+  const labels = points.map(p => ageAt(birthDate, p.date) + '歳');
+  const pensionIdx = points.findIndex(p => p.date >= startDate);
 
-  // x軸ラベル：開始・中間・終了の年齢
-  const labelIdxs = [0, Math.floor((points.length-1)/2), points.length-1];
-  const xLabels = labelIdxs.map(i=>{
-    const age = ageAt(birthDate, points[i].date);
-    return `<text x="${xForIndex(i)}" y="${H-12}" font-size="15" fill="#94A5B8" text-anchor="middle">${age}歳</text>`;
-  }).join('');
-
-  const yTop = `<text x="${padL-10}" y="${padT+14}" font-size="15" fill="#94A5B8" text-anchor="end">${topLabel}</text>`;
-  const yBottom = `<text x="${padL-10}" y="${H-padB}" font-size="15" fill="#94A5B8" text-anchor="end">¥0</text>`;
-
-  holder.innerHTML = `
-    <svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
-      <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${H-padB}" stroke="#223246"/>
-      <line x1="${padL}" y1="${H-padB}" x2="${W-padR}" y2="${H-padB}" stroke="#223246"/>
-      <path d="${areaD}" fill="rgba(242,184,75,.14)" stroke="none"/>
-      <path d="${pathD}" fill="none" stroke="#F2B84B" stroke-width="2.2"/>
-      ${yTop}${yBottom}${xLabels}
-    </svg>
-  `;
+  if(simChartInstance){ simChartInstance.destroy(); }
+  simChartInstance = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label:'貯蓄額', data: points.map(p=>Math.round(p.savings)), borderColor:'#F2B84B', backgroundColor:'rgba(242,184,75,.35)', borderWidth:2, tension:.3, pointRadius:0, pointHoverRadius:5, fill:'origin', stack:'assets' },
+        { label:'投資運用額', data: points.map(p=>Math.round(p.investment)), borderColor:'#7AA7FF', backgroundColor:'rgba(122,167,255,.35)', borderWidth:2, tension:.3, pointRadius:0, pointHoverRadius:5, fill:'origin', stack:'assets' }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      interaction:{ mode:'index', intersect:false },
+      plugins:{
+        legend:{ display:false },
+        pensionStartLine:{ index: pensionIdx, label:'年金開始' },
+        tooltip:{ callbacks:{
+          label: c => ` ${c.dataset.label}: ${yen(c.raw)}`,
+          footer: items => '合計 ' + yen(items.reduce((s,i)=>s+i.raw,0))
+        } }
+      },
+      scales:{
+        x:{ stacked:true, grid:{ display:false }, ticks:{ maxTicksLimit:8 } },
+        y:{ stacked:true, min:0, ticks:{ callback: v => yenCompact(v) }, border:{ display:false } }
+      }
+    },
+    plugins:[pensionStartLinePlugin]
+  });
 }
+
 
 /* ============ 金額入力欄のカンマ整形（全タブ共通） ============ */
 document.addEventListener('input', e=>{
