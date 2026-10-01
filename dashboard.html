@@ -311,6 +311,7 @@ const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(
 const D = { salary:null, subs:null, cats:null, holdings:null, price:null, maxProfit:null, kakei:null };
 let salYear = new Date().getFullYear();
 let salMode = 'month';
+let costMode = 'month';
 
 /* ===== 日付表示 ===== */
 function tick(){
@@ -409,9 +410,12 @@ function renderCost(){
   const cats = (D.cats && Object.keys(D.cats).length) ? Object.keys(D.cats).map(id=>({id,...D.cats[id]})) : DEFAULT_CATS;
   const catOf = id => cats.find(c=>c.id===id) || cats[cats.length-1];
   const mo = it => it.cycle==='year' ? numv(it.amount)/12 : numv(it.amount);
+  const mul = costMode==='year' ? 12 : 1;
+  const unit = costMode==='year' ? '年' : '月';
   const month = items.reduce((s,it)=>s+mo(it),0);
+  const total = month*mul;
   const byCat = {};
-  items.forEach(it=>{ const c=catOf(it.category); byCat[c.id]=(byCat[c.id]||0)+mo(it); });
+  items.forEach(it=>{ const c=catOf(it.category); byCat[c.id]=(byCat[c.id]||0)+mo(it)*mul; });
   const catRows = cats.filter(c=>byCat[c.id]>0).sort((a,b)=>byCat[b.id]-byCat[a.id]);
 
   const today=new Date(); today.setHours(0,0,0,0);
@@ -419,15 +423,15 @@ function renderCost(){
     .map(x=>({...x, days:Math.round((x.d-today)/86400000)})).filter(x=>x.days<=30).sort((a,b)=>a.days-b.days).slice(0,4);
 
   box.innerHTML = `
-    <div class="kpi">
-      <div class="main"><div class="lbl">月額換算の合計(${items.length}件)</div><div class="val num">${yen(month)}</div></div>
-      <div class="main"><div class="lbl">年額換算</div><div class="val num" style="font-size:26px;color:var(--sub)">${yen(month*12)}</div></div>
+    <div class="row-between">
+      <div class="main"><div class="lbl">${unit}額換算の合計(${items.length}件)</div><div class="val num">${yen(total)}</div></div>
+      <div class="seg"><button data-m="month" class="${costMode==='month'?'on':''}">月額</button><button data-m="year" class="${costMode==='year'?'on':''}">年額</button></div>
     </div>
     <div class="donut-row">
       <div class="donut"><canvas id="costChart"></canvas>
-        <div class="donut-center"><span class="lbl">月額</span><span class="v num">${man(month)}円</span></div></div>
+        <div class="donut-center"><span class="lbl">${unit}額</span><span class="v num">${man(total)}円</span></div></div>
       <div class="legend">
-        ${catRows.map(c=>`<div class="lg"><i style="background:${brighten(c.color)}"></i><span>${esc(c.label)}<span class="pct num">${Math.round(byCat[c.id]/month*100)}%</span></span><b class="num">${yen(byCat[c.id])}</b></div>`).join('')}
+        ${catRows.map(c=>`<div class="lg"><i style="background:${brighten(c.color)}"></i><span>${esc(c.label)}<span class="pct num">${Math.round(byCat[c.id]/total*100)}%</span></span><b class="num">${yen(byCat[c.id])}</b></div>`).join('')}
       </div>
     </div>
     <div class="upcoming">
@@ -435,10 +439,12 @@ function renderCost(){
       ${ups.length ? ups.map(x=>`<div class="up ${x.days<=5?'soon':''}"><span class="d">${x.days===0?'今日':x.days+'日後'}</span><span class="n">${esc(x.it.name)} <span class="note num">${x.d.getMonth()+1}/${x.d.getDate()}</span></span><b class="num">${yen(numv(x.it.amount))}</b></div>`).join('') : '<div class="note">30日以内の請求予定はありません</div>'}
     </div>`;
 
+  box.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{ costMode=b.dataset.m; renderCost(); });
+
   chart('costChart', {
     type:'doughnut',
     data:{ labels:catRows.map(c=>c.label), datasets:[{ data:catRows.map(c=>Math.round(byCat[c.id])), backgroundColor:catRows.map(c=>brighten(c.color)), borderColor:'#131D29', borderWidth:3, hoverOffset:8 }] },
-    options:{ responsive:true, maintainAspectRatio:false, cutout:'70%', plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>` ${c.label}: ${yen(c.raw)}/月`}} } }
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'70%', plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>` ${c.label}: ${yen(c.raw)}/${unit}`}} } }
   });
 }
 
