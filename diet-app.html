@@ -500,20 +500,33 @@ function addManual(){
 const SYS=`あなたは日本の管理栄養士です。食事の写真または説明から、料理・食品ごとに推定量(g)、エネルギー(kcal)、たんぱく質p・脂質f・炭水化物c(g)を、日本食品標準成分表や一般的な外食・市販品の値を参考に推定してください。量が書かれていなければ一般的な1人前とします。必ず次のJSONのみを出力し、前後に文章やコードブロックを付けないでください。
 {"items":[{"name":"ごはん","grams":150,"kcal":234,"p":3.8,"f":0.5,"c":55.7}],"comment":"栄養バランスについて管理栄養士としての一言（60字以内）"}
 食べ物が写っていない場合は {"items":[],"comment":"食べ物が見つかりませんでした"} を返してください。`;
-async function callGemini(text,img){
+async function geminiOnce(model,text,img){
   const parts=[{text}];if(img)parts.push({inline_data:{mime_type:'image/jpeg',data:img}});
-  const model=(S.geminiModel||'gemini-flash-latest').trim();
   const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{method:'POST',
     headers:{'content-type':'application/json','x-goog-api-key':S.geminiKey},
     body:JSON.stringify({systemInstruction:{parts:[{text:SYS}]},contents:[{role:'user',parts}],generationConfig:{temperature:0.2,responseMimeType:'application/json'}})});
   const d=await r.json().catch(()=>({}));
-  if(!r.ok){
-    if(r.status===429)throw new Error('無料枠の回数制限に達しました。1分ほど待つか、明日もう一度お試しください。');
-    if(r.status===401||r.status===403)throw new Error('APIキーが認証されませんでした。キーを全部コピーできているか（途中で切れていないか）確認してください。（'+(d.error?.message||r.status)+'）');
-    if(r.status===404)throw new Error('モデル名が見つかりません。設定のモデル名を「gemini-flash-latest」に戻してください。（'+(d.error?.message||'')+'）');
-    throw new Error(d.error?.message||('HTTP '+r.status));
+  return {ok:r.ok,status:r.status,d};
+}
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+async function callGemini(text,img){
+  const main=(S.geminiModel||'gemini-flash-latest').trim();
+  // 混雑時は少し待って再試行し、それでもだめなら軽量モデルに切り替える
+  const plan=[[main,0],[main,2500],['gemini-flash-lite-latest',0],['gemini-flash-lite-latest',3000]];
+  let last=null;
+  for(const [model,delay] of plan){
+    if(delay)await wait(delay);
+    const res=await geminiOnce(model,text,img);
+    if(res.ok)return (res.d.candidates?.[0]?.content?.parts||[]).map(x=>x.text||'').join('');
+    last=res;
+    if(![500,503,504].includes(res.status)&&!(res.status===404&&model!==main))break;
   }
-  return (d.candidates?.[0]?.content?.parts||[]).map(x=>x.text||'').join('');
+  const r=last,d=last.d;
+  if([500,503,504].includes(r.status))throw new Error('Geminiが混み合っていて応答できませんでした（Google側の一時的な混雑です）。APIキーは正しく認識されています。少し時間をおいてもう一度お試しください。');
+  if(r.status===429)throw new Error('無料枠の回数制限に達しました。1分ほど待つか、明日もう一度お試しください。');
+  if(r.status===401||r.status===403)throw new Error('APIキーが認証されませんでした。キーを全部コピーできているか（途中で切れていないか）確認してください。（'+(d.error?.message||r.status)+'）');
+  if(r.status===404)throw new Error('モデル名が見つかりません。設定のモデル名を「gemini-flash-latest」に戻してください。（'+(d.error?.message||'')+'）');
+  throw new Error(d.error?.message||('HTTP '+r.status));
 }
 async function callClaude(text,img){
   const content=img?[{type:'image',source:{type:'base64',media_type:'image/jpeg',data:img}},{type:'text',text}]:text;
@@ -884,12 +897,12 @@ function viewSettings(){
     <label class="btn sub" style="position:relative">バックアップから復元<input type="file" accept="application/json,.json" onchange="importData(this)" style="position:absolute;inset:0;opacity:0"></label></div>
     <button class="btn warn" style="margin-top:10px" onclick="if(confirm('すべての記録を削除します。よろしいですか？')){S=def();save();render();toast('すべて削除しました')}">すべてのデータを削除</button>
   </section>
-  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.3.1　食品の値は目安です</p>`;
+  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.3.2　食品の値は目安です</p>`;
 }
 async function testAI(){
   const gem=S.provider!=='claude';
   if(gem?!S.geminiKey:!S.apiKey){toast('APIキーを入力してください');return}
-  toast('接続を確認しています…');
+  toast('接続を確認しています…（混雑時は10秒ほどかかります）');
   try{const t=gem?await callGemini('ごはん茶碗1杯',null):await callClaude('ごはん茶碗1杯',null);if(!t.includes('{'))throw new Error('応答の形式が違います');toast('接続OK：AI計算が使えます')}
   catch(e){alert('接続できませんでした\n'+e.message)}
 }
