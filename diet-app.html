@@ -5,191 +5,208 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="からだノート">
-<meta name="theme-color" content="#F1F5F2">
+<meta name="theme-color" content="#0B121B">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>からだノート</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥗</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=DM+Sans:opsz,wght@9..40,500;9..40,700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#F1F5F2; --card:#FFFFFF; --ink:#1F3A31; --sub:#7C8C85; --line:#E1E9E4; --soft:#E8F0EB;
-  --pine:#1F4A3D; --leaf:#3BAF7E; --leaf2:#7FD3A8;
-  --b:#F2B632; --l:#3FA7D6; --d:#5B5FD6; --s:#F28CA8; --warn:#EE6A45;
-  --r1:26px; --r2:16px; --r3:12px;
-  color-scheme:light dark;
+  --bg:#0B121B; --card:#131D29; --card2:#0E1722; --line:#223246; --ink:#EDF2F7; --sub:#94A5B8; --dim:#62748A;
+  --soft:rgba(255,255,255,.05); --pine:#3CC9A6; --leaf:#3CC9A6; --leaf2:#3ECF8E;
+  --b:#F2C14E; --l:#7AA7FF; --d:#B48CFF; --s:#FF8A6B; --warn:#FF6B6B; --pos:#3ECF8E;
+  --num:"DM Sans","Zen Kaku Gothic New",sans-serif;
+  color-scheme:dark;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
 }
-@media (prefers-color-scheme:dark){
-  :root:not([data-theme="light"]){
-    --bg:#111916; --card:#1A2420; --ink:#E6EFEA; --sub:#8FA39A; --line:#26332D; --soft:#21302A;
-    --pine:#A8E6C9; --leaf:#4CC48F;
-  }
-}
-:root[data-theme="dark"]{--bg:#111916;--card:#1A2420;--ink:#E6EFEA;--sub:#8FA39A;--line:#26332D;--soft:#21302A;--pine:#A8E6C9;--leaf:#4CC48F}
-:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 *,*::before,*::after{box-sizing:inherit}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Hiragino Sans","Yu Gothic",sans-serif;font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%}
+body{background:radial-gradient(900px 520px at 0% -10%,#15263A 0%,transparent 60%),radial-gradient(700px 420px at 110% 8%,#2A1E14 0%,transparent 55%),var(--bg);background-attachment:fixed;
+  color:var(--ink);font-family:"Zen Kaku Gothic New","Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;font-size:16px;line-height:1.55;-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer;border:0;background:none}
 button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--leaf);outline-offset:2px}
-.app{max-width:520px;margin:0 auto;padding:12px 16px 120px}
-.num{font-variant-numeric:tabular-nums;font-weight:900;letter-spacing:-.01em}
+.num{font-family:var(--num);font-variant-numeric:tabular-nums;letter-spacing:-.01em;font-weight:700}
+.app{max-width:560px;margin:0 auto;padding:16px 16px 120px}
+svg.i{width:22px;height:22px;flex:none}
 
-/* header */
-.top{display:flex;align-items:center;justify-content:space-between;margin:4px 0 14px}
-.brand{font-weight:900;font-size:20px;color:var(--pine);display:flex;align-items:center;gap:6px}
-.datenav{display:flex;align-items:center;gap:4px;background:var(--card);border-radius:999px;padding:4px}
+/* ヘッダー */
+.top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:2px 0 16px}
+.brand{font-weight:700;font-size:21px;letter-spacing:.02em;display:flex;align-items:center;gap:10px;white-space:nowrap;min-width:0}
+@media (max-width:400px){.top .brand{font-size:18px}.top .brand .bi{width:34px;height:34px}}
+.brand .bi{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:color-mix(in srgb,var(--leaf) 18%,transparent);color:var(--leaf)}
+.datenav{display:flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:999px;padding:3px}
 .datenav button{width:32px;height:32px;border-radius:50%;font-size:18px;color:var(--sub)}
 .datenav button:active{background:var(--soft)}
-.datenav .d{font-weight:700;font-size:14px;min-width:96px;text-align:center}
-.today-pill{font-size:11px;background:var(--leaf);color:#fff;border-radius:999px;padding:1px 7px;margin-left:4px;vertical-align:2px}
+.datenav .d{font-weight:700;font-size:14px;min-width:100px;text-align:center;cursor:pointer}
 
-/* plate hero */
-.plate{position:relative;background:var(--card);border-radius:var(--r1);padding:22px 18px 18px;display:grid;grid-template-columns:170px 1fr;gap:14px;align-items:center}
+/* カード共通(ダッシュボード準拠) */
+.card,.plate,.meal,.stat,.mini,.goal-hero,.wchip,.pfc{
+  --c:var(--leaf);position:relative;overflow:hidden;
+  background:linear-gradient(180deg,#16212F 0%,#121B26 100%);border:1px solid var(--line);border-radius:22px}
+.card::before,.plate::before,.meal::before,.goal-hero::before,.mini::before,.wchip::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:linear-gradient(90deg,var(--c),transparent 85%)}
+.plate::after,.goal-hero::after,.meal::after{content:"";position:absolute;width:240px;height:240px;right:-120px;top:-140px;border-radius:50%;background:var(--c);opacity:.08;filter:blur(20px);pointer-events:none}
+.card{padding:18px}
+.card+.card{margin-top:12px}
+.muted{color:var(--sub);font-size:13px}
+.h2{font-size:15px;font-weight:500;color:var(--sub);margin:22px 4px 8px}
+
+/* 食事:お皿 */
+.plate{padding:22px 18px 18px;display:grid;grid-template-columns:170px 1fr;gap:16px;align-items:center}
 .plate svg{width:170px;height:170px;display:block}
 .plate .center{position:absolute;left:18px;top:22px;width:170px;height:170px;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
-.center .big{font-size:34px;line-height:1}
-.center .unit{font-size:11px;color:var(--sub);margin-top:4px}
-.center .of{font-size:12px;color:var(--sub)}
+.center .big{font-size:36px;line-height:1}
+.center .unit{font-size:12px;color:var(--sub);margin-top:6px}
+.side{position:relative;z-index:1}
 .side .rem{font-size:13px;color:var(--sub)}
-.side .rem b{display:block;font-size:26px;color:var(--ink);line-height:1.2}
+.side .rem b{display:block;font-size:30px;color:var(--ink);line-height:1.15}
 .side .rem.over b{color:var(--warn)}
-.legend{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:4px;font-size:12.5px}
-.legend li{display:flex;align-items:center;gap:7px}
-.legend i{width:9px;height:9px;border-radius:50%;flex:none}
-.legend span{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--sub)}
+.legend{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:5px;font-size:13.5px}
+.legend li{display:flex;align-items:center;gap:8px}
+.legend i{width:10px;height:10px;border-radius:3px;flex:none}
+.legend span{margin-left:auto;font-family:var(--num);font-variant-numeric:tabular-nums;color:var(--sub)}
 
-.pfc{background:var(--card);border-radius:var(--r2);padding:14px 16px;margin-top:10px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-.pfc .lab{font-size:12px;color:var(--sub);display:flex;justify-content:space-between}
-.bar{height:7px;background:var(--soft);border-radius:9px;overflow:hidden;margin-top:5px}
-.bar>i{display:block;height:100%;border-radius:9px;transition:width .6s}
-.pfc .v{font-size:16px}
+.pfc{padding:14px 16px;margin-top:12px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px;border-radius:18px}
+.pfc .lab{font-size:12.5px;color:var(--sub);display:flex;justify-content:space-between}
+.pfc .v{font-size:19px}
+.bar{height:8px;background:rgba(255,255,255,.06);border-radius:999px;overflow:hidden;margin-top:6px}
+.bar>i{display:block;height:100%;border-radius:999px;transition:width .6s}
 
-.tip{display:flex;gap:12px;align-items:flex-start;margin-top:10px;padding:14px 16px;border-radius:var(--r2);background:var(--soft);font-size:13.5px}
-.tip .face{flex:none;width:36px;height:36px;border-radius:50%;background:var(--card);display:grid;place-items:center;font-size:20px}
-.tip b{display:block;font-size:12px;color:var(--leaf)}
+.tip{display:flex;gap:12px;align-items:flex-start;margin-top:12px;padding:14px 16px;border-radius:14px;background:rgba(60,201,166,.09);border:1px solid rgba(60,201,166,.22);font-size:14px}
+.tip .face{flex:none;width:36px;height:36px;border-radius:12px;background:color-mix(in srgb,var(--leaf) 18%,transparent);color:var(--leaf);display:grid;place-items:center}
+.tip b{display:block;font-size:12.5px;color:var(--leaf);font-weight:700}
 
-/* meals */
-.meal{background:var(--card);border-radius:var(--r2);margin-top:12px;overflow:hidden}
-.meal-h{display:flex;align-items:center;gap:10px;padding:12px 12px 12px 14px}
-.meal-h .ic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-size:19px}
-.meal-h .t{font-weight:700}
-.meal-h .k{font-size:12px;color:var(--sub)}
-.add{margin-left:auto;width:38px;height:38px;border-radius:50%;background:var(--pine);color:var(--bg);font-size:22px;line-height:1;display:grid;place-items:center}
-.add:active{transform:scale(.94)}
-.items{list-style:none;margin:0;padding:0 14px 6px}
-.items li{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px dashed var(--line);cursor:pointer}
+.meal{margin-top:12px;border-radius:20px}
+.meal-h{position:relative;z-index:1;display:flex;align-items:center;gap:12px;padding:14px 14px 12px 16px}
+.meal-h .ic,.mini .ic{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;flex:none;background:color-mix(in srgb,var(--c) 18%,transparent);color:var(--c)}
+.meal-h .t{font-weight:700;font-size:17px}
+.meal-h .k{font-size:13px;color:var(--sub)}
+.add{margin-left:auto;height:38px;padding:0 16px 0 12px;border-radius:999px;background:color-mix(in srgb,var(--c) 16%,transparent);color:var(--c);font-weight:700;font-size:14.5px;display:flex;align-items:center;gap:4px}
+.add svg{width:18px;height:18px}
+.add:active{transform:scale(.96)}
+.items{position:relative;z-index:1;list-style:none;margin:0;padding:0 12px 10px}
+.items li{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;background:rgba(255,255,255,.035);margin-top:6px;cursor:pointer}
 .items .n{flex:1;min-width:0}
 .items .n div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.items .n small{color:var(--sub);font-size:11.5px}
-.items .kc{font-variant-numeric:tabular-nums;font-weight:700}
-.empty-line{color:var(--sub);font-size:12.5px;padding:0 14px 12px}
+.items .n small{color:var(--sub);font-size:12px}
+.items .kc{font-family:var(--num);font-weight:700}
+.empty-line{position:relative;color:var(--dim);font-size:13px;padding:0 16px 14px}
 
-.wchip{display:flex;align-items:center;justify-content:space-between;width:100%;margin-top:12px;background:var(--card);border-radius:var(--r2);padding:14px 16px;text-align:left}
-.wchip .lbl{font-size:12px;color:var(--sub)}
-.wchip .val{font-size:22px}
+.minis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+.mini{padding:12px;text-align:left;border-radius:18px}
+.mini .ic{width:32px;height:32px;border-radius:10px;margin-bottom:6px}
+.mini .ic svg{width:18px;height:18px}
+.mini .l{font-size:12.5px;color:var(--sub)}
+.mini .v{font-size:20px;line-height:1.3;white-space:nowrap}
+.mini .v small{font-size:11px;font-weight:500;color:var(--sub)}
+.mini .s{font-size:11px;color:var(--c)}
 
-/* sections */
-.h2{font-size:17px;font-weight:900;margin:22px 2px 8px;color:var(--pine)}
-.card{background:var(--card);border-radius:var(--r2);padding:16px}
-.card+.card{margin-top:10px}
-.muted{color:var(--sub);font-size:12.5px}
+.wchip{display:flex;align-items:center;justify-content:space-between;width:100%;margin-top:12px;padding:14px 16px;text-align:left;border-radius:18px}
+.wchip .lbl{font-size:13px;color:var(--sub)}
+.wchip .val{font-size:24px}
 
-/* weight input */
-.winput{display:flex;align-items:center;justify-content:center;gap:12px;margin:8px 0 12px}
-.winput button{width:48px;height:48px;border-radius:50%;background:var(--soft);font-size:22px;font-weight:700}
-.winput input{width:150px;text-align:center;font-size:40px;font-weight:900;border:0;background:transparent;font-variant-numeric:tabular-nums}
+/* 入力 */
+.winput{display:flex;align-items:center;justify-content:center;gap:12px;margin:10px 0 14px}
+.winput button{width:48px;height:48px;border-radius:50%;border:1px solid var(--line);background:var(--card2);font-size:22px}
+.winput input{width:150px;text-align:center;font-family:var(--num);font-size:42px;font-weight:700;border:0;background:transparent;font-variant-numeric:tabular-nums}
 .winput .u{font-size:14px;color:var(--sub);margin-left:-8px}
-.row{display:flex;gap:8px;align-items:center}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:48px;padding:0 20px;border-radius:14px;background:var(--leaf);color:#fff;font-weight:700;width:100%}
-.btn.sub{background:var(--soft);color:var(--ink)}
-.btn.warn{background:transparent;color:var(--warn);border:1.5px solid var(--warn)}
-.btn:active{filter:brightness(.95)}
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
-.stat{background:var(--card);border-radius:var(--r3);padding:12px}
-.stat .l{font-size:11.5px;color:var(--sub)}
-.stat .v{font-size:20px}
-.up{color:var(--warn)} .down{color:var(--leaf)}
+.bpin{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.bpin label{text-align:center;font-size:12.5px;color:var(--sub)}
+.bpin input{width:100%;height:60px;border-radius:14px;border:1px solid var(--line);background:var(--card2);text-align:center;font-family:var(--num);font-size:26px;font-weight:700;margin-top:4px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:50px;padding:0 20px;border-radius:999px;background:linear-gradient(90deg,var(--leaf),var(--l));color:#0B121B;font-weight:700;width:100%;font-size:16px}
+.btn.sub{background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--ink)}
+.btn.warn{background:transparent;color:var(--warn);border:1px solid rgba(255,107,107,.5)}
+.btn:active{filter:brightness(.92)}
 
-.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+.stat{padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.035)}
+.stat .l{font-size:12.5px;color:var(--sub)}
+.stat .v{font-size:21px}
+.up{color:var(--warn)} .down{color:var(--pos)}
+
+.chips{display:inline-flex;gap:2px;max-width:100%;overflow-x:auto;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:999px;padding:3px;scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
-.chip{flex:none;padding:6px 13px;border-radius:999px;background:var(--soft);font-size:13px;color:var(--sub)}
-.chip.on{background:var(--pine);color:var(--bg);font-weight:700}
-.chart{width:100%;height:auto;display:block;margin-top:8px}
+.chip{flex:none;padding:5px 14px;border-radius:999px;font-size:13.5px;color:var(--sub)}
+.chip.on{background:var(--c,var(--leaf));color:#0B121B;font-weight:700}
+.wchip .chip.on{background:color-mix(in srgb,var(--c) 16%,transparent);color:var(--c)}
+.chart{width:100%;height:auto;display:block;margin-top:10px}
 .list{list-style:none;margin:0;padding:0}
-.list li{display:flex;align-items:center;padding:10px 0;border-top:1px solid var(--line);gap:10px}
-.list li:first-child{border-top:0}
-.x{color:var(--sub);font-size:18px;width:32px;height:32px;border-radius:50%}
+.list li{display:flex;align-items:center;padding:10px 12px;gap:10px;border-radius:12px;background:rgba(255,255,255,.035);margin-top:6px}
+.list li:first-child{margin-top:0}
+.x{color:var(--dim);font-size:18px;width:32px;height:32px;border-radius:50%}
 
-/* goal */
-.goal-hero{background:var(--pine);color:var(--bg);border-radius:var(--r1);padding:20px}
-.goal-hero .m{font-size:13px;opacity:.75}
-.goal-hero .g{font-size:42px;line-height:1.1}
-.goal-hero .g small{font-size:15px;font-weight:500}
-.track{position:relative;height:12px;border-radius:9px;background:rgba(255,255,255,.18);margin:16px 0 8px}
-.track>i{position:absolute;left:0;top:0;bottom:0;border-radius:9px;background:var(--leaf2)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .track{background:rgba(0,0,0,.18)}}
-.goal-hero .meta{display:flex;justify-content:space-between;font-size:12.5px;opacity:.85}
-.goal-hero .btn{margin-top:14px;background:rgba(255,255,255,.14);color:inherit}
-.res{display:flex;align-items:center;gap:12px}
-.badge{font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px}
-.badge.ok{background:#E3F6EC;color:#1E8A5A}
-.badge.ng{background:#FDECE6;color:#C2502F}
-.badge.wait{background:var(--soft);color:var(--sub)}
-.warnbox{background:#FFF2EC;color:#A8452A;border-radius:var(--r3);padding:10px 12px;font-size:12.5px;margin-top:10px}
+/* 目標 */
+.goal-hero{padding:20px;border-radius:22px}
+.goal-hero>*{position:relative;z-index:1}
+.goal-hero .m{font-size:14px;color:var(--sub)}
+.goal-hero .g{font-size:44px;line-height:1.1}
+.goal-hero .g small{font-size:18px;font-weight:500;color:var(--sub)}
+.track{position:relative;height:14px;border-radius:999px;background:rgba(255,255,255,.06);margin:16px 0 8px;overflow:hidden}
+.track>i{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:linear-gradient(90deg,var(--leaf),var(--pos))}
+.goal-hero .meta{display:flex;justify-content:space-between;font-size:13px;color:var(--sub)}
+.goal-hero .btn{margin-top:14px;background:color-mix(in srgb,var(--leaf) 16%,transparent);color:var(--leaf)}
+.badge{font-size:13px;font-weight:700;padding:3px 10px;border-radius:999px}
+.badge.ok{background:rgba(62,207,142,.12);color:var(--pos)}
+.badge.ng{background:rgba(255,107,107,.12);color:var(--warn)}
+.badge.wait{background:rgba(255,255,255,.08);color:var(--sub)}
+.warnbox{background:rgba(255,107,107,.12);color:#FF9A9A;border-radius:14px;padding:11px 14px;font-size:13.5px;margin-top:12px;font-weight:500}
 
-/* forms */
-label.f{display:block;margin-top:12px;font-size:12.5px;color:var(--sub)}
-.field{width:100%;height:46px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);padding:0 12px;font-size:16px;margin-top:4px}
+/* フォーム */
+label.f{display:block;margin-top:12px;font-size:13px;color:var(--sub)}
+.field{width:100%;height:48px;border-radius:12px;border:1px solid var(--line);background:var(--card2);padding:0 12px;font-size:16px;margin-top:4px}
 textarea.field{height:auto;min-height:84px;padding:10px 12px;line-height:1.5}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
-.seg{display:flex;background:var(--soft);border-radius:12px;padding:3px;margin-top:4px}
-.seg button{flex:1;height:38px;border-radius:10px;font-size:14px;color:var(--sub)}
-.seg button.on{background:var(--card);color:var(--ink);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.seg{display:flex;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:999px;padding:3px;margin-top:4px}
+.seg button{flex:1;height:38px;border-radius:999px;font-size:14px;color:var(--sub);display:flex;align-items:center;justify-content:center;gap:6px}
+.seg button svg{width:17px;height:17px}
+.seg button.on{background:var(--leaf);color:#0B121B;font-weight:700}
 
-/* nav */
-.nav{position:fixed;left:0;right:0;bottom:0;z-index:20;padding:8px 12px calc(8px + env(safe-area-inset-bottom,0px));background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line)}
-.nav .in{max-width:520px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
-.nav button{display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 0;font-size:11px;color:var(--sub);border-radius:12px}
-.nav button .e{font-size:21px;filter:grayscale(1);opacity:.6}
-.nav button.on{color:var(--pine);font-weight:700}
-.nav button.on .e{filter:none;opacity:1}
+/* ナビ */
+.nav{position:fixed;left:0;right:0;bottom:0;z-index:20;padding:8px 12px calc(8px + env(safe-area-inset-bottom,0px));background:rgba(11,18,27,.82);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:1px solid var(--line)}
+.nav .in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
+.nav button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;font-size:11.5px;color:var(--dim);border-radius:12px}
+.nav button svg{width:24px;height:24px}
+.nav button.on{color:var(--leaf);font-weight:700}
 
-/* sheet */
-.back{position:fixed;inset:0;background:rgba(10,25,18,.42);z-index:40;opacity:0;pointer-events:none;transition:opacity .25s}
+/* シート */
+.back{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:40;opacity:0;pointer-events:none;transition:opacity .25s}
 .back.on{opacity:1;pointer-events:auto}
-.sheet{position:fixed;left:0;right:0;bottom:0;z-index:41;max-width:520px;margin:0 auto;background:var(--card);border-radius:24px 24px 0 0;max-height:88vh;max-height:88dvh;overflow-y:auto;padding:8px 18px calc(22px + env(safe-area-inset-bottom,0px));transform:translateY(105%);transition:transform .3s cubic-bezier(.2,.8,.2,1)}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:41;max-width:560px;margin:0 auto;background:#101924;border:1px solid var(--line);border-bottom:0;border-top:3px solid var(--leaf);border-radius:24px 24px 0 0;max-height:88vh;max-height:88dvh;overflow-y:auto;padding:4px 18px calc(22px + env(safe-area-inset-bottom,0px));transform:translateY(105%);transition:transform .32s cubic-bezier(.2,.8,.2,1)}
 .sheet.on{transform:none}
-.grab{width:40px;height:5px;border-radius:9px;background:var(--line);margin:4px auto 10px}
-.sheet h3{margin:0 0 4px;font-size:18px;font-weight:900}
+.grab{width:40px;height:5px;border-radius:9px;background:var(--line);margin:8px auto 12px}
+.sheet h3{margin:0 0 4px;font-size:20px;font-weight:700}
 .results{list-style:none;padding:0;margin:10px 0 0}
-.results li{display:flex;align-items:center;gap:10px;padding:11px 4px;border-top:1px solid var(--line);cursor:pointer}
-.results li:active{background:var(--soft)}
+.results li{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.035);margin-top:6px;cursor:pointer}
+.results li:active{background:rgba(255,255,255,.08)}
 .results .n{flex:1}
 .results small{color:var(--sub)}
+.results b{font-family:var(--num)}
 .stepper{display:flex;align-items:center;justify-content:center;gap:10px;margin:12px 0}
-.stepper button{width:44px;height:44px;border-radius:50%;background:var(--soft);font-size:20px;font-weight:700}
-.stepper input{width:110px;text-align:center;font-size:30px;font-weight:900;border:0;background:transparent}
-.calc{display:flex;justify-content:space-around;background:var(--soft);border-radius:var(--r3);padding:12px;margin:8px 0 14px;text-align:center}
-.calc .v{font-size:20px}
-.calc .l{font-size:11px;color:var(--sub)}
-.camrow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
-.cambtn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;height:96px;border-radius:var(--r2);background:var(--soft);font-weight:700;font-size:13.5px;position:relative;overflow:hidden}
-.cambtn .e{font-size:28px}
+.stepper button{width:46px;height:46px;border-radius:50%;border:1px solid var(--line);background:var(--card2);font-size:20px}
+.stepper input{width:110px;text-align:center;font-family:var(--num);font-size:32px;font-weight:700;border:0;background:transparent}
+.calc{display:flex;justify-content:space-around;background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:14px;padding:12px;margin:10px 0 14px;text-align:center}
+.calc .v{font-size:21px}
+.calc .l{font-size:12px;color:var(--sub)}
+.camrow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.cambtn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;height:100px;border-radius:18px;border:1px solid var(--line);background:linear-gradient(180deg,#16212F,#121B26);font-weight:700;font-size:14px;position:relative;overflow:hidden;color:var(--ink)}
+.cambtn .e{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:color-mix(in srgb,var(--l) 18%,transparent);color:var(--l)}
 .cambtn input{position:absolute;inset:0;opacity:0;cursor:pointer}
-.preview{width:100%;max-height:220px;object-fit:cover;border-radius:var(--r2);margin-top:12px;display:block}
-.ai-item{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.preview{width:100%;max-height:220px;object-fit:cover;border-radius:16px;margin-top:12px;display:block;border:1px solid var(--line)}
+.ai-item{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.035);margin-top:6px}
 .ai-item input[type=checkbox]{width:22px;height:22px;accent-color:var(--leaf)}
-.ai-item .g{width:70px;height:36px;border-radius:10px;border:1.5px solid var(--line);background:var(--bg);text-align:right;padding:0 8px}
+.ai-item .g{width:72px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--card2);text-align:right;padding:0 8px;font-family:var(--num)}
 .loading{display:flex;align-items:center;gap:10px;padding:18px 0;color:var(--sub)}
-.spin{width:20px;height:20px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--leaf);animation:sp 0.8s linear infinite}
+.spin{width:20px;height:20px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--leaf);animation:sp .8s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
-.toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);background:var(--pine);color:var(--bg);padding:10px 18px;border-radius:999px;font-size:13.5px;font-weight:700;opacity:0;transition:.25s;z-index:60;pointer-events:none;white-space:nowrap}
+.toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);background:var(--leaf);color:#0B121B;padding:10px 18px;border-radius:999px;font-size:14px;font-weight:700;opacity:0;transition:.25s;z-index:60;pointer-events:none;white-space:nowrap}
 .toast.on{opacity:1;transform:translate(-50%,0)}
 .celebrate{text-align:center;padding:10px 0}
 .celebrate .e{font-size:64px;line-height:1.1}
+@media (max-width:370px){.plate{grid-template-columns:1fr;justify-items:center}.plate .center{left:50%;margin-left:-85px}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -201,13 +218,37 @@ textarea.field{height:auto;min-height:84px;padding:10px 12px;line-height:1.5}
 <div class="toast" id="toast"></div>
 
 <script>
+/* ========== アイコン ========== */
+const SV=(d,cls='i')=>`<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const IC={
+ leaf:SV('<path d="M5 19c0-8 5-13 15-14-1 10-6 15-14 15"/><path d="M5 19l7-7"/>'),
+ sunrise:SV('<path d="M17 18a5 5 0 0 0-10 0"/><path d="M12 2v6M4.2 10.2l1.4 1.4M2 18h2M20 18h2M18.4 11.6l1.4-1.4M23 22H1M8 6l4-4 4 4"/>'),
+ sun:SV('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
+ moon:SV('<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>'),
+ cup:SV('<path d="M4 8h13v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V8z"/><path d="M17 10h1.5a2.5 2.5 0 0 1 0 5H17"/><path d="M8 2v3M12 2v3"/>'),
+ plus:SV('<path d="M12 5v14M5 12h14"/>'),
+ scale:SV('<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 9a5 5 0 0 1 8 0"/><path d="M12 9l1.5-2"/>'),
+ steps:SV('<path d="M7 16c-1.5 0-3-1.2-3-4s1-6 3-6 3 2.5 3 5-1.5 5-3 5z"/><path d="M4.5 18.5h5"/><path d="M17 12c-1.5 0-3-1.2-3-4s1-5 3-5 3 2.5 3 5-1.5 4-3 4z"/><path d="M14.5 14.5h5"/>'),
+ heart:SV('<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z"/><path d="M3 12h4l2-3 3 6 2-3h7"/>'),
+ meal:SV('<path d="M3 2v7a3 3 0 0 0 6 0V2M6 2v20"/><path d="M18 2c-2 0-3 3-3 7h3v13"/>'),
+ trend:SV('<path d="M3 20h18"/><path d="M4 16l5-5 4 3 7-8"/><path d="M15 6h5v5"/>'),
+ target:SV('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>'),
+ gear:SV('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'),
+ doctor:SV('<path d="M6 3v5a4 4 0 0 0 8 0V3"/><path d="M10 12v3a5 5 0 0 0 10 0v-1"/><circle cx="20" cy="12" r="2"/>'),
+ note:SV('<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/>'),
+ search:SV('<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>'),
+ camera:SV('<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>'),
+ image:SV('<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>'),
+ pen:SV('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>')
+};
+
 /* ========== データ ========== */
 const KEY='karada-note-v1';
 const MEALS=[
-  {k:'breakfast',n:'朝食',e:'🌅',c:'var(--b)',hex:'#F2B632'},
-  {k:'lunch',n:'昼食',e:'🍱',c:'var(--l)',hex:'#3FA7D6'},
-  {k:'dinner',n:'夕食',e:'🌙',c:'var(--d)',hex:'#5B5FD6'},
-  {k:'snack',n:'間食',e:'🍪',c:'var(--s)',hex:'#F28CA8'}
+  {k:'breakfast',n:'朝食',e:IC.sunrise,c:'var(--b)',hex:'#F2C14E'},
+  {k:'lunch',n:'昼食',e:IC.sun,c:'var(--l)',hex:'#7AA7FF'},
+  {k:'dinner',n:'夕食',e:IC.moon,c:'var(--d)',hex:'#B48CFF'},
+  {k:'snack',n:'間食',e:IC.cup,c:'var(--s)',hex:'#FF8A6B'}
 ];
 // [カテゴリ, 名前, 目安, g, kcal, P, F, C]  ※日本食品標準成分表などを参考にした目安値
 const FOODS=[
@@ -276,7 +317,7 @@ const FOODS=[
 ];
 const CATS=['すべて','主食','主菜','副菜','果物・乳','間食','飲み物'];
 
-function def(){return {profile:{sex:'',age:'',height:'',activity:1.375,manualKcal:''},meals:{},weights:{},goals:{},seen:{},apiKey:'',model:'claude-sonnet-5-5'}}
+function def(){return {profile:{sex:'',age:'',height:'',activity:1.375,manualKcal:''},meals:{},weights:{},steps:{},bp:{},stepGoal:8000,goals:{},seen:{},apiKey:'',model:'claude-sonnet-5-5'}}
 function load(){try{const d=JSON.parse(localStorage.getItem(KEY));if(d)return Object.assign(def(),d)}catch(e){}return def()}
 let S=load();
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('保存できませんでした（容量不足の可能性）')}}
@@ -329,10 +370,10 @@ function plateSVG(t,target){
   });
   const overMark=t.kcal>target?`<circle cx="85" cy="85" r="${r+12}" fill="none" stroke="var(--warn)" stroke-width="2" stroke-dasharray="3 5"/>`:'';
   return `<svg viewBox="0 0 170 170" aria-hidden="true">
-    <circle cx="85" cy="85" r="80" fill="var(--soft)"/>
-    <circle cx="85" cy="85" r="${r}" fill="none" stroke="var(--card)" stroke-width="16"/>
+    <circle cx="85" cy="85" r="80" fill="rgba(255,255,255,.03)" stroke="var(--line)"/>
+    <circle cx="85" cy="85" r="${r}" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="16"/>
     ${segs}${overMark}
-    <circle cx="85" cy="85" r="50" fill="var(--card)"/>
+    <circle cx="85" cy="85" r="50" fill="#121B26" stroke="var(--line)"/>
   </svg>`;
 }
 function advice(t,c){
@@ -350,11 +391,11 @@ function viewToday(){
   const c=calc(),t=dayTotals(cur),rem=c.target-t.kcal,isToday=cur===TODAY();
   const pT=c.target*0.2/4,fT=c.target*0.25/9,cT=c.target*0.55/4;
   const pfc=(lab,v,tg,col)=>`<div><div class="lab"><span>${lab}</span><span>${Math.round(tg)}g</span></div><div class="v num">${r1(v)}<small style="font-size:11px;color:var(--sub);font-weight:500">g</small></div><div class="bar"><i style="width:${Math.min(v/tg*100,100)}%;background:${v>tg*1.15?'var(--warn)':col}"></i></div></div>`;
-  const w=S.weights[cur];
-  const profileHint=!c.rec&&!(+S.profile.manualKcal>0)?`<div class="tip"><div class="face">📝</div><div><b>はじめに</b>設定でプロフィールと体重を入れると、あなたに合った目標カロリーを計算します（今は仮に1800kcal）。</div></div>`:'';
+  const w=S.weights[cur],st=S.steps[cur],bp=S.bp[cur]||{},bpv=bp.am||bp.pm;
+  const profileHint=!c.rec&&!(+S.profile.manualKcal>0)?`<div class="tip"><div class="face">${IC.note}</div><div><b>はじめに</b>設定でプロフィールと体重を入れると、あなたに合った目標カロリーを計算します（今は仮に1800kcal）。</div></div>`:'';
   return `
   <div class="top">
-    <div class="brand">🥗 からだノート</div>
+    <div class="brand"><span class="bi">${IC.leaf}</span>からだノート</div>
     <div class="datenav">
       <button onclick="go(-1)" aria-label="前の日">‹</button>
       <div class="d" onclick="cur=TODAY();render()">${fmtDate(cur)}${isToday?'':''}</div>
@@ -373,22 +414,23 @@ function viewToday(){
   <section class="pfc">
     ${pfc('たんぱく質',t.p,pT,'var(--leaf)')}${pfc('脂質',t.f,fT,'var(--b)')}${pfc('炭水化物',t.c,cT,'var(--l)')}
   </section>
-  <div class="tip"><div class="face">👩‍⚕️</div><div><b>管理栄養士より</b>${advice(t,c)}</div></div>
+  <div class="tip"><div class="face">${IC.doctor}</div><div><b>管理栄養士より</b>${advice(t,c)}</div></div>
   ${profileHint}
   ${MEALS.map(m=>{
     const list=(S.meals[cur]||[]).filter(i=>i.meal===m.k);
-    return `<section class="meal">
+    return `<section class="meal" style="--c:${m.hex}">
       <div class="meal-h">
-        <div class="ic" style="background:color-mix(in srgb,${m.c} 22%,transparent)">${m.e}</div>
+        <div class="ic">${m.e}</div>
         <div><div class="t">${m.n}</div><div class="k num">${Math.round(t.by[m.k])} kcal</div></div>
-        <button class="add" onclick="openAdd('${m.k}')" aria-label="${m.n}を追加">＋</button>
+        <button class="add" onclick="openAdd('${m.k}')" aria-label="${m.n}を追加">${IC.plus}追加</button>
       </div>
-      ${list.length?`<ul class="items">${list.map(i=>`<li onclick="openEdit('${i.id}')"><div class="n"><div>${esc(i.name)}</div><small>${i.grams?i.grams+'g ・ ':''}P${r1(i.p)} F${r1(i.f)} C${r1(i.c)}</small></div><div class="kc">${Math.round(i.kcal)}</div></li>`).join('')}</ul>`:`<div class="empty-line">＋ボタンで${m.n}を記録</div>`}
+      ${list.length?`<ul class="items">${list.map(i=>`<li onclick="openEdit('${i.id}')"><div class="n"><div>${esc(i.name)}</div><small>${i.grams?i.grams+'g ・ ':''}P${r1(i.p)} F${r1(i.f)} C${r1(i.c)}</small></div><div class="kc">${Math.round(i.kcal)}</div></li>`).join('')}</ul>`:`<div class="empty-line">「追加」から${m.n}を記録</div>`}
     </section>`}).join('')}
-  <button class="wchip" onclick="tab='weight';render()">
-    <div><div class="lbl">この日の体重</div><div class="val num">${w?w.toFixed(1)+' kg':'—'}</div></div>
-    <span class="chip on">${w?'グラフを見る':'体重を記録'}</span>
-  </button>`;
+  <div class="minis">
+    <button class="mini" style="--c:var(--leaf)" onclick="openBody('weight')"><div class="ic">${IC.scale}</div><div class="l">体重</div><div class="v num">${w?w.toFixed(1):'—'}<small> kg</small></div><div class="s">${w?'グラフを見る':'記録する'}</div></button>
+    <button class="mini" style="--c:var(--l)" onclick="openBody('steps')"><div class="ic">${IC.steps}</div><div class="l">歩数</div><div class="v num">${st!=null?st.toLocaleString():'—'}<small> 歩</small></div><div class="s">${st!=null?(st>=S.stepGoal?'目標達成 ✓':'目標まで'+(S.stepGoal-st).toLocaleString()):'記録する'}</div></button>
+    <button class="mini" style="--c:var(--warn)" onclick="openBody('bp')"><div class="ic">${IC.heart}</div><div class="l">血圧</div><div class="v num">${bpv?bpv.s+'/'+bpv.d:'—'}</div><div class="s">${bpv?(bp.am?'朝':'夜')+(bpv.p?' 脈拍'+bpv.p:''):'記録する'}</div></button>
+  </div>`;
 }
 function go(n){cur=addDays(cur,n);render()}
 
@@ -400,7 +442,7 @@ $('#back').onclick=closeSheet;
 function openAdd(m){addMeal=m;addMode='search';q='';cat='すべて';aiItems=null;aiImg=null;drawAdd()}
 function drawAdd(){
   const m=MEALS.find(x=>x.k===addMeal);
-  const seg=`<div class="seg">${[['search','🔍 食品を探す'],['ai','📷 AIで計算'],['manual','✏️ 手入力']].map(([k,l])=>`<button class="${addMode===k?'on':''}" onclick="addMode='${k}';drawAdd()">${l}</button>`).join('')}</div>`;
+  const seg=`<div class="seg">${[['search',IC.search+'食品'],['ai',IC.camera+'AI計算'],['manual',IC.pen+'手入力']].map(([k,l])=>`<button class="${addMode===k?'on':''}" onclick="addMode='${k}';drawAdd()">${l}</button>`).join('')}</div>`;
   let body='';
   if(addMode==='search'){
     body=`<input class="field" id="q" placeholder="例：ごはん、唐揚げ、バナナ" value="${esc(q)}" oninput="q=this.value;drawResults()" style="margin-top:12px">
@@ -409,8 +451,8 @@ function drawAdd(){
   }else if(addMode==='ai'){
     body=`<p class="muted" style="margin:10px 0 0">料理の写真、または「食べたもの・量」の文章から、AIがカロリーとPFCを推定します。</p>
     <div class="camrow">
-      <label class="cambtn"><span class="e">📸</span>写真を撮る<input type="file" accept="image/*" capture="environment" onchange="onPhoto(this)"></label>
-      <label class="cambtn"><span class="e">🖼️</span>写真を選ぶ<input type="file" accept="image/*" onchange="onPhoto(this)"></label>
+      <label class="cambtn"><span class="e">${IC.camera}</span>写真を撮る<input type="file" accept="image/*" capture="environment" onchange="onPhoto(this)"></label>
+      <label class="cambtn"><span class="e">${IC.image}</span>写真を選ぶ<input type="file" accept="image/*" onchange="onPhoto(this)"></label>
     </div>
     <textarea class="field" id="aitext" style="margin-top:12px" placeholder="例：ごはん大盛り、豚の生姜焼き、キャベツの千切り、味噌汁"></textarea>
     <button class="btn sub" style="margin-top:8px" onclick="onText()">文章からカロリーを計算</button>
@@ -421,7 +463,7 @@ function drawAdd(){
     <div class="grid3"><label class="f">P（g）<input class="field" id="mp" type="number" inputmode="decimal"></label><label class="f">F（g）<input class="field" id="mf" type="number" inputmode="decimal"></label><label class="f">C（g）<input class="field" id="mc" type="number" inputmode="decimal"></label></div>
     <button class="btn" style="margin-top:16px" onclick="addManual()">${m.n}に追加</button>`;
   }
-  openSheet(`<h3>${m.e} ${m.n}を記録</h3>${seg}${body}`);
+  openSheet(`<h3 style="display:flex;align-items:center;gap:8px;color:${m.hex}">${m.e}<span style="color:var(--ink)">${m.n}を記録</span></h3>${seg}${body}`);
   if(addMode==='search')drawResults();
 }
 function drawResults(){
@@ -484,7 +526,7 @@ function aiList(){
     <div><div>${esc(i.name)}</div><small class="muted">${Math.round(i.kcal*k)} kcal ・ P${r1(i.p*k)} F${r1(i.f*k)} C${r1(i.c*k)}</small></div>
     <div><input class="g" type="number" inputmode="decimal" value="${i.grams}" onchange="aiItems.items[${n}].grams=+this.value||0;refreshAI()"><small class="muted"> g</small></div></div>`}).join('')}
   </div>
-  ${aiItems.comment?`<div class="tip"><div class="face">👩‍⚕️</div><div><b>管理栄養士より</b>${esc(aiItems.comment)}</div></div>`:''}
+  ${aiItems.comment?`<div class="tip"><div class="face">${IC.doctor}</div><div><b>管理栄養士より</b>${esc(aiItems.comment)}</div></div>`:''}
   <p class="muted" style="margin:8px 0">AIの推定値です。量（g）を直すとカロリーも変わります。</p>
   <button class="btn" onclick="addAI()">合計 ${Math.round(sum)} kcal を追加</button>`;
 }
@@ -526,6 +568,123 @@ function delItem(){S.meals[cur]=(S.meals[cur]||[]).filter(i=>i.id!==edit.it.id);
 
 /* ========== 体重 ========== */
 let wDate=null,wVal=null;
+let bodyMode='weight',bpSlot='am',sRange=30,bRange=30;
+function openBody(m){bodyMode=m;tab='weight';wDate=cur;wVal=null;render();scrollTo(0,0)}
+function viewBody(){
+  const seg=`<div class="seg" style="margin-bottom:12px">${[['weight',IC.scale+'体重'],['steps',IC.steps+'歩数'],['bp',IC.heart+'血圧']].map(([k,l])=>`<button class="${bodyMode===k?'on':''}" onclick="bodyMode='${k}';render()">${l}</button>`).join('')}</div>`;
+  const body=bodyMode==='weight'?viewWeight():bodyMode==='steps'?viewSteps():viewBP();
+  return `<div class="top"><div class="brand"><span class="bi">${IC.trend}</span>からだの記録</div></div>${seg}${body}`;
+}
+function dateInput(){return `<input type="date" class="field" value="${wDate}" max="${TODAY()}" onchange="wDate=this.value;wVal=null;render()">`}
+
+/* ---- 歩数 ---- */
+function viewSteps(){
+  wDate=wDate||cur;
+  const v=S.steps[wDate],ks=Object.keys(S.steps).sort();
+  const last7=[...Array(7)].map((_,i)=>S.steps[addDays(TODAY(),-i)]).filter(x=>x!=null);
+  const avg=last7.length?Math.round(last7.reduce((a,b)=>a+b,0)/last7.length):null;
+  const d30=[...Array(30)].map((_,i)=>S.steps[addDays(TODAY(),-i)]).filter(x=>x!=null);
+  const hit=d30.filter(x=>x>=S.stepGoal).length;
+  return `<section class="card">${dateInput()}
+    <div class="winput">
+      <button onclick="stepS(-500)" aria-label="500歩減らす">−</button>
+      <input id="sv" type="number" inputmode="numeric" value="${v??''}" placeholder="0" style="width:170px">
+      <span class="u">歩</span>
+      <button onclick="stepS(500)" aria-label="500歩増やす">＋</button>
+    </div>
+    <button class="btn" onclick="saveSteps()">${v!=null?'歩数を更新':'歩数を記録'}</button>
+  </section>
+  <div class="stats">
+    <div class="stat"><div class="l">この日</div><div class="v num">${v!=null?v.toLocaleString():'—'}</div></div>
+    <div class="stat"><div class="l">7日平均</div><div class="v num">${avg!=null?avg.toLocaleString():'—'}</div></div>
+    <div class="stat"><div class="l">30日の達成</div><div class="v num">${d30.length?hit+'<small style="font-size:11px"> 日</small>':'—'}</div></div>
+  </div>
+  <div class="h2">推移</div>
+  <section class="card">
+    <div class="chips">${[[7,'1週間'],[30,'1か月'],[90,'3か月']].map(([d,l])=>`<button class="chip ${sRange===d?'on':''}" onclick="sRange=${d};render()">${l}</button>`).join('')}</div>
+    ${stepChart()}
+    <div class="muted" style="display:flex;gap:14px;margin-top:4px"><span><span style="color:var(--leaf)">■</span> 目標達成</span><span><span style="color:var(--l)">■</span> 未達</span><span><span style="color:var(--warn)">┅</span> 目標 ${S.stepGoal.toLocaleString()}歩</span></div>
+  </section>
+  <section class="card"><label class="f" style="margin-top:0">1日の目標歩数<input class="field" type="number" inputmode="numeric" value="${S.stepGoal}" onchange="S.stepGoal=Math.max(1000,+this.value||8000);save();render()"></label></section>
+  <div class="tip"><div class="face">${IC.doctor}</div><div><b>管理栄養士より</b>歩数を1,000歩増やすと、およそ30〜40kcalの消費になります。食事を減らしすぎるより、少し歩く量を増やす方が筋肉を保ちやすく、リバウンドしにくくなります。</div></div>
+  <div class="h2">記録一覧</div>
+  <section class="card">${ks.length?`<ul class="list">${ks.slice(-30).reverse().map(k=>`<li><span style="flex:1">${fmtDate(k)}</span><b class="num">${S.steps[k].toLocaleString()} 歩</b><button class="x" onclick="delRec('steps','${k}')" aria-label="削除">×</button></li>`).join('')}</ul>`:'<div class="muted">まだ記録がありません。iPhoneの「ヘルスケア」アプリで1日の歩数を確認して入力できます。</div>'}</section>`;
+}
+function stepS(d){const e=$('#sv');e.value=Math.max(0,(+e.value||0)+d)}
+function saveSteps(){const v=Math.round(+$('#sv').value);if(!(v>=0&&v<200000)||$('#sv').value===''){toast('歩数を正しく入力してください');return}S.steps[wDate]=v;save();render();toast(`${fmtDate(wDate)}　${v.toLocaleString()}歩を記録しました`)}
+function delRec(type,k){if(!confirm(`${fmtDate(k)}の記録を削除しますか？`))return;delete S[type][k];save();render()}
+function stepChart(){
+  const days=[...Array(sRange)].map((_,i)=>addDays(TODAY(),i-sRange+1));
+  if(!days.some(d=>S.steps[d]!=null))return `<div class="muted" style="padding:40px 0;text-align:center">歩数を記録するとグラフが表示されます</div>`;
+  const W=340,H=200,L=38,R=8,T=12,B=26,vals=days.map(d=>S.steps[d]||0);
+  const hi=Math.max(...vals,S.stepGoal)*1.12,bw=(W-L-R)/days.length;
+  const Y=v=>T+(1-v/hi)*(H-T-B);
+  let grid='';for(let i=0;i<=3;i++){const v=hi*i/3,y=Y(v);grid+=`<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="rgba(255,255,255,.06)"/><text x="${L-5}" y="${y+4}" text-anchor="end" font-size="10" font-family="DM Sans,sans-serif" fill="var(--dim)">${v>=1000?Math.round(v/1000)+'千':Math.round(v)}</text>`}
+  const bars=days.map((d,i)=>{const v=S.steps[d];if(v==null)return'';const x=L+i*bw+bw*0.15,w=Math.max(bw*0.7,1.5),y=Y(v);return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${(H-B-y).toFixed(1)}" rx="${Math.min(w/2,4)}" fill="${v>=S.stepGoal?'var(--leaf)':'var(--l)'}"/>`}).join('');
+  const idx=sRange===7?[0,1,2,3,4,5,6]:[0,Math.floor(days.length/3),Math.floor(days.length*2/3),days.length-1];
+  const xl=idx.map(i=>{const d=parse(days[i]);return `<text x="${L+i*bw+bw/2}" y="${H-8}" text-anchor="middle" font-size="10" font-family="DM Sans,sans-serif" fill="var(--dim)">${sRange===7?WD[d.getDay()]:(d.getMonth()+1)+'/'+d.getDate()}</text>`}).join('');
+  const gy=Y(S.stepGoal);
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="歩数のグラフ">${grid}${bars}${xl}<line x1="${L}" x2="${W-R}" y1="${gy}" y2="${gy}" stroke="var(--warn)" stroke-width="1.6" stroke-dasharray="4 4"/></svg>`;
+}
+
+/* ---- 血圧 ---- */
+function viewBP(){
+  wDate=wDate||cur;
+  const rec=(S.bp[wDate]||{})[bpSlot]||{};
+  const ks=Object.keys(S.bp).sort();
+  const avg=slot=>{const a=[...Array(7)].map((_,i)=>(S.bp[addDays(TODAY(),-i)]||{})[slot]).filter(Boolean);return a.length?{s:Math.round(a.reduce((x,y)=>x+y.s,0)/a.length),d:Math.round(a.reduce((x,y)=>x+y.d,0)/a.length)}:null};
+  const am=avg('am'),pm=avg('pm');
+  const high=(am&&(am.s>=135||am.d>=85))||(pm&&(pm.s>=135||pm.d>=85));
+  const fmt=r=>r?`${r.s}/${r.d}`:'—';
+  return `<section class="card">${dateInput()}
+    <div class="seg" style="margin-top:10px">${[['am',IC.sunrise+'朝'],['pm',IC.moon+'夜']].map(([k,l])=>`<button class="${bpSlot===k?'on':''}" onclick="bpSlot='${k}';render()">${l}</button>`).join('')}</div>
+    <div class="bpin">
+      <label>最高（上）<input id="bs" type="number" inputmode="numeric" value="${rec.s??''}" placeholder="120"></label>
+      <label>最低（下）<input id="bd" type="number" inputmode="numeric" value="${rec.d??''}" placeholder="80"></label>
+      <label>脈拍<input id="bpp" type="number" inputmode="numeric" value="${rec.p??''}" placeholder="任意"></label>
+    </div>
+    <button class="btn" onclick="saveBP()">${rec.s?'血圧を更新':'血圧を記録'}</button>
+  </section>
+  <div class="stats" style="grid-template-columns:1fr 1fr">
+    <div class="stat"><div class="l">朝の7日平均</div><div class="v num">${fmt(am)}</div></div>
+    <div class="stat"><div class="l">夜の7日平均</div><div class="v num">${fmt(pm)}</div></div>
+  </div>
+  ${high?`<div class="warnbox">7日平均が家庭血圧の基準（135/85mmHg）以上です。この状態が続く場合は、かかりつけ医に相談してください。</div>`:''}
+  <div class="h2">推移</div>
+  <section class="card">
+    <div class="chips">${[[30,'1か月'],[90,'3か月'],[365,'1年'],[0,'全期間']].map(([d,l])=>`<button class="chip ${bRange===d?'on':''}" onclick="bRange=${d};render()">${l}</button>`).join('')}</div>
+    ${bpChart()}
+    <div class="muted" style="display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:4px"><span><span style="color:var(--warn)">●</span> 最高</span><span><span style="color:var(--l)">●</span> 最低</span><span>実線＝朝　細線＝夜</span><span>┅ 基準 135/85</span></div>
+  </section>
+  <div class="tip"><div class="face">${IC.doctor}</div><div><b>管理栄養士より</b>朝は起きて1時間以内（トイレの後・朝食の前）、夜は寝る前に、座って1〜2分休んでから測りましょう。減塩（1日6g未満が目安）と、野菜・果物のカリウムが血圧対策の基本です。</div></div>
+  <div class="h2">記録一覧</div>
+  <section class="card">${ks.length?`<ul class="list">${ks.slice(-30).reverse().map(k=>{const r=S.bp[k];return `<li><span style="flex:1">${fmtDate(k)}</span><span class="num" style="text-align:right;font-size:13px"><b>朝</b> ${fmt(r.am)}${r.am&&r.am.p?' ('+r.am.p+')':''}<br><b>夜</b> ${fmt(r.pm)}${r.pm&&r.pm.p?' ('+r.pm.p+')':''}</span><button class="x" onclick="delRec('bp','${k}')" aria-label="削除">×</button></li>`}).join('')}</ul>`:'<div class="muted">まだ記録がありません。</div>'}</section>`;
+}
+function saveBP(){
+  const s=Math.round(+$('#bs').value),d=Math.round(+$('#bd').value),p=Math.round(+$('#bpp').value)||0;
+  if(!(s>=60&&s<=260&&d>=30&&d<=180&&s>d)){toast('最高・最低血圧を正しく入力してください');return}
+  (S.bp[wDate]=S.bp[wDate]||{})[bpSlot]=p?{s,d,p}:{s,d};
+  save();render();toast(`${bpSlot==='am'?'朝':'夜'}の血圧 ${s}/${d} を記録しました`);
+}
+function bpChart(){
+  let ks=Object.keys(S.bp).sort();
+  if(bRange){const from=addDays(TODAY(),-bRange);ks=ks.filter(k=>k>=from)}
+  const pts=[];ks.forEach(k=>['am','pm'].forEach(sl=>{const r=S.bp[k][sl];if(r)pts.push({t:parse(k).getTime(),sl,...r})}));
+  const days=new Set(pts.map(p=>p.t));
+  if(days.size<2)return `<div class="muted" style="padding:40px 0;text-align:center">2日分以上記録するとグラフが表示されます</div>`;
+  const W=340,H=210,L=34,R=10,T=12,B=26;
+  const t0=Math.min(...days),t1=Math.max(...days),span=Math.max(t1-t0,864e5);
+  let lo=Math.min(...pts.map(p=>p.d),85)-8,hi=Math.max(...pts.map(p=>p.s),135)+8;
+  const X=t=>L+(t-t0)/span*(W-L-R),Y=v=>T+(hi-v)/(hi-lo)*(H-T-B);
+  let grid='';for(let i=0;i<=4;i++){const v=lo+(hi-lo)*i/4,y=Y(v);grid+=`<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="rgba(255,255,255,.06)"/><text x="${L-6}" y="${y+4}" text-anchor="end" font-size="10" font-family="DM Sans,sans-serif" fill="var(--dim)">${Math.round(v)}</text>`}
+  let xl='';for(let i=0;i<=3;i++){const t=t0+span*i/3,d=new Date(t);xl+=`<text x="${X(t)}" y="${H-8}" text-anchor="${i===0?'start':i===3?'end':'middle'}" font-size="10" font-family="DM Sans,sans-serif" fill="var(--dim)">${d.getMonth()+1}/${d.getDate()}</text>`}
+  const ref=[135,85].map(v=>`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--sub)" stroke-width="1" stroke-dasharray="4 4"/>`).join('');
+  const line=(sl,key,col,wd)=>{const a=pts.filter(p=>p.sl===sl);if(!a.length)return'';const d=a.map((p,i)=>(i?'L':'M')+X(p.t).toFixed(1)+' '+Y(p[key]).toFixed(1)).join(' ');
+    return `<path d="${d}" fill="none" stroke="${col}" stroke-width="${wd}" stroke-linejoin="round" stroke-linecap="round" ${sl==='pm'?'opacity=".55"':''}/>`+(a.length<=40?a.map(p=>`<circle cx="${X(p.t).toFixed(1)}" cy="${Y(p[key]).toFixed(1)}" r="${sl==='am'?2.6:2}" fill="${col}" ${sl==='pm'?'opacity=".55"':''}/>`).join(''):'')};
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="血圧のグラフ">${grid}${xl}${ref}
+    ${line('pm','s','var(--warn)',1.4)}${line('pm','d','var(--l)',1.4)}${line('am','s','var(--warn)',2.4)}${line('am','d','var(--l)',2.4)}</svg>`;
+}
+
 function viewWeight(){
   wDate=wDate||cur;
   const last=latestWeight(TODAY());
@@ -534,9 +693,8 @@ function viewWeight(){
   const wk=latest!=null?latestWeight(addDays(ks[ks.length-1],-7)):null;
   const diff=latest!=null&&wk!=null&&ks.filter(k=>k<=addDays(ks[ks.length-1],-7)).length?latest-wk:null;
   const h=+S.profile.height/100,bmi=latest&&h?latest/(h*h):null;
-  return `<div class="top"><div class="brand">⚖️ 体重</div></div>
-  <section class="card">
-    <input type="date" class="field" value="${wDate}" max="${TODAY()}" onchange="wDate=this.value;wVal=S.weights[wDate]??latestWeight(wDate)??wVal;render()">
+  return `<section class="card">
+    ${dateInput()}
     <div class="winput">
       <button onclick="wVal=r1(wVal-0.1);$('#wv').value=wVal.toFixed(1)" aria-label="0.1kg減らす">−</button>
       <input id="wv" type="number" inputmode="decimal" step="0.1" value="${(+wVal).toFixed(1)}" oninput="wVal=+this.value">
@@ -563,7 +721,7 @@ function saveWeight(){
   const v=+$('#wv').value;if(!(v>20&&v<300)){toast('体重を正しく入力してください');return}
   S.weights[wDate]=r1(v);save();render();toast(`${fmtDate(wDate)}　${v.toFixed(1)}kgを記録しました`);
 }
-function delWeight(k){if(!confirm(`${fmtDate(k)}の記録を削除しますか？`))return;delete S.weights[k];save();render()}
+function delWeight(k){delRec('weights',k)}
 function chart(){
   let ks=wKeys();
   if(wRange){const from=addDays(TODAY(),-wRange);ks=ks.filter(k=>k>=from)}
@@ -583,18 +741,18 @@ function chart(){
   const pts=ks.map(k=>[X(parse(k).getTime()),Y(S.weights[k])]);
   const line=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
   const area=line+` L${pts[pts.length-1][0].toFixed(1)} ${H-B} L${pts[0][0].toFixed(1)} ${H-B} Z`;
-  let grid='';for(let i=0;i<=3;i++){const v=lo+(hi-lo)*i/3,y=Y(v);grid+=`<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${L-6}" y="${y+4}" text-anchor="end" font-size="10" fill="var(--sub)">${v.toFixed(1)}</text>`}
-  let xl='';for(let i=0;i<=3;i++){const t=t0+span*i/3,d=new Date(t);xl+=`<text x="${X(t)}" y="${H-8}" text-anchor="${i===0?'start':i===3?'end':'middle'}" font-size="10" fill="var(--sub)">${d.getMonth()+1}/${d.getDate()}</text>`}
+  let grid='';for(let i=0;i<=3;i++){const v=lo+(hi-lo)*i/3,y=Y(v);grid+=`<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="rgba(255,255,255,.06)"/><text x="${L-6}" y="${y+4}" text-anchor="end" font-size="10" font-family="DM Sans,sans-serif" fill="var(--dim)">${v.toFixed(1)}</text>`}
+  let xl='';for(let i=0;i<=3;i++){const t=t0+span*i/3,d=new Date(t);xl+=`<text x="${X(t)}" y="${H-8}" text-anchor="${i===0?'start':i===3?'end':'middle'}" font-size="10" font-family="DM Sans,sans-serif" fill="var(--dim)">${d.getMonth()+1}/${d.getDate()}</text>`}
   const gl=goals.map(g=>`<line x1="${X(g.a)}" x2="${X(g.b)}" y1="${Y(g.v)}" y2="${Y(g.v)}" stroke="var(--warn)" stroke-width="1.6" stroke-dasharray="4 4"/>`).join('');
   const lp=pts[pts.length-1],lv=vals[vals.length-1];
   const dots=pts.length<=40?pts.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="2.4" fill="var(--leaf)"/>`).join(''):'';
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="体重の推移グラフ">
-    <defs><linearGradient id="wa" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3BAF7E" stop-opacity=".32"/><stop offset="1" stop-color="#3BAF7E" stop-opacity="0"/></linearGradient></defs>
+    <defs><linearGradient id="wa" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3CC9A6" stop-opacity=".30"/><stop offset="1" stop-color="#3CC9A6" stop-opacity="0"/></linearGradient></defs>
     ${grid}${xl}<path d="${area}" fill="url(#wa)"/>${gl}
     <path d="${line}" fill="none" stroke="var(--leaf)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>${dots}
     <circle cx="${lp[0]}" cy="${lp[1]}" r="5" fill="var(--card)" stroke="var(--leaf)" stroke-width="2.5"/>
-    <rect x="${Math.min(lp[0]-26,W-R-52)}" y="${Math.max(lp[1]-30,0)}" width="52" height="19" rx="9" fill="var(--pine)"/>
-    <text x="${Math.min(lp[0],W-R-26)}" y="${Math.max(lp[1]-30,0)+13.5}" text-anchor="middle" font-size="11" font-weight="700" fill="var(--bg)">${lv.toFixed(1)}</text>
+    <rect x="${Math.min(lp[0]-26,W-R-52)}" y="${Math.max(lp[1]-30,0)}" width="52" height="19" rx="9" fill="var(--leaf)"/>
+    <text x="${Math.min(lp[0],W-R-26)}" y="${Math.max(lp[1]-30,0)+13.5}" text-anchor="middle" font-size="11" font-weight="700" font-family="DM Sans,sans-serif" fill="#0B121B">${lv.toFixed(1)}</text>
   </svg>`;
 }
 
@@ -633,13 +791,13 @@ function viewGoal(){
   const nx=new Date(today.getFullYear(),today.getMonth()+1,1),nym=`${nx.getFullYear()}-${pad(nx.getMonth()+1)}`;
   const past=Object.keys(S.goals).filter(k=>k<ym).sort().reverse();
   const won=past.filter(k=>monthInfo(k).ok).length;
-  return `<div class="top"><div class="brand">🎯 月間目標</div></div>
+  return `<div class="top"><div class="brand"><span class="bi">${IC.target}</span>月間目標</div></div>
   ${hero}
   <button class="wchip" onclick="openGoal('${nym}')"><div><div class="lbl">${nx.getMonth()+1}月の目標</div><div class="val num">${S.goals[nym]!=null?(+S.goals[nym]).toFixed(1)+' kg':'未設定'}</div></div><span class="chip on">${S.goals[nym]!=null?'変更':'設定する'}</span></button>
   <div class="h2">これまでの結果</div>
   ${past.length?`<section class="card"><div class="muted" style="margin-bottom:6px">${past.length}か月中 ${won}か月 達成</div><ul class="list">${past.map(k=>{const r=monthInfo(k);return `<li><div style="flex:1"><b>${r.y}年${r.m}月</b><div class="muted">目標 ${r.goal.toFixed(1)}kg → 月末 ${r.end!=null?r.end.toFixed(1)+'kg':'記録なし'}</div></div><span class="badge ${r.end==null?'wait':r.ok?'ok':'ng'}">${r.end==null?'判定なし':r.ok?'達成':'未達成'}</span></li>`}).join('')}</ul></section>`
   :`<section class="card muted">月が終わると、ここに達成結果が表示されます。月末の結果は、その月に記録した最後の体重で判定します。</section>`}
-  <div class="tip"><div class="face">👩‍⚕️</div><div><b>管理栄養士より</b>1か月の減量は、今の体重の5％以内（多くても3〜4kg）が目安です。体重は水分で1日1kg前後動くので、日々の増減より月の流れを見ていきましょう。</div></div>`;
+  <div class="tip"><div class="face">${IC.doctor}</div><div><b>管理栄養士より</b>1か月の減量は、今の体重の5％以内（多くても3〜4kg）が目安です。体重は水分で1日1kg前後動くので、日々の増減より月の流れを見ていきましょう。</div></div>`;
 }
 function openGoal(ym){
   const mi=monthInfo(ym),base=mi.goal??(latestWeight(TODAY())?r1(latestWeight(TODAY())-1):60);
@@ -666,7 +824,7 @@ function checkMonthEnd(){
 /* ========== 設定 ========== */
 function viewSettings(){
   const p=S.profile,c=calc();
-  return `<div class="top"><div class="brand">⚙️ 設定</div></div>
+  return `<div class="top"><div class="brand"><span class="bi">${IC.gear}</span>設定</div></div>
   <section class="card">
     <b>プロフィール</b>
     <label class="f">性別</label><div class="seg">${[['male','男性'],['female','女性']].map(([k,l])=>`<button class="${p.sex===k?'on':''}" onclick="S.profile.sex='${k}';save();render()">${l}</button>`).join('')}</div>
@@ -696,7 +854,7 @@ function viewSettings(){
     <label class="btn sub" style="position:relative">バックアップから復元<input type="file" accept="application/json,.json" onchange="importData(this)" style="position:absolute;inset:0;opacity:0"></label></div>
     <button class="btn warn" style="margin-top:10px" onclick="if(confirm('すべての記録を削除します。よろしいですか？')){S=def();save();render();toast('すべて削除しました')}">すべてのデータを削除</button>
   </section>
-  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.0　食品の値は目安です</p>`;
+  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.2　食品の値は目安です</p>`;
 }
 function exportData(){
   const b=new Blob([JSON.stringify(Object.assign({},S,{apiKey:''}),null,1)],{type:'application/json'});
@@ -705,15 +863,15 @@ function exportData(){
 }
 function importData(inp){
   const f=inp.files[0];if(!f)return;const r=new FileReader();
-  r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.meals||!d.weights)throw 0;const key=S.apiKey;S=Object.assign(def(),d);if(!S.apiKey)S.apiKey=key;save();render();toast('復元しました')}catch(e){toast('バックアップファイルを読み込めませんでした')}};
+  r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.meals||!d.weights)throw 0;d.steps=d.steps||{};d.bp=d.bp||{};const key=S.apiKey;S=Object.assign(def(),d);if(!S.apiKey)S.apiKey=key;save();render();toast('復元しました')}catch(e){toast('バックアップファイルを読み込めませんでした')}};
   r.readAsText(f);
 }
 
 /* ========== 描画 ========== */
-const TABS=[['today','🍽️','食事'],['weight','⚖️','体重'],['goal','🎯','目標'],['settings','⚙️','設定']];
+const TABS=[['today',IC.meal,'食事'],['weight',IC.trend,'からだ'],['goal',IC.target,'目標'],['settings',IC.gear,'設定']];
 function render(){
-  $('#app').innerHTML=tab==='today'?viewToday():tab==='weight'?viewWeight():tab==='goal'?viewGoal():viewSettings();
-  $('#nav').innerHTML=TABS.map(([k,e,l])=>`<button class="${tab===k?'on':''}" onclick="tab='${k}';wVal=null;wDate=null;render();scrollTo(0,0)"><span class="e">${e}</span>${l}</button>`).join('');
+  $('#app').innerHTML=tab==='today'?viewToday():tab==='weight'?viewBody():tab==='goal'?viewGoal():viewSettings();
+  $('#nav').innerHTML=TABS.map(([k,e,l])=>`<button class="${tab===k?'on':''}" onclick="tab='${k}';wVal=null;wDate=null;render();scrollTo(0,0)">${e}${l}</button>`).join('');
 }
 render();
 checkMonthEnd();
