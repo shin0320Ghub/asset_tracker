@@ -317,7 +317,7 @@ const FOODS=[
 ];
 const CATS=['すべて','主食','主菜','副菜','果物・乳','間食','飲み物'];
 
-function def(){return {profile:{sex:'',age:'',height:'',activity:1.375,manualKcal:''},meals:{},weights:{},steps:{},bp:{},stepGoal:8000,goals:{},seen:{},apiKey:'',model:'claude-sonnet-5-5'}}
+function def(){return {profile:{sex:'',age:'',height:'',activity:1.375,manualKcal:''},meals:{},weights:{},steps:{},bp:{},stepGoal:8000,goals:{},seen:{},provider:'gemini',geminiKey:'',geminiModel:'gemini-flash-latest',apiKey:'',model:'claude-sonnet-5-5'}}
 function load(){try{const d=JSON.parse(localStorage.getItem(KEY));if(d)return Object.assign(def(),d)}catch(e){}return def()}
 let S=load();
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('保存できませんでした（容量不足の可能性）')}}
@@ -500,15 +500,34 @@ function addManual(){
 const SYS=`あなたは日本の管理栄養士です。食事の写真または説明から、料理・食品ごとに推定量(g)、エネルギー(kcal)、たんぱく質p・脂質f・炭水化物c(g)を、日本食品標準成分表や一般的な外食・市販品の値を参考に推定してください。量が書かれていなければ一般的な1人前とします。必ず次のJSONのみを出力し、前後に文章やコードブロックを付けないでください。
 {"items":[{"name":"ごはん","grams":150,"kcal":234,"p":3.8,"f":0.5,"c":55.7}],"comment":"栄養バランスについて管理栄養士としての一言（60字以内）"}
 食べ物が写っていない場合は {"items":[],"comment":"食べ物が見つかりませんでした"} を返してください。`;
-async function askAI(content){
-  if(!S.apiKey){toast('設定でAPIキーを登録してください');return null}
+async function callGemini(text,img){
+  const parts=[{text}];if(img)parts.push({inline_data:{mime_type:'image/jpeg',data:img}});
+  const model=(S.geminiModel||'gemini-flash-latest').trim();
+  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{method:'POST',
+    headers:{'content-type':'application/json','x-goog-api-key':S.geminiKey},
+    body:JSON.stringify({systemInstruction:{parts:[{text:SYS}]},contents:[{role:'user',parts}],generationConfig:{temperature:0.2,responseMimeType:'application/json'}})});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok){
+    if(r.status===429)throw new Error('無料枠の回数制限に達しました。1分ほど待つか、明日もう一度お試しください。');
+    throw new Error(d.error?.message||('HTTP '+r.status));
+  }
+  return (d.candidates?.[0]?.content?.parts||[]).map(x=>x.text||'').join('');
+}
+async function callClaude(text,img){
+  const content=img?[{type:'image',source:{type:'base64',media_type:'image/jpeg',data:img}},{type:'text',text}]:text;
+  const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':S.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model:S.model||'claude-sonnet-5-5',max_tokens:1500,system:SYS,messages:[{role:'user',content}]})});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(d.error?.message||('HTTP '+r.status));
+  return d.content.filter(x=>x.type==='text').map(x=>x.text).join('');
+}
+async function askAI(text,img){
+  const gem=S.provider!=='claude';
+  if(gem?!S.geminiKey:!S.apiKey){toast('設定でAPIキーを登録してください');return null}
   $('#aiout').innerHTML=(aiImg?`<img class="preview" src="${aiImg}" alt="">`:'')+`<div class="loading"><div class="spin"></div>AIが料理を分析しています…</div>`;
   try{
-    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':S.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:S.model||'claude-sonnet-5-5',max_tokens:1500,system:SYS,messages:[{role:'user',content}]})});
-    const d=await r.json();
-    if(!r.ok)throw new Error(d.error?.message||('HTTP '+r.status));
-    const txt=d.content.filter(x=>x.type==='text').map(x=>x.text).join('').replace(/```json|```/g,'');
+    const raw=gem?await callGemini(text,img):await callClaude(text,img);
+    const txt=raw.replace(/```json|```/g,'');
     const j=JSON.parse(txt.slice(txt.indexOf('{'),txt.lastIndexOf('}')+1));
     aiItems={items:(j.items||[]).map(i=>({name:i.name,grams:+i.grams||0,base:+i.grams||0,kcal:+i.kcal||0,p:+i.p||0,f:+i.f||0,c:+i.c||0,on:true})),comment:j.comment||''};
   }catch(e){
@@ -544,11 +563,11 @@ function onPhoto(inp){
     const cv=document.createElement('canvas');cv.width=Math.round(img.width*s);cv.height=Math.round(img.height*s);
     cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);URL.revokeObjectURL(url);
     aiImg=cv.toDataURL('image/jpeg',0.82);aiItems=null;
-    askAI([{type:'image',source:{type:'base64',media_type:'image/jpeg',data:aiImg.split(',')[1]}},{type:'text',text:'この食事の内容を推定してください。'}]);
+    askAI('この食事の内容を推定してください。',aiImg.split(',')[1]);
   };
   img.src=url;
 }
-function onText(){const t=$('#aitext').value.trim();if(!t){toast('食べたものを入力してください');return}aiImg=null;askAI(t)}
+function onText(){const t=$('#aitext').value.trim();if(!t){toast('食べたものを入力してください');return}aiImg=null;askAI(t,null)}
 
 /* ========== 記録の編集 ========== */
 let edit=null;
@@ -843,9 +862,18 @@ function viewSettings(){
   </section>
   <section class="card">
     <b>AIカロリー計算</b>
-    <div class="muted" style="margin-top:4px">写真・文章からのカロリー計算には Anthropic の APIキーが必要です（console.anthropic.com で発行・従量課金）。キーはこの端末の中だけに保存されます。</div>
-    <label class="f">APIキー<input class="field" type="password" autocomplete="off" placeholder="sk-ant-..." value="${esc(S.apiKey)}" onchange="S.apiKey=this.value.trim();save();toast('APIキーを保存しました')"></label>
-    <label class="f">モデル名<input class="field" value="${esc(S.model)}" onchange="S.model=this.value.trim()||'claude-sonnet-5-5';save()"></label>
+    <label class="f">使うAI</label>
+    <div class="seg">${[['gemini','Google Gemini（無料）'],['claude','Claude（有料）']].map(([k,l])=>`<button class="${(S.provider||'gemini')===k?'on':''}" onclick="S.provider='${k}';save();render()">${l}</button>`).join('')}</div>
+    ${S.provider!=='claude'?`
+    <div class="muted" style="margin-top:10px">Googleアカウントがあれば無料でAPIキーを発行できます。<br>① <b>aistudio.google.com</b> を開いてGoogleアカウントでログイン<br>② 「Get API key」→「APIキーを作成」<br>③ 表示されたキー（AIza…）をコピーして下に貼り付け</div>
+    <label class="f">Gemini APIキー<input class="field" type="password" autocomplete="off" placeholder="AIza..." value="${esc(S.geminiKey)}" onchange="S.geminiKey=this.value.trim();save();toast('APIキーを保存しました')"></label>
+    <label class="f">モデル名<input class="field" value="${esc(S.geminiModel)}" onchange="S.geminiModel=this.value.trim()||'gemini-flash-latest';save()"></label>
+    <div class="muted" style="margin-top:8px">無料枠には1分・1日あたりの回数制限があります（個人の食事記録なら通常は十分です）。無料枠では、送った写真や文章がGoogleのAI改善に使われる場合があります。</div>`:`
+    <div class="muted" style="margin-top:10px">Anthropic の APIキーが必要です（console.anthropic.com で発行・従量課金）。</div>
+    <label class="f">Claude APIキー<input class="field" type="password" autocomplete="off" placeholder="sk-ant-..." value="${esc(S.apiKey)}" onchange="S.apiKey=this.value.trim();save();toast('APIキーを保存しました')"></label>
+    <label class="f">モデル名<input class="field" value="${esc(S.model)}" onchange="S.model=this.value.trim()||'claude-sonnet-5-5';save()"></label>`}
+    <div class="muted" style="margin-top:8px">キーはこの端末の中だけに保存されます。</div>
+    <button class="btn sub" style="margin-top:12px" onclick="testAI()">接続テスト</button>
   </section>
   <section class="card">
     <b>データ</b>
@@ -854,16 +882,23 @@ function viewSettings(){
     <label class="btn sub" style="position:relative">バックアップから復元<input type="file" accept="application/json,.json" onchange="importData(this)" style="position:absolute;inset:0;opacity:0"></label></div>
     <button class="btn warn" style="margin-top:10px" onclick="if(confirm('すべての記録を削除します。よろしいですか？')){S=def();save();render();toast('すべて削除しました')}">すべてのデータを削除</button>
   </section>
-  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.2　食品の値は目安です</p>`;
+  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.3　食品の値は目安です</p>`;
+}
+async function testAI(){
+  const gem=S.provider!=='claude';
+  if(gem?!S.geminiKey:!S.apiKey){toast('APIキーを入力してください');return}
+  toast('接続を確認しています…');
+  try{const t=gem?await callGemini('ごはん茶碗1杯',null):await callClaude('ごはん茶碗1杯',null);if(!t.includes('{'))throw new Error('応答の形式が違います');toast('接続OK：AI計算が使えます')}
+  catch(e){alert('接続できませんでした\n'+e.message)}
 }
 function exportData(){
-  const b=new Blob([JSON.stringify(Object.assign({},S,{apiKey:''}),null,1)],{type:'application/json'});
+  const b=new Blob([JSON.stringify(Object.assign({},S,{apiKey:'',geminiKey:''}),null,1)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`karada-note-${TODAY()}.json`;a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),2000);
 }
 function importData(inp){
   const f=inp.files[0];if(!f)return;const r=new FileReader();
-  r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.meals||!d.weights)throw 0;d.steps=d.steps||{};d.bp=d.bp||{};const key=S.apiKey;S=Object.assign(def(),d);if(!S.apiKey)S.apiKey=key;save();render();toast('復元しました')}catch(e){toast('バックアップファイルを読み込めませんでした')}};
+  r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.meals||!d.weights)throw 0;d.steps=d.steps||{};d.bp=d.bp||{};const key=S.apiKey,gk=S.geminiKey;S=Object.assign(def(),d);if(!S.apiKey)S.apiKey=key;if(!S.geminiKey)S.geminiKey=gk;save();render();toast('復元しました')}catch(e){toast('バックアップファイルを読み込めませんでした')}};
   r.readAsText(f);
 }
 
