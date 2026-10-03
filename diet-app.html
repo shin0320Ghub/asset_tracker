@@ -136,6 +136,8 @@ svg.i{width:22px;height:22px;flex:none}
 .list{list-style:none;margin:0;padding:0}
 .list li{display:flex;align-items:center;padding:10px 12px;gap:10px;border-radius:12px;background:rgba(255,255,255,.035);margin-top:6px}
 .list li:first-child{margin-top:0}
+.tap{cursor:pointer}.tap:active,.items li:active{background:rgba(255,255,255,.08)}
+.ed{color:var(--dim);display:grid;place-items:center}.ed svg{width:16px;height:16px}
 .x{color:var(--dim);font-size:18px;width:32px;height:32px;border-radius:50%}
 
 /* 目標 */
@@ -424,7 +426,7 @@ function viewToday(){
         <div><div class="t">${m.n}</div><div class="k num">${Math.round(t.by[m.k])} kcal</div></div>
         <button class="add" onclick="openAdd('${m.k}')" aria-label="${m.n}を追加">${IC.plus}追加</button>
       </div>
-      ${list.length?`<ul class="items">${list.map(i=>`<li onclick="openEdit('${i.id}')"><div class="n"><div>${esc(i.name)}</div><small>${i.grams?i.grams+'g ・ ':''}P${r1(i.p)} F${r1(i.f)} C${r1(i.c)}</small></div><div class="kc">${Math.round(i.kcal)}</div></li>`).join('')}</ul>`:`<div class="empty-line">「追加」から${m.n}を記録</div>`}
+      ${list.length?`<ul class="items">${list.map(i=>`<li onclick="openEdit('${i.id}')"><div class="n"><div>${esc(i.name)}</div><small>${i.grams?i.grams+'g ・ ':''}P${r1(i.p)} F${r1(i.f)} C${r1(i.c)}</small></div><div class="kc">${Math.round(i.kcal)}</div><span class="ed">${IC.pen}</span></li>`).join('')}</ul>`:`<div class="empty-line">「追加」から${m.n}を記録</div>`}
     </section>`}).join('')}
   <div class="minis">
     <button class="mini" style="--c:var(--leaf)" onclick="openBody('weight')"><div class="ic">${IC.scale}</div><div class="l">体重</div><div class="v num">${w?w.toFixed(1):'—'}<small> kg</small></div><div class="s">${w?'グラフを見る':'記録する'}</div></button>
@@ -584,21 +586,85 @@ function onPhoto(inp){
 }
 function onText(){const t=$('#aitext').value.trim();if(!t){toast('食べたものを入力してください');return}aiImg=null;askAI(t,null)}
 
-/* ========== 記録の編集 ========== */
+/* ========== 記録の編集（食事） ========== */
 let edit=null;
 function openEdit(id){
   const it=(S.meals[cur]||[]).find(i=>i.id===id);if(!it)return;
-  edit={it,g:it.grams};
-  openSheet(`<h3>${esc(it.name)}</h3><div class="muted">${Math.round(it.kcal)} kcal で記録中</div>
-  ${it.grams?`<div class="stepper"><button onclick="edit.g=Math.max(0,edit.g-10);$('#eg').value=edit.g;eCalc()">−</button><input id="eg" type="number" inputmode="decimal" value="${it.grams}" oninput="edit.g=+this.value||0;eCalc()"><span class="muted">g</span><button onclick="edit.g+=10;$('#eg').value=edit.g;eCalc()">＋</button></div><div class="calc" id="ec"></div>`:'<div style="height:12px"></div>'}
-  <label class="f">食事の区分</label><div class="seg">${MEALS.map(m=>`<button class="${it.meal===m.k?'on':''}" onclick="edit.it.meal='${m.k}';this.parentNode.querySelectorAll('button').forEach(b=>b.classList.remove('on'));this.classList.add('on')">${m.n}</button>`).join('')}</div>
-  <button class="btn" style="margin-top:16px" onclick="saveEdit()">変更を保存</button>
+  edit={id,from:cur,meal:it.meal,g:it.grams||0};
+  const nf=(id,lab,v,step)=>`<label class="f">${lab}<input class="field" id="${id}" type="number" inputmode="decimal" step="${step}" value="${v}"></label>`;
+  openSheet(`<h3>記録を訂正</h3><div class="muted">日付・区分・内容を直して「保存」を押してください</div>
+  <label class="f">日付<input class="field" id="ed" type="date" max="${TODAY()}" value="${cur}"></label>
+  <label class="f">食事の区分</label><div class="seg" id="em">${MEALS.map(m=>`<button class="${it.meal===m.k?'on':''}" onclick="edit.meal='${m.k}';document.querySelectorAll('#em button').forEach(b=>b.classList.remove('on'));this.classList.add('on')">${m.n}</button>`).join('')}</div>
+  <label class="f">食品名<input class="field" id="en" value="${esc(it.name)}"></label>
+  <label class="f">量（g）</label>
+  <div class="stepper" style="margin-top:4px"><button onclick="eStep(-10)" aria-label="10g減らす">−</button><input id="eg" type="number" inputmode="decimal" value="${it.grams||''}" placeholder="—" oninput="eGrams(+this.value||0)"><span class="muted">g</span><button onclick="eStep(10)" aria-label="10g増やす">＋</button></div>
+  <div class="muted" style="text-align:center;margin-top:-6px">量を変えると、カロリーとPFCも自動で計算し直します</div>
+  <div class="grid2">${nf('ek','カロリー（kcal）',Math.round(it.kcal),1)}${nf('ep','たんぱく質 P（g）',r1(it.p),0.1)}</div>
+  <div class="grid2">${nf('ef','脂質 F（g）',r1(it.f),0.1)}${nf('ec2','炭水化物 C（g）',r1(it.c),0.1)}</div>
+  <button class="btn" style="margin-top:18px" onclick="saveEdit()">訂正を保存</button>
   <button class="btn warn" style="margin-top:8px" onclick="delItem()">この記録を削除</button>`);
-  if(it.grams)eCalc();
 }
-function eCalc(){const k=edit.g/edit.it.grams;$('#ec').innerHTML=`<div><div class="v num">${Math.round(edit.it.kcal*k)}</div><div class="l">kcal</div></div><div><div class="v num">${r1(edit.it.p*k)}</div><div class="l">P</div></div><div><div class="v num">${r1(edit.it.f*k)}</div><div class="l">F</div></div><div><div class="v num">${r1(edit.it.c*k)}</div><div class="l">C</div></div>`}
-function saveEdit(){const it=edit.it;if(it.grams&&edit.g>0&&edit.g!==it.grams){const k=edit.g/it.grams;['kcal','p','f','c'].forEach(x=>it[x]*=k);it.grams=Math.round(edit.g)}save();closeSheet();render();toast('変更を保存しました')}
-function delItem(){S.meals[cur]=(S.meals[cur]||[]).filter(i=>i.id!==edit.it.id);save();closeSheet();render();toast('削除しました')}
+function eStep(d){const g=Math.max(0,(+$('#eg').value||0)+d);$('#eg').value=g;eGrams(g)}
+function eGrams(g){
+  if(edit.g>0&&g>0){const k=g/edit.g;
+    $('#ek').value=Math.round((+$('#ek').value||0)*k);
+    ['ep','ef','ec2'].forEach(id=>$('#'+id).value=r1((+$('#'+id).value||0)*k));}
+  if(g>0)edit.g=g;
+}
+function saveEdit(){
+  const date=$('#ed').value,name=$('#en').value.trim(),kcal=+$('#ek').value;
+  if(!date){toast('日付を選んでください');return}
+  if(!name){toast('食品名を入力してください');return}
+  if(!(kcal>=0)){toast('カロリーを正しく入力してください');return}
+  const list=S.meals[edit.from]||[],i=list.findIndex(x=>x.id===edit.id);if(i<0)return;
+  const it=list[i];
+  Object.assign(it,{name,meal:edit.meal,grams:Math.round(+$('#eg').value||0),kcal,p:+$('#ep').value||0,f:+$('#ef').value||0,c:+$('#ec2').value||0});
+  if(date!==edit.from){
+    list.splice(i,1);if(!list.length)delete S.meals[edit.from];
+    (S.meals[date]=S.meals[date]||[]).push(it);cur=date;
+    toast(`${fmtDate(date)}に移動しました`);
+  }else toast('訂正を保存しました');
+  save();closeSheet();render();
+}
+function delItem(){if(!confirm('この記録を削除しますか？'))return;S.meals[edit.from]=(S.meals[edit.from]||[]).filter(i=>i.id!==edit.id);if(!S.meals[edit.from].length)delete S.meals[edit.from];save();closeSheet();render();toast('削除しました')}
+
+/* ========== 記録の編集（体重・歩数・血圧） ========== */
+let recEdit=null;
+function openRec(type,k){
+  recEdit={type,k};
+  const date=`<label class="f">日付<input class="field" id="rd" type="date" max="${TODAY()}" value="${k}"></label>`;
+  let body='';
+  if(type==='weights')body=`<label class="f">体重（kg）<input class="field" id="rv" type="number" inputmode="decimal" step="0.1" value="${S.weights[k].toFixed(1)}"></label>`;
+  else if(type==='steps')body=`<label class="f">歩数<input class="field" id="rv" type="number" inputmode="numeric" value="${S.steps[k]}"></label>`;
+  else{const r=S.bp[k]||{};const row=(sl,lab)=>{const x=r[sl]||{};return `<label class="f">${lab}（空欄なら記録なし）</label><div class="bpin" style="margin-top:4px">
+      <label>最高<input id="${sl}s" type="number" inputmode="numeric" value="${x.s??''}"></label><label>最低<input id="${sl}d" type="number" inputmode="numeric" value="${x.d??''}"></label><label>脈拍<input id="${sl}p" type="number" inputmode="numeric" value="${x.p??''}"></label></div>`};
+    body=row('am','朝')+row('pm','夜');}
+  const t={weights:'体重',steps:'歩数',bp:'血圧'}[type];
+  openSheet(`<h3>${t}の記録を訂正</h3><div class="muted">${fmtDate(k)}の記録</div>${date}${body}
+  <button class="btn" style="margin-top:18px" onclick="saveRec()">訂正を保存</button>
+  <button class="btn warn" style="margin-top:8px" onclick="if(confirm('この記録を削除しますか？')){delete S[recEdit.type][recEdit.k];save();closeSheet();render();toast('削除しました')}">この記録を削除</button>`);
+}
+function saveRec(){
+  const {type,k}=recEdit,date=$('#rd').value;
+  if(!date){toast('日付を選んでください');return}
+  let val;
+  if(type==='weights'){val=r1(+$('#rv').value);if(!(val>20&&val<300)){toast('体重を正しく入力してください');return}}
+  else if(type==='steps'){val=Math.round(+$('#rv').value);if(!(val>=0&&val<200000)||$('#rv').value===''){toast('歩数を正しく入力してください');return}}
+  else{
+    val={};
+    for(const sl of ['am','pm']){
+      const sv=$('#'+sl+'s').value,dv=$('#'+sl+'d').value;if(sv===''&&dv==='')continue;
+      const x={s:Math.round(+sv),d:Math.round(+dv)},pp=Math.round(+$('#'+sl+'p').value)||0;
+      if(!(x.s>=60&&x.s<=260&&x.d>=30&&x.d<=180&&x.s>x.d)){toast(`${sl==='am'?'朝':'夜'}の血圧を正しく入力してください`);return}
+      if(pp)x.p=pp;val[sl]=x;
+    }
+    if(!val.am&&!val.pm){toast('朝か夜のどちらかを入力してください');return}
+  }
+  if(date!==k&&S[type][date]!=null&&!confirm(`${fmtDate(date)}にはすでに記録があります。上書きしますか？`))return;
+  if(date!==k)delete S[type][k];
+  S[type][date]=val;save();closeSheet();render();
+  toast(date!==k?`${fmtDate(date)}に移動しました`:'訂正を保存しました');
+}
 
 /* ========== 体重 ========== */
 let wDate=null,wVal=null;
@@ -641,8 +707,8 @@ function viewSteps(){
   </section>
   <section class="card"><label class="f" style="margin-top:0">1日の目標歩数<input class="field" type="number" inputmode="numeric" value="${S.stepGoal}" onchange="S.stepGoal=Math.max(1000,+this.value||8000);save();render()"></label></section>
   <div class="tip"><div class="face">${IC.doctor}</div><div><b>管理栄養士より</b>歩数を1,000歩増やすと、およそ30〜40kcalの消費になります。食事を減らしすぎるより、少し歩く量を増やす方が筋肉を保ちやすく、リバウンドしにくくなります。</div></div>
-  <div class="h2">記録一覧</div>
-  <section class="card">${ks.length?`<ul class="list">${ks.slice(-30).reverse().map(k=>`<li><span style="flex:1">${fmtDate(k)}</span><b class="num">${S.steps[k].toLocaleString()} 歩</b><button class="x" onclick="delRec('steps','${k}')" aria-label="削除">×</button></li>`).join('')}</ul>`:'<div class="muted">まだ記録がありません。iPhoneの「ヘルスケア」アプリで1日の歩数を確認して入力できます。</div>'}</section>`;
+  <div class="h2">記録一覧 <span style="font-size:12px;color:var(--dim)">（タップで訂正・削除）</span></div>
+  <section class="card">${ks.length?`<ul class="list">${ks.slice(-30).reverse().map(k=>`<li class="tap" onclick="openRec('steps','${k}')"><span style="flex:1">${fmtDate(k)}</span><b class="num">${S.steps[k].toLocaleString()} 歩</b><span class="ed">${IC.pen}</span></li>`).join('')}</ul>`:'<div class="muted">まだ記録がありません。iPhoneの「ヘルスケア」アプリで1日の歩数を確認して入力できます。</div>'}</section>`;
 }
 function stepS(d){const e=$('#sv');e.value=Math.max(0,(+e.value||0)+d)}
 function saveSteps(){const v=Math.round(+$('#sv').value);if(!(v>=0&&v<200000)||$('#sv').value===''){toast('歩数を正しく入力してください');return}S.steps[wDate]=v;save();render();toast(`${fmtDate(wDate)}　${v.toLocaleString()}歩を記録しました`)}
@@ -691,8 +757,8 @@ function viewBP(){
     <div class="muted" style="display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:4px"><span><span style="color:var(--warn)">●</span> 最高</span><span><span style="color:var(--l)">●</span> 最低</span><span>実線＝朝　細線＝夜</span><span>┅ 基準 135/85</span></div>
   </section>
   <div class="tip"><div class="face">${IC.doctor}</div><div><b>管理栄養士より</b>朝は起きて1時間以内（トイレの後・朝食の前）、夜は寝る前に、座って1〜2分休んでから測りましょう。減塩（1日6g未満が目安）と、野菜・果物のカリウムが血圧対策の基本です。</div></div>
-  <div class="h2">記録一覧</div>
-  <section class="card">${ks.length?`<ul class="list">${ks.slice(-30).reverse().map(k=>{const r=S.bp[k];return `<li><span style="flex:1">${fmtDate(k)}</span><span class="num" style="text-align:right;font-size:13px"><b>朝</b> ${fmt(r.am)}${r.am&&r.am.p?' ('+r.am.p+')':''}<br><b>夜</b> ${fmt(r.pm)}${r.pm&&r.pm.p?' ('+r.pm.p+')':''}</span><button class="x" onclick="delRec('bp','${k}')" aria-label="削除">×</button></li>`}).join('')}</ul>`:'<div class="muted">まだ記録がありません。</div>'}</section>`;
+  <div class="h2">記録一覧 <span style="font-size:12px;color:var(--dim)">（タップで訂正・削除）</span></div>
+  <section class="card">${ks.length?`<ul class="list">${ks.slice(-30).reverse().map(k=>{const r=S.bp[k];return `<li class="tap" onclick="openRec('bp','${k}')"><span style="flex:1">${fmtDate(k)}</span><span class="num" style="text-align:right;font-size:13px"><b>朝</b> ${fmt(r.am)}${r.am&&r.am.p?' ('+r.am.p+')':''}<br><b>夜</b> ${fmt(r.pm)}${r.pm&&r.pm.p?' ('+r.pm.p+')':''}</span><span class="ed">${IC.pen}</span></li>`}).join('')}</ul>`:'<div class="muted">まだ記録がありません。</div>'}</section>`;
 }
 function saveBP(){
   const s=Math.round(+$('#bs').value),d=Math.round(+$('#bd').value),p=Math.round(+$('#bpp').value)||0;
@@ -748,8 +814,8 @@ function viewWeight(){
     ${chart()}
     <div class="muted" style="display:flex;gap:14px;margin-top:4px"><span><span style="color:var(--leaf)">●</span> 体重</span><span><span style="color:var(--warn)">┅</span> 月の目標</span></div>
   </section>
-  <div class="h2">記録一覧</div>
-  <section class="card">${ks.length?`<ul class="list">${ks.slice(-30).reverse().map(k=>`<li><span style="flex:1">${fmtDate(k)}</span><b class="num">${S.weights[k].toFixed(1)} kg</b><button class="x" onclick="delWeight('${k}')" aria-label="削除">×</button></li>`).join('')}</ul>`:'<div class="muted">まだ記録がありません。毎朝、トイレの後・朝食の前に量ると変化がわかりやすくなります。</div>'}</section>`;
+  <div class="h2">記録一覧 <span style="font-size:12px;color:var(--dim)">（タップで訂正・削除）</span></div>
+  <section class="card">${ks.length?`<ul class="list">${ks.slice(-30).reverse().map(k=>`<li class="tap" onclick="openRec('weights','${k}')"><span style="flex:1">${fmtDate(k)}</span><b class="num">${S.weights[k].toFixed(1)} kg</b><span class="ed">${IC.pen}</span></li>`).join('')}</ul>`:'<div class="muted">まだ記録がありません。毎朝、トイレの後・朝食の前に量ると変化がわかりやすくなります。</div>'}</section>`;
 }
 function saveWeight(){
   const v=+$('#wv').value;if(!(v>20&&v<300)){toast('体重を正しく入力してください');return}
@@ -897,7 +963,7 @@ function viewSettings(){
     <label class="btn sub" style="position:relative">バックアップから復元<input type="file" accept="application/json,.json" onchange="importData(this)" style="position:absolute;inset:0;opacity:0"></label></div>
     <button class="btn warn" style="margin-top:10px" onclick="if(confirm('すべての記録を削除します。よろしいですか？')){S=def();save();render();toast('すべて削除しました')}">すべてのデータを削除</button>
   </section>
-  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.3.2　食品の値は目安です</p>`;
+  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.4　食品の値は目安です</p>`;
 }
 async function testAI(){
   const gem=S.provider!=='claude';
