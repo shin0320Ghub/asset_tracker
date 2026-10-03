@@ -509,6 +509,8 @@ async function callGemini(text,img){
   const d=await r.json().catch(()=>({}));
   if(!r.ok){
     if(r.status===429)throw new Error('無料枠の回数制限に達しました。1分ほど待つか、明日もう一度お試しください。');
+    if(r.status===401||r.status===403)throw new Error('APIキーが認証されませんでした。キーを全部コピーできているか（途中で切れていないか）確認してください。（'+(d.error?.message||r.status)+'）');
+    if(r.status===404)throw new Error('モデル名が見つかりません。設定のモデル名を「gemini-flash-latest」に戻してください。（'+(d.error?.message||'')+'）');
     throw new Error(d.error?.message||('HTTP '+r.status));
   }
   return (d.candidates?.[0]?.content?.parts||[]).map(x=>x.text||'').join('');
@@ -865,8 +867,8 @@ function viewSettings(){
     <label class="f">使うAI</label>
     <div class="seg">${[['gemini','Google Gemini（無料）'],['claude','Claude（有料）']].map(([k,l])=>`<button class="${(S.provider||'gemini')===k?'on':''}" onclick="S.provider='${k}';save();render()">${l}</button>`).join('')}</div>
     ${S.provider!=='claude'?`
-    <div class="muted" style="margin-top:10px">Googleアカウントがあれば無料でAPIキーを発行できます。<br>① <b>aistudio.google.com</b> を開いてGoogleアカウントでログイン<br>② 「Get API key」→「APIキーを作成」<br>③ 表示されたキー（AIza…）をコピーして下に貼り付け</div>
-    <label class="f">Gemini APIキー<input class="field" type="password" autocomplete="off" placeholder="AIza..." value="${esc(S.geminiKey)}" onchange="S.geminiKey=this.value.trim();save();toast('APIキーを保存しました')"></label>
+    <div class="muted" style="margin-top:10px">Googleアカウントがあれば無料でAPIキーを発行できます。<br>① <b>aistudio.google.com</b> を開いてGoogleアカウントでログイン<br>② 「Get API key」→「APIキーを作成」<br>③ 表示されたキー（AQ.… で始まる文字列）をコピーして下に貼り付け</div>
+    <label class="f">Gemini APIキー<input class="field" type="password" autocomplete="off" placeholder="AQ.… または AIza…" value="${esc(S.geminiKey)}" onchange="S.geminiKey=this.value.trim();save();toast('APIキーを保存しました')"></label>
     <label class="f">モデル名<input class="field" value="${esc(S.geminiModel)}" onchange="S.geminiModel=this.value.trim()||'gemini-flash-latest';save()"></label>
     <div class="muted" style="margin-top:8px">無料枠には1分・1日あたりの回数制限があります（個人の食事記録なら通常は十分です）。無料枠では、送った写真や文章がGoogleのAI改善に使われる場合があります。</div>`:`
     <div class="muted" style="margin-top:10px">Anthropic の APIキーが必要です（console.anthropic.com で発行・従量課金）。</div>
@@ -882,7 +884,7 @@ function viewSettings(){
     <label class="btn sub" style="position:relative">バックアップから復元<input type="file" accept="application/json,.json" onchange="importData(this)" style="position:absolute;inset:0;opacity:0"></label></div>
     <button class="btn warn" style="margin-top:10px" onclick="if(confirm('すべての記録を削除します。よろしいですか？')){S=def();save();render();toast('すべて削除しました')}">すべてのデータを削除</button>
   </section>
-  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.3　食品の値は目安です</p>`;
+  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.3.1　食品の値は目安です</p>`;
 }
 async function testAI(){
   const gem=S.provider!=='claude';
