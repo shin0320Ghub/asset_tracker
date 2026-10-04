@@ -685,7 +685,7 @@ function viewSteps(){
   const avg=last7.length?Math.round(last7.reduce((a,b)=>a+b,0)/last7.length):null;
   const d30=[...Array(30)].map((_,i)=>S.steps[addDays(TODAY(),-i)]).filter(x=>x!=null);
   const hit=d30.filter(x=>x>=S.stepGoal).length;
-  return `<section class="card">${dateInput()}
+  return `${hkCard()}<div class="h2" style="margin-top:4px">手入力・訂正</div><section class="card">${dateInput()}
     <div class="winput">
       <button onclick="stepS(-500)" aria-label="500歩減らす">−</button>
       <input id="sv" type="number" inputmode="numeric" value="${v??''}" placeholder="0" style="width:170px">
@@ -708,8 +708,71 @@ function viewSteps(){
   <section class="card"><label class="f" style="margin-top:0">1日の目標歩数<input class="field" type="number" inputmode="numeric" value="${S.stepGoal}" onchange="S.stepGoal=Math.max(1000,+this.value||8000);save();render()"></label></section>
   <div class="tip"><div class="face">${IC.doctor}</div><div><b>管理栄養士より</b>歩数を1,000歩増やすと、およそ30〜40kcalの消費になります。食事を減らしすぎるより、少し歩く量を増やす方が筋肉を保ちやすく、リバウンドしにくくなります。</div></div>
   <div class="h2">記録一覧 <span style="font-size:12px;color:var(--dim)">（タップで訂正・削除）</span></div>
-  <section class="card">${ks.length?`<ul class="list">${ks.slice(-30).reverse().map(k=>`<li class="tap" onclick="openRec('steps','${k}')"><span style="flex:1">${fmtDate(k)}</span><b class="num">${S.steps[k].toLocaleString()} 歩</b><span class="ed">${IC.pen}</span></li>`).join('')}</ul>`:'<div class="muted">まだ記録がありません。iPhoneの「ヘルスケア」アプリで1日の歩数を確認して入力できます。</div>'}</section>`;
+  <section class="card">${ks.length?`<ul class="list">${ks.slice(-30).reverse().map(k=>`<li class="tap" onclick="openRec('steps','${k}')"><span style="flex:1">${fmtDate(k)}</span><b class="num">${S.steps[k].toLocaleString()} 歩</b><span class="ed">${IC.pen}</span></li>`).join('')}</ul>`:'<div class="muted">まだ記録がありません。上の「ヘルスケアから取り込む」で自動入力できます。</div>'}</section>`;
 }
+
+/* ---- iPhoneヘルスケア連動（ショートカット経由） ---- */
+const SC_NAME='からだノート歩数';
+let hkWaiting=false;
+function hkCard(){
+  const last=S.hkLast?`最終取り込み：${S.hkLast}`:'まだ取り込んでいません';
+  return `<section class="card" style="--c:var(--l);margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:10px"><div class="ic" style="width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:color-mix(in srgb,var(--l) 18%,transparent);color:var(--l)">${IC.heart}</div>
+    <div><b>iPhoneヘルスケアと連動</b><div class="muted">${last}</div></div></div>
+    <button class="btn" style="margin-top:14px" onclick="hkRun()">ヘルスケアから取り込む</button>
+    <div class="grid2" style="margin-top:8px">
+      <button class="btn sub" style="height:44px;font-size:14px" onclick="hkPaste()">コピーを貼り付け</button>
+      <button class="btn sub" style="height:44px;font-size:14px" onclick="hkHelp()">初回の設定方法</button>
+    </div>
+  </section>`;
+}
+function hkRun(){hkWaiting=true;location.href='shortcuts://run-shortcut?name='+encodeURIComponent(SC_NAME)}
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'&&hkWaiting){hkWaiting=false;
+    openSheet(`<h3>歩数を取り込みます</h3><div class="muted">ショートカットがコピーした歩数を、アプリに貼り付けます。</div>
+    <button class="btn" style="margin-top:16px" onclick="hkPaste()">貼り付けて取り込む</button>
+    <button class="btn sub" style="margin-top:8px" onclick="closeSheet()">あとで</button>`);}
+});
+async function hkPaste(){
+  let t='';
+  try{t=await navigator.clipboard.readText()}catch(e){t=prompt('コピーした歩数を貼り付けてください')||''}
+  closeSheet();hkImport(t);
+}
+function hkImport(t){
+  t=String(t||'').trim();if(!t){toast('貼り付ける内容がありません');return 0}
+  const re=/(\d{4})[-\/年.](\d{1,2})[-\/月.](\d{1,2})日?\s*[=:：]\s*(\d[\d,]*(?:\.\d+)?)/g;let m,n=0;
+  while((m=re.exec(t))){const k=`${m[1]}-${pad(m[2])}-${pad(m[3])}`,v=Math.round(parseFloat(m[4].replace(/,/g,'')));if(v>=0&&v<200000&&k<=TODAY()){S.steps[k]=v;n++}}
+  if(!n){ // 日付なし（新しい順：1行目=今日、2行目=昨日…）
+    const lines=t.split(/\r?\n/).map(x=>x.replace(/[=＝\s歩,]/g,'')).filter(x=>x!=='');
+    if(lines.length&&lines.every(x=>/^\d+(\.\d+)?$/.test(x))){
+      lines.forEach((x,i)=>{const v=Math.round(parseFloat(x));if(v<200000){S.steps[addDays(TODAY(),-i)]=v;n++}});
+    }
+  }
+  if(!n){toast('歩数のデータが見つかりませんでした');return 0}
+  const d=new Date();S.hkLast=`${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}（${n}日分）`;
+  save();bodyMode='steps';tab='weight';render();toast(`ヘルスケアから${n}日分の歩数を取り込みました`);return n;
+}
+function hkHelp(){
+  const st=(n,t)=>`<li style="display:flex;gap:10px;margin-top:10px"><span class="num" style="flex:none;width:24px;height:24px;border-radius:50%;background:color-mix(in srgb,var(--l) 20%,transparent);color:var(--l);display:grid;place-items:center;font-size:13px">${n}</span><div>${t}</div></li>`;
+  openSheet(`<h3>ショートカットの作り方（初回だけ）</h3>
+  <div class="muted">iPhoneの「ショートカット」アプリで、歩数を読み取る仕組みを1つ作ります。</div>
+  <ol style="list-style:none;padding:0;margin:8px 0 0;font-size:14px">
+  ${st(1,'「ショートカット」アプリを開き、右上の「＋」で新規作成。名前を <b>からだノート歩数</b> にします（一文字でも違うと動きません）。')}
+  ${st(2,'アクション <b>「ヘルスケアサンプルを検索」</b> を追加。<br>・種類：<b>歩数</b><br>・開始日：<b>過去 7 日間</b><br>・グループ分け：<b>日</b><br>・単位：<b>歩</b>')}
+  ${st(3,'<b>「各項目を繰り返す」</b> を追加し、その中に次の2つを入れます。<br>① <b>「日付を書式設定」</b>：日付に「繰り返し項目」→「開始日」を選び、日付フォーマットを<b>カスタム</b>、書式を <b>yyyy-MM-dd</b> に。<br>② <b>「テキスト」</b>：「書式設定された日付」＝「繰り返し項目」の<b>値</b> と並べます（間は半角の <b>=</b>）。')}
+  ${st(4,'繰り返しの後に <b>「テキストを結合」</b> を追加し、区切り文字を <b>改行</b> にします。')}
+  ${st(5,'最後に <b>「クリップボードにコピー」</b> を追加して完成です。')}
+  ${st(6,'一度だけショートカットを手動で実行し、ヘルスケアへのアクセスを<b>許可</b>してください。')}
+  </ol>
+  <div class="tip"><div class="face">${IC.note}</div><div><b>使い方</b>このアプリの「ヘルスケアから取り込む」を押す → ショートカットが動く → 左上の「◀」でアプリに戻る → 「貼り付けて取り込む」→ iPhoneの「ペースト」をタップ。過去7日分がまとめて更新されます。</div></div>
+  <div class="warnbox" style="background:rgba(122,167,255,.12);color:#AFC8FF">Apple Watchも使っている場合、歩数が2重に数えられることがあります。ヘルスケアアプリの数字と違うときは、手順2の検索条件に「ソース」が「（iPhoneの名前）」を追加してください。</div>
+  <button class="btn sub" style="margin-top:14px" onclick="closeSheet()">閉じる</button>`);
+}
+function hkFromURL(){
+  try{const u=new URL(location.href),v=u.searchParams.get('steps');if(v==null)return;
+    history.replaceState(null,'',u.pathname);hkImport(v);}catch(e){}
+}
+
 function stepS(d){const e=$('#sv');e.value=Math.max(0,(+e.value||0)+d)}
 function saveSteps(){const v=Math.round(+$('#sv').value);if(!(v>=0&&v<200000)||$('#sv').value===''){toast('歩数を正しく入力してください');return}S.steps[wDate]=v;save();render();toast(`${fmtDate(wDate)}　${v.toLocaleString()}歩を記録しました`)}
 function delRec(type,k){if(!confirm(`${fmtDate(k)}の記録を削除しますか？`))return;delete S[type][k];save();render()}
@@ -963,7 +1026,7 @@ function viewSettings(){
     <label class="btn sub" style="position:relative">バックアップから復元<input type="file" accept="application/json,.json" onchange="importData(this)" style="position:absolute;inset:0;opacity:0"></label></div>
     <button class="btn warn" style="margin-top:10px" onclick="if(confirm('すべての記録を削除します。よろしいですか？')){S=def();save();render();toast('すべて削除しました')}">すべてのデータを削除</button>
   </section>
-  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.4　食品の値は目安です</p>`;
+  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.5.1　食品の値は目安です</p>`;
 }
 async function testAI(){
   const gem=S.provider!=='claude';
@@ -990,6 +1053,7 @@ function render(){
   $('#nav').innerHTML=TABS.map(([k,e,l])=>`<button class="${tab===k?'on':''}" onclick="tab='${k}';wVal=null;wDate=null;render();scrollTo(0,0)">${e}${l}</button>`).join('');
 }
 render();
+hkFromURL();
 checkMonthEnd();
 </script>
 </body>
