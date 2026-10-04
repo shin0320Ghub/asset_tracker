@@ -464,6 +464,75 @@
   .btn-ghost{ background:transparent; color:var(--ink-soft); border:1px solid var(--paper-line); }
   .btn-delete{ background:var(--stamp); color:#fff; }
 </style>
+<!-- ===== Firebaseログイン(メール/パスワード)共通部品 ===== -->
+<style>
+#fbl{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;box-sizing:border-box;padding:24px;padding-top:max(24px,env(safe-area-inset-top));background:#eef1f5;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;color:#1d2433;-webkit-text-size-adjust:100%}
+#fbl .fbl-b{width:100%;max-width:360px;background:#fff;border-radius:14px;padding:26px 22px;box-shadow:0 6px 24px rgba(20,30,50,.12)}
+#fbl h1{font-size:19px;margin:0 0 6px;font-weight:700;letter-spacing:0}
+#fbl .fbl-s{font-size:13px;color:#5b6475;margin:0 0 8px;line-height:1.6}
+#fbl label{display:block;font-size:12px;color:#5b6475;margin:14px 0 5px}
+#fbl input{width:100%;box-sizing:border-box;font-size:16px;padding:12px;border:1px solid #c9d0db;border-radius:9px;background:#fff;color:#1d2433;-webkit-appearance:none}
+#fbl input:focus{outline:2px solid #2f6fdf;outline-offset:0;border-color:#2f6fdf}
+#fbl button{width:100%;margin-top:20px;font-size:16px;font-weight:700;padding:13px;border:0;border-radius:9px;background:#2f6fdf;color:#fff;cursor:pointer}
+#fbl button:disabled{opacity:.6}
+#fbl .fbl-e{min-height:1.4em;margin-top:12px;font-size:13px;color:#c0392b;line-height:1.5}
+@media (prefers-color-scheme:dark){#fbl{background:#12161d;color:#e8ebf0}#fbl .fbl-b{background:#1c222c;box-shadow:none}#fbl .fbl-s,#fbl label{color:#9aa3b2}#fbl input{background:#12161d;color:#e8ebf0;border-color:#3a4352}}
+</style>
+<script>
+(function(){
+  var MSG={
+    'auth/invalid-credential':'メールアドレスまたはパスワードが違います。',
+    'auth/invalid-login-credentials':'メールアドレスまたはパスワードが違います。',
+    'auth/wrong-password':'メールアドレスまたはパスワードが違います。',
+    'auth/user-not-found':'メールアドレスまたはパスワードが違います。',
+    'auth/invalid-email':'メールアドレスの形式が正しくありません。',
+    'auth/missing-password':'パスワードを入力してください。',
+    'auth/too-many-requests':'失敗が続いたため一時的に制限されています。しばらく待ってからお試しください。',
+    'auth/network-request-failed':'通信できませんでした。インターネット接続を確認してください。',
+    'auth/operation-not-allowed':'Firebaseで「メール/パスワード」のログインが有効になっていません。',
+    'auth/user-disabled':'このアカウントは無効になっています。'
+  };
+  var box=null, submitFn=null;
+  function build(){
+    box=document.createElement('div');
+    box.id='fbl';
+    box.innerHTML='<form class="fbl-b" novalidate>'+
+      '<h1>ログイン</h1>'+
+      '<p class="fbl-s">iPhone・iPad共通のアカウントでログインしてください。この端末では次回から自動でログインします。</p>'+
+      '<label for="fbl-m">メールアドレス</label><input id="fbl-m" type="email" autocomplete="username" autocapitalize="off" spellcheck="false">'+
+      '<label for="fbl-p">パスワード</label><input id="fbl-p" type="password" autocomplete="current-password">'+
+      '<button type="submit">ログイン</button><div class="fbl-e" role="alert"></div></form>';
+    var f=box.querySelector('form'), btn=box.querySelector('button'), err=box.querySelector('.fbl-e');
+    f.addEventListener('submit',function(ev){
+      ev.preventDefault();
+      var m=box.querySelector('#fbl-m').value.trim(), p=box.querySelector('#fbl-p').value;
+      if(!m||!p){err.textContent='メールアドレスとパスワードを入力してください。';return;}
+      btn.disabled=true; btn.textContent='確認中…'; err.textContent='';
+      Promise.resolve().then(function(){return submitFn(m,p);}).catch(function(e){
+        err.textContent=MSG[e&&e.code]||('ログインできませんでした('+((e&&(e.code||e.message))||'不明なエラー')+')');
+      }).then(function(){btn.disabled=false; btn.textContent='ログイン';});
+    });
+    document.body.appendChild(box);
+  }
+  function show(fn){
+    submitFn=fn;
+    var go=function(){ if(!box) build(); box.style.display='flex'; };
+    if(document.body) go(); else document.addEventListener('DOMContentLoaded',go);
+  }
+  function hide(){ if(box) box.style.display='none'; }
+  /* o.onState(cb) / o.login(email,pw) / o.logout() を渡すと、ログイン済みユーザーで resolve する */
+  window.fbLoginGate=function(o){
+    return new Promise(function(resolve){
+      o.onState(function(u){
+        if(u && !u.isAnonymous){ hide(); resolve(u); return; }
+        if(u && u.isAnonymous){ Promise.resolve().then(o.logout).catch(function(){}); return; } // 以前の匿名ログインは破棄
+        show(o.login);
+      });
+    });
+  };
+})();
+</script>
+
 </head>
 <body>
 
@@ -569,6 +638,9 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import {
   getDatabase, ref, onValue, set, remove, push
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import {
+  initializeAuth, browserLocalPersistence, onAuthStateChanged, signInWithEmailAndPassword, signOut
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 // ▼▼▼ ここに自分の Firebase プロジェクトの設定を貼り付けてください ▼▼▼
 // Firebase コンソール > プロジェクトの設定 > マイアプリ > SDK の設定と構成 から取得できます
@@ -593,8 +665,9 @@ const firebaseConfig = {
   v1.1.4 (2026-09-05) 更新ボタン押下時に確認ダイアログを表示するように変更（新しい次回課金日を提示して確認）
   v1.2.0 (2026-09-05) バックアップの保存（JSONファイルとしてダウンロード）と復元（ファイル選択して上書き）機能を追加
   v1.3.0 (2026-09-05) カテゴリ別集計セクションを追加。月別・年別を切り替えて各カテゴリの金額・割合をバー表示
+  v1.4.0 (2026-10-04) セキュリティ対策:メール/パスワードでのログインを追加。ログイン後にのみデータベースへ接続
 */
-const APP_VERSION = 'v1.3.0';
+const APP_VERSION = 'v1.4.0';
 document.getElementById('versionBadge').textContent = APP_VERSION;
 
 let db = null;
@@ -680,9 +753,18 @@ try{
     throw new Error("not configured");
   }
   const app = initializeApp(firebaseConfig);
+  const auth = initializeAuth(app, { persistence: browserLocalPersistence });
+  auth.languageCode = 'ja';
   db = getDatabase(app);
   subsRef = ref(db, 'subscriptions');
   categoriesRef = ref(db, 'costCategories');
+  syncText.textContent = 'ログイン確認中…';
+  window.fbLoginGate({
+    onState: cb => onAuthStateChanged(auth, cb),
+    login: (m, p) => signInWithEmailAndPassword(auth, m, p),
+    logout: () => signOut(auth)
+  }).then(() => {
+  if(firebaseReady) return;
   firebaseReady = true;
   syncText.textContent = 'iPhone / iPad 間で自動同期中';
   onValue(subsRef, (snap) => {
@@ -703,6 +785,7 @@ try{
     }
     renderCategoryOptions();
     render();
+  });
   });
 }catch(e){
   syncDot.classList.add('off');

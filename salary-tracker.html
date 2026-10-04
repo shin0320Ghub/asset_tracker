@@ -243,6 +243,75 @@ select.inp{background-image:linear-gradient(45deg,transparent 50%,var(--sub) 50%
 
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
+<!-- ===== Firebaseログイン(メール/パスワード)共通部品 ===== -->
+<style>
+#fbl{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;box-sizing:border-box;padding:24px;padding-top:max(24px,env(safe-area-inset-top));background:#eef1f5;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;color:#1d2433;-webkit-text-size-adjust:100%}
+#fbl .fbl-b{width:100%;max-width:360px;background:#fff;border-radius:14px;padding:26px 22px;box-shadow:0 6px 24px rgba(20,30,50,.12)}
+#fbl h1{font-size:19px;margin:0 0 6px;font-weight:700;letter-spacing:0}
+#fbl .fbl-s{font-size:13px;color:#5b6475;margin:0 0 8px;line-height:1.6}
+#fbl label{display:block;font-size:12px;color:#5b6475;margin:14px 0 5px}
+#fbl input{width:100%;box-sizing:border-box;font-size:16px;padding:12px;border:1px solid #c9d0db;border-radius:9px;background:#fff;color:#1d2433;-webkit-appearance:none}
+#fbl input:focus{outline:2px solid #2f6fdf;outline-offset:0;border-color:#2f6fdf}
+#fbl button{width:100%;margin-top:20px;font-size:16px;font-weight:700;padding:13px;border:0;border-radius:9px;background:#2f6fdf;color:#fff;cursor:pointer}
+#fbl button:disabled{opacity:.6}
+#fbl .fbl-e{min-height:1.4em;margin-top:12px;font-size:13px;color:#c0392b;line-height:1.5}
+@media (prefers-color-scheme:dark){#fbl{background:#12161d;color:#e8ebf0}#fbl .fbl-b{background:#1c222c;box-shadow:none}#fbl .fbl-s,#fbl label{color:#9aa3b2}#fbl input{background:#12161d;color:#e8ebf0;border-color:#3a4352}}
+</style>
+<script>
+(function(){
+  var MSG={
+    'auth/invalid-credential':'メールアドレスまたはパスワードが違います。',
+    'auth/invalid-login-credentials':'メールアドレスまたはパスワードが違います。',
+    'auth/wrong-password':'メールアドレスまたはパスワードが違います。',
+    'auth/user-not-found':'メールアドレスまたはパスワードが違います。',
+    'auth/invalid-email':'メールアドレスの形式が正しくありません。',
+    'auth/missing-password':'パスワードを入力してください。',
+    'auth/too-many-requests':'失敗が続いたため一時的に制限されています。しばらく待ってからお試しください。',
+    'auth/network-request-failed':'通信できませんでした。インターネット接続を確認してください。',
+    'auth/operation-not-allowed':'Firebaseで「メール/パスワード」のログインが有効になっていません。',
+    'auth/user-disabled':'このアカウントは無効になっています。'
+  };
+  var box=null, submitFn=null;
+  function build(){
+    box=document.createElement('div');
+    box.id='fbl';
+    box.innerHTML='<form class="fbl-b" novalidate>'+
+      '<h1>ログイン</h1>'+
+      '<p class="fbl-s">iPhone・iPad共通のアカウントでログインしてください。この端末では次回から自動でログインします。</p>'+
+      '<label for="fbl-m">メールアドレス</label><input id="fbl-m" type="email" autocomplete="username" autocapitalize="off" spellcheck="false">'+
+      '<label for="fbl-p">パスワード</label><input id="fbl-p" type="password" autocomplete="current-password">'+
+      '<button type="submit">ログイン</button><div class="fbl-e" role="alert"></div></form>';
+    var f=box.querySelector('form'), btn=box.querySelector('button'), err=box.querySelector('.fbl-e');
+    f.addEventListener('submit',function(ev){
+      ev.preventDefault();
+      var m=box.querySelector('#fbl-m').value.trim(), p=box.querySelector('#fbl-p').value;
+      if(!m||!p){err.textContent='メールアドレスとパスワードを入力してください。';return;}
+      btn.disabled=true; btn.textContent='確認中…'; err.textContent='';
+      Promise.resolve().then(function(){return submitFn(m,p);}).catch(function(e){
+        err.textContent=MSG[e&&e.code]||('ログインできませんでした('+((e&&(e.code||e.message))||'不明なエラー')+')');
+      }).then(function(){btn.disabled=false; btn.textContent='ログイン';});
+    });
+    document.body.appendChild(box);
+  }
+  function show(fn){
+    submitFn=fn;
+    var go=function(){ if(!box) build(); box.style.display='flex'; };
+    if(document.body) go(); else document.addEventListener('DOMContentLoaded',go);
+  }
+  function hide(){ if(box) box.style.display='none'; }
+  /* o.onState(cb) / o.login(email,pw) / o.logout() を渡すと、ログイン済みユーザーで resolve する */
+  window.fbLoginGate=function(o){
+    return new Promise(function(resolve){
+      o.onState(function(u){
+        if(u && !u.isAnonymous){ hide(); resolve(u); return; }
+        if(u && u.isAnonymous){ Promise.resolve().then(o.logout).catch(function(){}); return; } // 以前の匿名ログインは破棄
+        show(o.login);
+      });
+    });
+  };
+})();
+</script>
+
 </head>
 <body>
 
@@ -438,7 +507,7 @@ window.addEventListener('unhandledrejection', function(e){
 /* ===== Firebase(新方式):ログイン用の隠しフレームを読み込まない軽量な方式 ===== */
 const B='https://www.gstatic.com/firebasejs/10.12.2/';
 window.__fbInit = async function(config){
-  const [{ initializeApp }, { initializeAuth, browserLocalPersistence, signInAnonymously, onAuthStateChanged },
+  const [{ initializeApp }, { initializeAuth, browserLocalPersistence, onAuthStateChanged, signInWithEmailAndPassword, signOut },
          { getDatabase, ref: dRef, onValue, push: dPush, set: dSet, remove: dRemove },
          { getStorage, ref: sRef, uploadBytesResumable, getDownloadURL, deleteObject }] =
     await Promise.all([import(B+'firebase-app.js'), import(B+'firebase-auth.js'), import(B+'firebase-database.js'), import(B+'firebase-storage.js')]);
@@ -449,8 +518,14 @@ window.__fbInit = async function(config){
   const S = getStorage(app);
 
   const auth = {
-    signIn: () => signInAnonymously(A),
-    onAuthStateChanged: cb => onAuthStateChanged(A, cb)
+    // メール/パスワードでログイン(未ログインならログイン画面を表示)
+    signIn: () => window.fbLoginGate({
+      onState: cb => onAuthStateChanged(A, cb),
+      login: (m, p) => signInWithEmailAndPassword(A, m, p),
+      logout: () => signOut(A)
+    }),
+    // 匿名ユーザーはデータベースを読めないので無視する
+    onAuthStateChanged: cb => onAuthStateChanged(A, u => { if (u && !u.isAnonymous) cb(u); })
   };
   const wrapDb = path => {
     const r = dRef(D, path); let unsubs = [];
@@ -492,7 +567,7 @@ const firebaseConfig = {
 
 </script>
 <script type="module">
-const APP_VER = 'Ver4.2';
+const APP_VER = 'Ver4.3';
 const MAX_PDF = 10 * 1024 * 1024;          // PDFは10MBまで
 const ROOT = 'salary';                      // データベース上の保存場所
 const TYPES = {
@@ -667,7 +742,7 @@ auth.onAuthStateChanged(async u => {
     });
   }catch(e){
     __bootFail('データベースを読めませんでした', '内容:<code>'+String(e.code||e.message).replace(/</g,'&lt;')+'</code><br><br>' +
-      'Realtime Database のルールで <code>"salary"</code> の読み書きが <code>auth != null</code> で許可されているか確認してください。');
+      'Realtime Database のルールで、ログインしたアカウント(UID)の読み書きが許可されているか確認してください。');
     return;
   }
   if (!pinStored) pinShow('set','はじめに4桁の暗証番号を決めてください');
@@ -677,7 +752,7 @@ window.__stage = 'Firebaseへの接続';
 auth.signIn().catch(e => {
   __bootFail('接続できませんでした',
     '内容:<code>' + String(e.code || e.message).replace(/</g,'&lt;') + '</code><br>' +
-    'Firebaseコンソール → Authentication → Sign-in method で「匿名」が有効になっているか確認してください。');
+    'Firebaseコンソール → Authentication → ログイン方法 で「メール/パスワード」が有効になっているか確認してください。');
 });
 
 function subscribe(){
