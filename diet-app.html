@@ -740,14 +740,17 @@ async function hkPaste(){
 }
 function hkImport(t){
   t=String(t||'').trim();if(!t){toast('貼り付ける内容がありません');return 0}
-  const re=/(\d{4})[-\/年.](\d{1,2})[-\/月.](\d{1,2})日?\s*[=:：]\s*(\d[\d,]*(?:\.\d+)?)/g;let m,n=0;
-  while((m=re.exec(t))){const k=`${m[1]}-${pad(m[2])}-${pad(m[3])}`,v=Math.round(parseFloat(m[4].replace(/,/g,'')));if(v>=0&&v<200000&&k<=TODAY()){S.steps[k]=v;n++}}
-  if(!n){ // 日付なし（新しい順：1行目=今日、2行目=昨日…）
-    const lines=t.split(/\r?\n/).map(x=>x.replace(/[=＝\s歩,]/g,'')).filter(x=>x!=='');
-    if(lines.length&&lines.every(x=>/^\d+(\.\d+)?$/.test(x))){
-      lines.forEach((x,i)=>{const v=Math.round(parseFloat(x));if(v<200000){S.steps[addDays(TODAY(),-i)]=v;n++}});
-    }
-  }
+  const lines=t.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+  const re=/^(\d{4})[-\/年.](\d{1,2})[-\/月.](\d{1,2})日?\s*[=:：]\s*(\d[\d,]*(?:\.\d+)?)/;
+  const num=x=>Math.round(parseFloat(String(x).replace(/,/g,'')));
+  // 各行の歩数（日付の有無にかかわらず取り出す）
+  const rows=lines.map(l=>{const m=l.match(re);if(m)return {k:`${m[1]}-${pad(m[2])}-${pad(m[3])}`,v:num(m[4])};
+    const x=l.replace(/^.*[=＝]/,'').replace(/[\s歩,]/g,'');return /^\d+(\.\d+)?$/.test(x)?{k:null,v:num(x)}:null}).filter(Boolean);
+  if(!rows.length){toast('歩数のデータが見つかりませんでした');return 0}
+  // 日付がすべて付いていて重複もなければ日付どおり。それ以外は「1行目=今日、2行目=昨日…」の順番で割り当てる
+  const ks=rows.map(r=>r.k),trust=ks.every(Boolean)&&new Set(ks).size===ks.length&&ks.every(k=>k<=TODAY());
+  let n=0;
+  rows.forEach((r,i)=>{if(!(r.v>=0&&r.v<200000))return;const k=trust?r.k:addDays(TODAY(),-i);S.steps[k]=r.v;n++});
   if(!n){toast('歩数のデータが見つかりませんでした');return 0}
   const d=new Date();S.hkLast=`${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}（${n}日分）`;
   save();bodyMode='steps';tab='weight';render();toast(`ヘルスケアから${n}日分の歩数を取り込みました`);return n;
@@ -1026,7 +1029,7 @@ function viewSettings(){
     <label class="btn sub" style="position:relative">バックアップから復元<input type="file" accept="application/json,.json" onchange="importData(this)" style="position:absolute;inset:0;opacity:0"></label></div>
     <button class="btn warn" style="margin-top:10px" onclick="if(confirm('すべての記録を削除します。よろしいですか？')){S=def();save();render();toast('すべて削除しました')}">すべてのデータを削除</button>
   </section>
-  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.5.1　食品の値は目安です</p>`;
+  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.5.2　食品の値は目安です</p>`;
 }
 async function testAI(){
   const gem=S.provider!=='claude';
