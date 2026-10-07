@@ -93,6 +93,9 @@ svg.i{width:22px;height:22px;flex:none}
 .items .n div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .items .n small{color:var(--sub);font-size:12px}
 .items .kc{font-family:var(--num);font-weight:700}
+.items li.new{box-shadow:inset 0 0 0 1.5px var(--c);background:color-mix(in srgb,var(--c) 12%,transparent);transition:background .6s,box-shadow .6s}
+.seg button small{font-family:var(--num);font-size:11px;margin-left:3px}
+.btn:disabled{cursor:default;opacity:.45}
 .empty-line{position:relative;color:var(--dim);font-size:13px;padding:0 16px 14px}
 
 .minis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
@@ -163,7 +166,7 @@ textarea.field{height:auto;min-height:84px;padding:10px 12px;line-height:1.5}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
 .seg{display:flex;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:999px;padding:3px;margin-top:4px}
-.seg button{flex:1;height:38px;border-radius:999px;font-size:14px;color:var(--sub);display:flex;align-items:center;justify-content:center;gap:6px}
+.seg button{flex:1;min-width:0;white-space:nowrap;height:38px;border-radius:999px;font-size:14px;color:var(--sub);display:flex;align-items:center;justify-content:center;gap:6px}
 .seg button svg{width:17px;height:17px}
 .seg button.on{background:var(--leaf);color:#0B121B;font-weight:700}
 
@@ -241,6 +244,7 @@ const IC={
  search:SV('<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>'),
  camera:SV('<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>'),
  image:SV('<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>'),
+ copy:SV('<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>'),
  pen:SV('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>')
 };
 
@@ -426,7 +430,7 @@ function viewToday(){
         <div><div class="t">${m.n}</div><div class="k num">${Math.round(t.by[m.k])} kcal</div></div>
         <button class="add" onclick="openAdd('${m.k}')" aria-label="${m.n}を追加">${IC.plus}追加</button>
       </div>
-      ${list.length?`<ul class="items">${list.map(i=>`<li onclick="openEdit('${i.id}')"><div class="n"><div>${esc(i.name)}</div><small>${i.grams?i.grams+'g ・ ':''}P${r1(i.p)} F${r1(i.f)} C${r1(i.c)}</small></div><div class="kc">${Math.round(i.kcal)}</div><span class="ed">${IC.pen}</span></li>`).join('')}</ul>`:`<div class="empty-line">「追加」から${m.n}を記録</div>`}
+      ${list.length?`<ul class="items">${list.map(i=>`<li class="${lastCopied.has(i.id)?'new':''}" onclick="openEdit('${i.id}')"><div class="n"><div>${esc(i.name)}</div><small>${i.grams?i.grams+'g ・ ':''}P${r1(i.p)} F${r1(i.f)} C${r1(i.c)}</small></div><div class="kc">${Math.round(i.kcal)}</div><span class="ed">${IC.pen}</span></li>`).join('')}</ul>`:`<div class="empty-line">「追加」から${m.n}を記録</div>`}
     </section>`}).join('')}
   <div class="minis">
     <button class="mini" style="--c:var(--leaf)" onclick="openBody('weight')"><div class="ic">${IC.scale}</div><div class="l">体重</div><div class="v num">${w?w.toFixed(1):'—'}<small> kg</small></div><div class="s">${w?'グラフを見る':'記録する'}</div></button>
@@ -444,12 +448,14 @@ $('#back').onclick=closeSheet;
 function openAdd(m){addMeal=m;addMode='search';q='';cat='すべて';aiItems=null;aiImg=null;drawAdd()}
 function drawAdd(){
   const m=MEALS.find(x=>x.k===addMeal);
-  const seg=`<div class="seg">${[['search',IC.search+'食品'],['ai',IC.camera+'AI計算'],['manual',IC.pen+'手入力']].map(([k,l])=>`<button class="${addMode===k?'on':''}" onclick="addMode='${k}';drawAdd()">${l}</button>`).join('')}</div>`;
+  const seg=`<div class="seg">${[['search',IC.search+'食品'],['copy',IC.copy+'コピー'],['ai',IC.camera+'AI'],['manual',IC.pen+'手入力']].map(([k,l])=>`<button class="${addMode===k?'on':''}" onclick="addMode='${k}';if(addMode==='copy')cpInit();drawAdd()">${l}</button>`).join('')}</div>`;
   let body='';
   if(addMode==='search'){
     body=`<input class="field" id="q" placeholder="例：ごはん、唐揚げ、バナナ" value="${esc(q)}" oninput="q=this.value;drawResults()" style="margin-top:12px">
     <div class="chips" style="margin-top:10px">${CATS.map(c=>`<button class="chip ${cat===c?'on':''}" onclick="cat='${c}';drawAdd()">${c}</button>`).join('')}</div>
     <ul class="results" id="res"></ul>`;
+  }else if(addMode==='copy'){
+    body=cpBody();
   }else if(addMode==='ai'){
     body=`<p class="muted" style="margin:10px 0 0">料理の写真、または「食べたもの・量」の文章から、AIがカロリーとPFCを推定します。</p>
     <div class="camrow">
@@ -496,6 +502,61 @@ function addManual(){
   if(!n||!k){toast('食品名とカロリーを入力してください');return}
   pushItem({name:n,grams:+$('#mg').value||0,kcal:k,p:+$('#mp').value||0,f:+$('#mf').value||0,c:+$('#mc').value||0});
   save();closeSheet();render();toast(`${n}を追加しました`);
+}
+
+
+/* ========== 食事のコピー ========== */
+let cpDate=null,cpMeal=null,cpSel={},lastCopied=new Set();
+function cpInit(){
+  // 既定：コピー先と同じ区分で、直近に記録がある日（なければ前日）
+  const ks=Object.keys(S.meals).filter(k=>k<cur&&(S.meals[k]||[]).some(i=>i.meal===addMeal)).sort();
+  cpDate=ks.length?ks[ks.length-1]:addDays(cur,-1);cpMeal=addMeal;cpReset();
+}
+function cpItems(){return (S.meals[cpDate]||[]).filter(i=>i.meal===cpMeal)}
+function cpReset(){cpSel={};cpItems().forEach(i=>cpSel[i.id]=true)}
+function cpPick(d,m){cpDate=d;cpMeal=m;cpReset();drawAdd()}
+function cpRecent(){
+  const out=[];const ks=Object.keys(S.meals).sort().reverse();
+  for(const k of ks){
+    for(const m of MEALS){
+      if(k===cur&&m.k===addMeal)continue;
+      const l=(S.meals[k]||[]).filter(i=>i.meal===m.k);if(!l.length)continue;
+      out.push({k,m,l,kcal:l.reduce((a,i)=>a+i.kcal,0)});
+      if(out.length>=8)return out;
+    }
+  }
+  return out;
+}
+function cpBody(){
+  const dest=MEALS.find(x=>x.k===addMeal),items=cpItems();
+  const cnt=MEALS.map(m=>(S.meals[cpDate]||[]).filter(i=>i.meal===m.k).length);
+  const selN=items.filter(i=>cpSel[i.id]).length,selK=items.filter(i=>cpSel[i.id]).reduce((a,i)=>a+i.kcal,0);
+  const rec=cpRecent();
+  return `<p class="muted" style="margin:10px 0 0">コピー元の日と食事を選ぶと、${fmtDate(cur)}の<b style="color:${dest.hex}">${dest.n}</b>に追加します。</p>
+  <label class="f">コピー元の日付
+    <input class="field" type="date" max="${TODAY()}" value="${cpDate}" onchange="cpPick(this.value||cpDate,cpMeal)"></label>
+  <div class="chips" style="margin-top:8px">${[[-1,'前日'],[-2,'2日前'],[-7,'1週間前']].map(([d,l])=>{const k=addDays(cur,d);return `<button class="chip ${cpDate===k?'on':''}" onclick="cpPick('${k}',cpMeal)">${l}</button>`}).join('')}</div>
+  <label class="f">コピー元の食事</label>
+  <div class="seg">${MEALS.map((m,i)=>`<button class="${cpMeal===m.k?'on':''}" onclick="cpPick(cpDate,'${m.k}')">${m.n}${cnt[i]?`<small style="opacity:.7">${cnt[i]}</small>`:''}</button>`).join('')}</div>
+  ${items.length?`<div style="margin-top:10px">${items.map(i=>`<label class="ai-item" style="grid-template-columns:auto 1fr auto;cursor:pointer">
+      <input type="checkbox" ${cpSel[i.id]?'checked':''} onchange="cpSel['${i.id}']=this.checked;drawAdd()">
+      <div><div>${esc(i.name)}</div><small class="muted">${i.grams?i.grams+'g ・ ':''}P${r1(i.p)} F${r1(i.f)} C${r1(i.c)}</small></div>
+      <b class="num">${Math.round(i.kcal)}</b></label>`).join('')}</div>
+    <button class="btn" style="margin-top:14px" ${selN?'':'disabled'} onclick="cpDo()">${selN?`${selN}品（${Math.round(selK)} kcal）を${dest.n}にコピー`:'コピーする料理を選んでください'}</button>
+    <p class="muted" style="margin:8px 0 0;text-align:center">コピー後は、各料理をタップして量や内容を訂正できます</p>`
+  :`<div class="list" style="margin-top:10px"><div class="muted" style="padding:14px;border-radius:12px;background:rgba(255,255,255,.035)">${fmtDate(cpDate)}の${MEALS.find(x=>x.k===cpMeal).n}は記録がありません。日付か食事を変えるか、下の「最近の記録」から選んでください。</div></div>`}
+  ${rec.length?`<div class="h2" style="margin:20px 2px 6px">最近の記録から選ぶ</div>
+  <ul class="results" style="margin-top:0">${rec.map(r=>`<li onclick="cpPick('${r.k}','${r.m.k}')" style="${r.k===cpDate&&r.m.k===cpMeal?'box-shadow:inset 3px 0 0 '+r.m.hex:''}">
+    <div class="n"><div><span style="color:${r.m.hex};font-weight:700">${r.m.n}</span>　${fmtDate(r.k)}</div><small>${esc(r.l.map(i=>i.name).join('、'))}</small></div>
+    <b class="num">${Math.round(r.kcal)}</b><small>kcal</small></li>`).join('')}</ul>`:''}`;
+}
+function cpDo(){
+  const sel=cpItems().filter(i=>cpSel[i.id]);if(!sel.length){toast('コピーする料理を選んでください');return}
+  lastCopied=new Set();
+  sel.forEach(i=>{const id=uid();lastCopied.add(id);(S.meals[cur]=S.meals[cur]||[]).push({id,meal:addMeal,name:i.name,grams:i.grams||0,kcal:i.kcal,p:i.p,f:i.f,c:i.c})});
+  save();closeSheet();render();
+  toast(`${sel.length}品をコピーしました。タップで訂正できます`);
+  setTimeout(()=>{lastCopied=new Set();document.querySelectorAll('.items li.new').forEach(e=>e.classList.remove('new'))},4000);
 }
 
 /* ========== AI ========== */
@@ -1029,7 +1090,7 @@ function viewSettings(){
     <label class="btn sub" style="position:relative">バックアップから復元<input type="file" accept="application/json,.json" onchange="importData(this)" style="position:absolute;inset:0;opacity:0"></label></div>
     <button class="btn warn" style="margin-top:10px" onclick="if(confirm('すべての記録を削除します。よろしいですか？')){S=def();save();render();toast('すべて削除しました')}">すべてのデータを削除</button>
   </section>
-  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.5.2　食品の値は目安です</p>`;
+  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.6　食品の値は目安です</p>`;
 }
 async function testAI(){
   const gem=S.provider!=='claude';
