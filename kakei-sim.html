@@ -124,7 +124,7 @@
 
   label{display:block;font-size:12.5px;color:var(--ink-soft);margin:10px 0 4px;}
   label:first-child{margin-top:0;}
-  input[type=number],input[type=date],input[type=month],input[type=text],input[type=password],input[type=email],select,textarea{
+  input[type=number],input[type=date],input[type=month],input[type=text],input[type=password],select,textarea{
     width:100%;
     padding:10px 11px;
     font-size:15px;
@@ -254,6 +254,24 @@
   .lg i{width:10px;height:10px;border-radius:3px;flex:none;}
   .lg b{margin-left:auto;font-weight:700;font-family:'DM Sans','Zen Kaku Gothic New',sans-serif;font-variant-numeric:tabular-nums;}
 
+  .cmp-wrap{overflow-x:auto;margin:0 -4px;}
+  .cmp-table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:300px;}
+  .cmp-table th,.cmp-table td{padding:8px 6px;border-bottom:1px dashed var(--line);text-align:right;white-space:nowrap;}
+  .cmp-table th:first-child,.cmp-table td:first-child{text-align:left;color:var(--ink-soft);font-weight:400;white-space:normal;}
+  .cmp-table thead th{font-size:14px;color:var(--ink);border-bottom:1px solid var(--line);}
+  .cmp-table thead th i{display:inline-block;width:8px;height:8px;border-radius:3px;margin-right:5px;vertical-align:1px;}
+  .cmp-table td{font-family:'DM Sans','Zen Kaku Gothic New',sans-serif;font-variant-numeric:tabular-nums;color:var(--ink);}
+  .cmp-table tr.em td{font-weight:700;}
+  .cmp-selects{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;}
+  .be-item{padding:10px 0;border-bottom:1px dashed var(--line);}
+  .be-item:last-child{border-bottom:none;}
+  .be-item .pair{font-size:13px;color:var(--ink-soft);}
+  .be-item .res{font-size:16px;font-weight:700;margin-top:2px;color:var(--ink);}
+  .be-item .res small{font-size:12px;font-weight:400;color:var(--ink-soft);margin-left:6px;}
+  details.adv{margin-top:14px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;}
+  details.adv summary{cursor:pointer;font-size:13.5px;color:var(--ink-soft);}
+  details.adv[open] summary{margin-bottom:6px;}
+
   /* ============ レスポンシブ対応（タブレット・横向き・大画面） ============ */
   @media (min-width:700px){
     main{padding:20px 24px 96px;}
@@ -262,7 +280,7 @@
     header .summary .box .val{font-size:21px;}
     .card{padding:22px 24px;}
     .card h2{font-size:17px;}
-    input[type=number],input[type=date],input[type=month],input[type=text],input[type=password],input[type=email],select,textarea{font-size:16px;padding:11px 12px;}
+    input[type=number],input[type=date],input[type=month],input[type=text],input[type=password],select,textarea{font-size:16px;padding:11px 12px;}
     .grid3{grid-template-columns:repeat(4,1fr);gap:0 12px;}
     .btn{font-size:16px;}
     nav#bottom-nav button{font-size:12.5px;padding:12px 4px 10px;}
@@ -291,7 +309,7 @@
   <header>
     <div class="title-row">
       <h1>家計・年金シミュレーター</h1>
-      <span class="version">Ver1.9</span>
+      <span class="version">Ver1.8</span>
     </div>
     <div class="kpi" style="margin-top:14px;">
       <div><div class="lbl">資産合計（貯蓄＋投資）</div><div class="val" id="hdr-total">¥0</div></div>
@@ -314,7 +332,6 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script>
 /* ============ Firebase（他アプリと同じプロジェクトを再利用、データパスのみ分離） ============ */
@@ -328,11 +345,8 @@ const FIREBASE_CONFIG = {
   appId: "1:36181399487:web:0ef48412b814d81aaa330a"
 };
 const FIREBASE_PATH = 'household-finance';
-// Realtime Databaseのセキュリティルールがログイン必須になったため、Firebase Authでのサインインが必要。
-// メールアドレス・パスワードはコードに保持せず、初回のみ入力してもらい、以降はこの端末にFirebaseが保持するセッションで自動ログインする。
 let dataRef = null;
 let firebaseReady = false;
-let fbListenerStarted = false;
 let firstSnapshotHandled = false;
 let suppressNextWrite = false;
 
@@ -374,6 +388,23 @@ const EXPENSE_FIELDS = [
   {key:'cash', label:'現金・カード'},
 ];
 
+/* ============ 手取り計算の初期値（Ver1.8） ============ */
+// 料率は全国的な平均に近い概算値。お住まいの市区町村の値に変更可能
+const TAX_DEFAULTS = {
+  household:'single',   // 'single'（単身） / 'spouse'（配偶者あり）
+  retireAge:65,         // 会社を退職する年齢（それまでは会社の健康保険、以降は国保）
+  salaryAnnual:0,       // 退職までの給与収入（年額）
+  otherIncome:0,        // その他の所得（年額）
+  useNet:true,          // シミュレーションで年金を手取りで計算するか
+  nhiRate:9.0,          // 国保（医療分＋支援金分）所得割率 %
+  nhiFlat:50000,        // 国保（医療分＋支援金分）均等割＋平等割 円/年
+  nhiCareRate:2.5,      // 国保 介護分 所得割率 %（40〜64歳）
+  nhiCareFlat:15000,    // 国保 介護分 均等割 円/年（40〜64歳）
+  careBase:75000,       // 介護保険料 基準額 円/年（65歳以上）
+  elderRate:9.5,        // 後期高齢者医療 所得割率 %（75歳以上）
+  elderFlat:47000       // 後期高齢者医療 均等割 円/年（75歳以上）
+};
+
 /* ============ 状態管理 ============ */
 const STORAGE_KEY = 'kakeiSimData_v1';
 const AUTH_LOCAL_KEY = 'kakeiSimAuthOK_v1';
@@ -384,7 +415,7 @@ function defaultState(){
     entries: [],      // {ym:'2026-09', income:{...}, expenses:{...}}
     assets: { savings:0, investment:0, history:[] }, // history: {id,date,type,amount,note}
     bigExpenses: [],  // {id, ym:'2028-05', label:'自動車購入', amount:2500000}
-    settings: { birthDate:'', pensionBase65:0, startAge:65, simEndAge:90, monthlyBudget:0 },
+    settings: { birthDate:'', pensionBase65:0, startAge:65, simEndAge:90, monthlyBudget:0, compareAges:[63,65,70], tax: Object.assign({}, TAX_DEFAULTS) },
     simInputs: { salary:0, dividend:0, expenses:{} },
     auth: { pinHash:'', recoveryQuestion:'', recoveryAnswerHash:'' }
   };
@@ -396,7 +427,10 @@ function normalizeState(parsed){
     entries: parsed.entries || d.entries,
     assets: Object.assign(d.assets, parsed.assets||{}),
     bigExpenses: parsed.bigExpenses || d.bigExpenses,
-    settings: Object.assign(d.settings, parsed.settings||{}),
+    settings: Object.assign(d.settings, parsed.settings||{}, {
+      tax: Object.assign({}, TAX_DEFAULTS, (parsed.settings&&parsed.settings.tax)||{}),
+      compareAges: (parsed.settings&&Array.isArray(parsed.settings.compareAges)&&parsed.settings.compareAges.length===3) ? parsed.settings.compareAges.map(Number) : [63,65,70]
+    }),
     simInputs: Object.assign(d.simInputs, parsed.simInputs||{}, {expenses: Object.assign({}, (parsed.simInputs&&parsed.simInputs.expenses)||{})}),
     auth: Object.assign(d.auth, parsed.auth||{})
   };
@@ -432,24 +466,6 @@ function initFirebaseSync(){
     return;
   }
   setSyncStatus('syncing');
-  // この端末で既にサインイン済みならFirebaseが自動的に復元してくれる。未サインインの場合だけ入力画面を出す
-  firebase.auth().onAuthStateChanged(user => {
-    if(user){
-      if(!fbListenerStarted) startFirebaseListener();
-    } else {
-      fbListenerStarted = false;
-      showAuthScreen('fblogin');
-    }
-  });
-}
-
-async function firebaseSignIn(email, password){
-  await firebase.auth().signInWithEmailAndPassword(email, password);
-  // 成功するとonAuthStateChangedが発火し、startFirebaseListener()が呼ばれる
-}
-
-function startFirebaseListener(){
-  fbListenerStarted = true;
   dataRef.on('value', snap => {
     // 自分自身の書き込みで発火した最初の通知はスキップ（不要な再描画防止）
     if(suppressNextWrite){ suppressNextWrite = false; setSyncStatus('ok'); return; }
@@ -562,36 +578,6 @@ function showAuthScreen(mode){
 
   if(mode === 'loading'){
     body.innerHTML = `<div class="empty">読み込み中…</div>`;
-    return;
-  }
-
-  if(mode === 'fblogin'){
-    body.innerHTML = `
-      <div class="field-note">初回のみ、同期用のメールアドレスとパスワードを入力してください。この端末では次回以降、自動的にサインインされます。</div>
-      <label>メールアドレス</label>
-      <input type="email" id="fb-email" autocomplete="username">
-      <label>パスワード</label>
-      <input type="password" id="fb-password" autocomplete="current-password">
-      <button class="btn" id="fb-login-btn">サインインする</button>
-      <div class="field-note" id="auth-error" style="color:var(--red);"></div>
-    `;
-    const tryFbLogin = async ()=>{
-      const email = document.getElementById('fb-email').value.trim();
-      const pw = document.getElementById('fb-password').value;
-      const err = document.getElementById('auth-error');
-      if(!email || !pw){ err.textContent = 'メールアドレスとパスワードを入力してください'; return; }
-      const btn = document.getElementById('fb-login-btn');
-      btn.disabled = true;
-      try{
-        await firebaseSignIn(email, pw);
-      }catch(e){
-        console.error('Firebase sign-in failed', e);
-        err.textContent = 'サインインに失敗しました。メールアドレスとパスワードをご確認ください。';
-        btn.disabled = false;
-      }
-    };
-    document.getElementById('fb-login-btn').addEventListener('click', tryFbLogin);
-    document.getElementById('fb-password').addEventListener('keydown', e=>{ if(e.key === 'Enter') tryFbLogin(); });
     return;
   }
 
@@ -1075,13 +1061,21 @@ function renderAssetHistory(){
 }
 
 /* ============ 年金設定タブ ============ */
-function pensionAnnual(base65, startAge){
-  base65 = num(base65);
+// 繰上げ減額率：1962年4月2日以降生まれは1ヶ月0.4%、それ以前は0.5%
+function earlyRatePerMonth(birthDateStr){
+  if(birthDateStr && birthDateStr < '1962-04-02') return 0.005;
+  return 0.004;
+}
+function pensionRate(startAge, birthDateStr){
   const months = (startAge - 65) * 12;
-  let rate = 0;
-  if(months > 0) rate = months * 0.007;       // 繰下げ受給：1ヶ月あたり+0.7%
-  else if(months < 0) rate = months * 0.004;  // 繰上げ受給：1ヶ月あたり-0.4%（参考）
-  return Math.round(base65 * (1 + rate));
+  if(months > 0) return months * 0.007;                               // 繰下げ受給：1ヶ月あたり+0.7%
+  if(months < 0) return months * earlyRatePerMonth(birthDateStr);     // 繰上げ受給：1ヶ月あたり-0.4%
+  return 0;
+}
+function pensionAnnual(base65, startAge, birthDateStr){
+  base65 = num(base65);
+  if(birthDateStr === undefined) birthDateStr = state.settings.birthDate;
+  return Math.round(base65 * (1 + pensionRate(startAge, birthDateStr)));
 }
 function addYears(dateStr, years){
   const d = new Date(dateStr);
@@ -1092,10 +1086,171 @@ function fmtDate(d){
   return `${d.getFullYear()}年${d.getMonth()+1}月`;
 }
 
+/* ============ 手取り計算（税金・国保・介護保険料・後期高齢者医療）Ver1.8 ============ */
+// 公的年金等控除（年金以外の所得1,000万円以下の場合）
+function pensionDeduction(P, age){
+  if(P <= 0) return 0;
+  let d;
+  if(age >= 65){
+    if(P <= 3300000) d = 1100000;
+    else if(P <= 4100000) d = P*0.25 + 275000;
+    else if(P <= 7700000) d = P*0.15 + 685000;
+    else if(P <= 10000000) d = P*0.05 + 1455000;
+    else d = 1955000;
+  } else {
+    if(P <= 1300000) d = 600000;
+    else if(P <= 4100000) d = P*0.25 + 275000;
+    else if(P <= 7700000) d = P*0.15 + 685000;
+    else if(P <= 10000000) d = P*0.05 + 1455000;
+    else d = 1955000;
+  }
+  return Math.min(P, d);
+}
+// 給与所得控除（2025年分以降）
+function salaryDeduction(S){
+  if(S <= 0) return 0;
+  if(S <= 1900000) return Math.min(S, 650000);
+  if(S <= 3600000) return S*0.3 + 80000;
+  if(S <= 6600000) return S*0.2 + 440000;
+  if(S <= 8500000) return S*0.1 + 1100000;
+  return 1950000;
+}
+// 所得税の基礎控除（2025・2026年分）
+function basicDeductionIT(T){
+  if(T <= 1320000) return 950000;
+  if(T <= 3360000) return 880000;
+  if(T <= 4890000) return 680000;
+  if(T <= 6550000) return 630000;
+  if(T <= 23500000) return 580000;
+  if(T <= 24000000) return 480000;
+  if(T <= 24500000) return 320000;
+  if(T <= 25000000) return 160000;
+  return 0;
+}
+// 所得税（復興特別所得税2.1%込み）
+function incomeTaxCalc(x){
+  if(x <= 0) return 0;
+  x = Math.floor(x/1000)*1000;
+  let t;
+  if(x <= 1950000) t = x*0.05;
+  else if(x <= 3300000) t = x*0.10 - 97500;
+  else if(x <= 6950000) t = x*0.20 - 427500;
+  else if(x <= 9000000) t = x*0.23 - 636000;
+  else if(x <= 18000000) t = x*0.33 - 1536000;
+  else if(x <= 40000000) t = x*0.40 - 2796000;
+  else t = x*0.45 - 4796000;
+  return Math.floor(t*1.021);
+}
+// 国保・後期高齢者医療の均等割軽減（7割・5割・2割）
+function reductionRatio(J, n){
+  if(J <= 430000) return 0.7;
+  if(J <= 430000 + 305000*n) return 0.5;
+  if(J <= 430000 + 560000*n) return 0.2;
+  return 0;
+}
+// 介護保険料（65歳以上）の段階倍率（国の標準段階）
+function careStageRate(T, K, taxable){
+  if(!taxable){
+    if(K <= 809000) return 0.285;
+    if(K <= 1200000) return 0.485;
+    return 0.685;
+  }
+  if(T < 1200000) return 1.2;
+  if(T < 2100000) return 1.3;
+  if(T < 3200000) return 1.5;
+  if(T < 4200000) return 1.7;
+  if(T < 5200000) return 1.9;
+  if(T < 6200000) return 2.1;
+  if(T < 7200000) return 2.3;
+  return 2.4;
+}
+// ある年齢の1年間にかかる負担（国保・後期・介護・住民税・所得税）
+function annualBurden(age, P, t){
+  const employed = age < num(t.retireAge);
+  const S = employed ? num(t.salaryAnnual) : 0;
+  const other = num(t.otherIncome);
+  const spouse = t.household === 'spouse';
+  const n = spouse ? 2 : 1;
+  const pIncome = Math.max(0, P - pensionDeduction(P, age));
+  const sIncome = Math.max(0, S - salaryDeduction(S));
+  let adj = 0; // 所得金額調整控除（給与と年金の両方がある場合）
+  if(sIncome > 0 && pIncome > 0) adj = Math.max(0, Math.min(sIncome,100000) + Math.min(pIncome,100000) - 100000);
+  const T = Math.max(0, sIncome + pIncome + other - adj); // 合計所得
+  const taxable = T > (spouse ? 1010000 : 450000);       // 住民税の非課税限度（概算）
+
+  let health = 0, care = 0;
+  if(!employed){
+    const base = Math.max(0, T - 430000);
+    const J = T - (age >= 65 ? Math.min(150000, pIncome) : 0); // 軽減判定（65歳以上は年金所得から15万円控除）
+    const red = reductionRatio(J, n);
+    if(age < 75){
+      health = Math.min(920000, base*num(t.nhiRate)/100 + num(t.nhiFlat)*(1-red));
+      if(age < 65) health += Math.min(170000, base*num(t.nhiCareRate)/100 + num(t.nhiCareFlat)*(1-red));
+    } else {
+      health = Math.min(800000, base*num(t.elderRate)/100 + num(t.elderFlat)*(1-red));
+    }
+  }
+  if(age >= 65){
+    const K = P + Math.max(0, T - pIncome); // 年金収入＋その他の合計所得
+    care = num(t.careBase) * careStageRate(T, K, taxable);
+  }
+  const social = health + care + S*0.15; // 社会保険料控除（給与からの社会保険料は概算15%）
+  let resident = 0;
+  if(taxable){
+    resident = Math.max(0, T - 430000 - social - (spouse ? 330000 : 0)) * 0.10 + 5000;
+  }
+  const it = incomeTaxCalc(T - basicDeductionIT(T) - social - (spouse ? 380000 : 0));
+  return health + care + resident + it;
+}
+// 手取り年金額 ＝ 額面 −（年金を受け取ることで増える負担）
+function netPensionAnnual(age, gross, t){
+  if(gross <= 0) return 0;
+  return Math.round(gross - (annualBurden(age, gross, t) - annualBurden(age, 0, t)));
+}
+
+/* ============ 受給開始年齢の比較（累計受取額と損益分岐点） ============ */
+const CMP_START = 60, CMP_END = 100;
+function buildComparison(base65, birth, ages, t){
+  return ages.map(sa=>{
+    const gross = pensionAnnual(base65, sa, birth);
+    const netByAge = {};
+    for(let a=CMP_START; a<CMP_END; a++){ netByAge[a] = a >= sa ? netPensionAnnual(a, gross, t) : 0; }
+    // 月単位の累計（index 0 = 60歳0ヶ月）
+    const cumNet = [0], cumGross = [0];
+    for(let m=CMP_START*12; m<CMP_END*12; m++){
+      const a = Math.floor(m/12);
+      const on = a >= sa;
+      cumNet.push(cumNet[cumNet.length-1] + (on ? netByAge[a]/12 : 0));
+      cumGross.push(cumGross[cumGross.length-1] + (on ? gross/12 : 0));
+    }
+    return { startAge:sa, rate:pensionRate(sa, birth), gross, netAtStart:netByAge[sa], net75:netByAge[Math.max(75,sa)], netByAge, cumNet, cumGross };
+  });
+}
+function breakevenMonth(early, late, key){
+  const from = (late.startAge - CMP_START)*12;
+  const e = early[key], l = late[key];
+  for(let i=from+1; i<e.length; i++){
+    if(l[i] >= e[i]) return CMP_START*12 + i;
+  }
+  return null;
+}
+function fmtAgeMonths(totalMonths){
+  if(totalMonths == null) return `${CMP_END}歳までに逆転しない`;
+  const y = Math.floor(totalMonths/12), m = totalMonths % 12;
+  return `${y}歳${m}ヶ月`;
+}
+
 function renderSettingsTab(){
   const main = document.getElementById('tab-content');
   const s = state.settings;
+  const t = Object.assign({}, TAX_DEFAULTS, s.tax||{});
+  const ageOpts = Array.from({length:16},(_,i)=>60+i).map(a=>{
+    const tag = a<65 ? '（繰上げ）' : a>65 ? '（繰下げ）' : '';
+    return `<option value="${a}" ${Number(s.startAge)===a?'selected':''}>${a}歳${tag}</option>`;
+  }).join('');
+  const cmpSel = (idx)=>`<select id="cmp-age-${idx}">${Array.from({length:16},(_,i)=>60+i).map(a=>`<option value="${a}" ${s.compareAges[idx]===a?'selected':''}>${a}歳</option>`).join('')}</select>`;
   main.innerHTML = `
+    <div id="settings-form">
     <div class="card">
       <div class="c-head">
         <span class="c-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></span>
@@ -1108,10 +1263,8 @@ function renderSettingsTab(){
       <input type="text" inputmode="numeric" class="money-input" id="st-base65" value="${fmtInput(s.pensionBase65)}" placeholder="円/年">
 
       <label>年金受給開始年齢</label>
-      <div class="pill-select" id="st-startage">
-        ${[65,70,75].map(age=>`<button data-age="${age}" class="${s.startAge===age?'active':''}">${age}歳</button>`).join('')}
-      </div>
-      <div class="field-note">70歳・75歳を選ぶと繰下げ受給（1ヶ月ごとに+0.7%）で増額されます</div>
+      <select id="st-startage">${ageOpts}</select>
+      <div class="field-note">60〜64歳は繰上げ受給（1ヶ月ごとに−0.4%）、66〜75歳は繰下げ受給（1ヶ月ごとに+0.7%）で増減します</div>
     </div>
 
     <div class="card">
@@ -1123,11 +1276,68 @@ function renderSettingsTab(){
       <input type="text" inputmode="numeric" class="money-input" id="st-budget" value="${fmtInput(s.monthlyBudget)}" placeholder="円/月">
     </div>
 
+    <div class="card">
+      <h2>手取り計算の条件</h2>
+      <label>世帯</label>
+      <div class="pill-select" id="tx-household">
+        <button data-v="single" class="${t.household==='single'?'active':''}">単身</button>
+        <button data-v="spouse" class="${t.household==='spouse'?'active':''}">配偶者あり</button>
+      </div>
+      <div class="field-note">配偶者ありは、配偶者控除の対象（配偶者の収入が少ない）として計算します</div>
+
+      <div class="grid2">
+        <div>
+          <label>会社を退職する年齢</label>
+          <input type="number" inputmode="numeric" id="tx-retire" value="${t.retireAge}" placeholder="例：65">
+        </div>
+        <div>
+          <label>退職までの給与収入（年額）</label>
+          <input type="text" inputmode="numeric" class="money-input" id="tx-salary" value="${fmtInput(t.salaryAnnual)}" placeholder="円/年">
+        </div>
+      </div>
+      <div class="field-note">退職までは会社の健康保険、退職後は国民健康保険（75歳からは後期高齢者医療）として計算します</div>
+
+      <label>その他の所得（年額）</label>
+      <input type="text" inputmode="numeric" class="money-input" id="tx-other" value="${fmtInput(t.otherIncome)}" placeholder="不動産所得など（円/年）">
+      <div class="field-note">源泉徴収で済ませている株の配当は含めません</div>
+
+      <label>シミュレーションの年金額</label>
+      <div class="pill-select" id="tx-usenet">
+        <button data-v="1" class="${t.useNet!==false?'active':''}">手取りで計算</button>
+        <button data-v="0" class="${t.useNet===false?'active':''}">額面で計算</button>
+      </div>
+
+      <details class="adv">
+        <summary>保険料率の詳細（お住まいの市区町村の値に変更できます）</summary>
+        <div class="grid2">
+          <div><label>国保 所得割率（%）</label><input type="number" step="0.01" inputmode="decimal" id="tx-nhiRate" value="${t.nhiRate}"></div>
+          <div><label>国保 均等割＋平等割（円/年）</label><input type="text" inputmode="numeric" class="money-input" id="tx-nhiFlat" value="${fmtInput(t.nhiFlat)}"></div>
+          <div><label>国保 介護分 所得割率（%）<br>40〜64歳</label><input type="number" step="0.01" inputmode="decimal" id="tx-nhiCareRate" value="${t.nhiCareRate}"></div>
+          <div><label>国保 介護分 均等割（円/年）<br>40〜64歳</label><input type="text" inputmode="numeric" class="money-input" id="tx-nhiCareFlat" value="${fmtInput(t.nhiCareFlat)}"></div>
+          <div><label>介護保険料 基準額（円/年）<br>65歳以上</label><input type="text" inputmode="numeric" class="money-input" id="tx-careBase" value="${fmtInput(t.careBase)}"></div>
+          <div></div>
+          <div><label>後期高齢者 所得割率（%）<br>75歳以上</label><input type="number" step="0.01" inputmode="decimal" id="tx-elderRate" value="${t.elderRate}"></div>
+          <div><label>後期高齢者 均等割（円/年）<br>75歳以上</label><input type="text" inputmode="numeric" class="money-input" id="tx-elderFlat" value="${fmtInput(t.elderFlat)}"></div>
+        </div>
+        <button class="btn secondary small" id="tx-reset" style="margin-top:12px;">料率を初期値に戻す</button>
+      </details>
+    </div>
+    </div>
+
     <button class="btn" id="st-save">設定を保存</button>
 
     <div class="card" style="margin-top:14px;">
       <h2>受給見込み（計算結果）</h2>
       <div id="st-preview"></div>
+    </div>
+
+    <div class="card">
+      <div class="c-head">
+        <span class="c-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18"/><path d="M5 16l4-6 4 3 6-8"/></svg></span>
+        <h2>受給開始年齢の比較</h2>
+      </div>
+      <div class="cmp-selects">${cmpSel(0)}${cmpSel(1)}${cmpSel(2)}</div>
+      <div id="cmp-result"></div>
     </div>
 
     <div class="card">
@@ -1147,12 +1357,27 @@ function renderSettingsTab(){
     </div>
   `;
 
-  document.querySelectorAll('#st-startage button').forEach(b=>{
-    b.addEventListener('click', ()=>{
-      document.querySelectorAll('#st-startage button').forEach(x=>x.classList.remove('active'));
-      b.classList.add('active');
-      renderSettingsPreview(Number(b.dataset.age));
+  ['#tx-household','#tx-usenet'].forEach(sel=>{
+    document.querySelectorAll(sel+' button').forEach(b=>{
+      b.addEventListener('click', ()=>{
+        document.querySelectorAll(sel+' button').forEach(x=>x.classList.remove('active'));
+        b.classList.add('active');
+        refreshSettingsCalcs();
+      });
     });
+  });
+  document.getElementById('settings-form').addEventListener('change', refreshSettingsCalcs);
+  [0,1,2].forEach(i=> document.getElementById('cmp-age-'+i).addEventListener('change', refreshSettingsCalcs));
+  document.getElementById('tx-reset').addEventListener('click', (e)=>{
+    e.preventDefault();
+    document.getElementById('tx-nhiRate').value = TAX_DEFAULTS.nhiRate;
+    document.getElementById('tx-nhiFlat').value = fmtInput(TAX_DEFAULTS.nhiFlat);
+    document.getElementById('tx-nhiCareRate').value = TAX_DEFAULTS.nhiCareRate;
+    document.getElementById('tx-nhiCareFlat').value = fmtInput(TAX_DEFAULTS.nhiCareFlat);
+    document.getElementById('tx-careBase').value = fmtInput(TAX_DEFAULTS.careBase);
+    document.getElementById('tx-elderRate').value = TAX_DEFAULTS.elderRate;
+    document.getElementById('tx-elderFlat').value = fmtInput(TAX_DEFAULTS.elderFlat);
+    refreshSettingsCalcs();
   });
   document.getElementById('st-save').addEventListener('click', saveSettings);
   document.getElementById('bk-export').addEventListener('click', exportBackup);
@@ -1169,14 +1394,14 @@ function renderSettingsTab(){
   document.getElementById('auth-logout-btn').addEventListener('click', ()=>{
     if(confirm('ログアウトしますか？次回は暗証番号の入力が必要になります。')) logoutApp();
   });
-  renderSettingsPreview(s.startAge || 65);
+  refreshSettingsCalcs();
 }
 
 /* ============ バックアップの保存・復元 ============ */
 function exportBackup(){
   const payload = {
     app: 'kakei-sim',
-    version: 'Ver1.9',
+    version: 'Ver1.8',
     exportedAt: new Date().toISOString(),
     data: state
   };
@@ -1220,8 +1445,38 @@ function importBackupFile(file){
 }
 
 function currentStartAgeSelection(){
-  const active = document.querySelector('#st-startage button.active');
-  return active ? Number(active.dataset.age) : 65;
+  const el = document.getElementById('st-startage');
+  return el ? Number(el.value) : 65;
+}
+function pillValue(sel, fallback){
+  const a = document.querySelector(sel+' button.active');
+  return a ? a.dataset.v : fallback;
+}
+// 画面の入力値から手取り計算の条件を読み取る（未保存の値も反映）
+function readTaxForm(){
+  const rawNum = (id, def)=>{ const el = document.getElementById(id); if(!el || el.value==='') return def; const v = Number(el.value); return isNaN(v) ? def : v; };
+  const money = (id, def)=>{ const el = document.getElementById(id); if(!el || el.value==='') return def; return num(el.value); };
+  return {
+    household: pillValue('#tx-household','single'),
+    retireAge: rawNum('tx-retire', TAX_DEFAULTS.retireAge),
+    salaryAnnual: money('tx-salary', 0),
+    otherIncome: money('tx-other', 0),
+    useNet: pillValue('#tx-usenet','1') === '1',
+    nhiRate: rawNum('tx-nhiRate', TAX_DEFAULTS.nhiRate),
+    nhiFlat: money('tx-nhiFlat', TAX_DEFAULTS.nhiFlat),
+    nhiCareRate: rawNum('tx-nhiCareRate', TAX_DEFAULTS.nhiCareRate),
+    nhiCareFlat: money('tx-nhiCareFlat', TAX_DEFAULTS.nhiCareFlat),
+    careBase: money('tx-careBase', TAX_DEFAULTS.careBase),
+    elderRate: rawNum('tx-elderRate', TAX_DEFAULTS.elderRate),
+    elderFlat: money('tx-elderFlat', TAX_DEFAULTS.elderFlat)
+  };
+}
+function readCompareAges(){
+  return [0,1,2].map(i=> Number(document.getElementById('cmp-age-'+i).value));
+}
+function refreshSettingsCalcs(){
+  renderSettingsPreview(currentStartAgeSelection());
+  renderComparison();
 }
 
 function renderSettingsPreview(startAge){
@@ -1232,18 +1487,114 @@ function renderSettingsPreview(startAge){
     box.innerHTML = '<div class="empty">生年月日と65歳時の年金額を入力すると表示されます</div>';
     return;
   }
-  const annual = pensionAnnual(base65, startAge);
-  const monthly = annual / 12;
+  const t = readTaxForm();
+  const annual = pensionAnnual(base65, startAge, birth);
   const startDate = addYears(birth, startAge);
-  const months = (startAge-65)*12;
-  const rate = months>0 ? months*0.007 : (months<0? months*0.004 : 0);
+  const rate = pensionRate(startAge, birth);
+  const netStart = netPensionAnnual(startAge, annual, t);
+  let netRows = `<div class="stat-line"><span>手取り年額（${startAge}歳時点）</span><span class="v">${yen(netStart)}</span></div>`;
+  if(startAge < 65){
+    netRows += `<div class="stat-line"><span>手取り年額（65〜74歳）</span><span class="v">${yen(netPensionAnnual(70, annual, t))}</span></div>`;
+  }
+  netRows += `<div class="stat-line"><span>手取り年額（75歳以降）</span><span class="v">${yen(netPensionAnnual(Math.max(75,startAge), annual, t))}</span></div>`;
   box.innerHTML = `
     <div class="stat-line"><span>受給開始年齢</span><span class="v">${startAge}歳</span></div>
     <div class="stat-line"><span>受給開始時期</span><span class="v">${fmtDate(startDate)}</span></div>
     <div class="stat-line"><span>増減率</span><span class="v">${rate>=0?'+':''}${(rate*100).toFixed(1)}%</span></div>
-    <div class="stat-line"><span>受給年額</span><span class="v">${yen(annual)}</span></div>
-    <div class="stat-line"><span>受給月額</span><span class="v">${yen(monthly)}</span></div>
+    <div class="stat-line"><span>額面年額</span><span class="v">${yen(annual)}</span></div>
+    <div class="stat-line"><span>額面月額</span><span class="v">${yen(annual/12)}</span></div>
+    ${netRows}
+    <div class="field-note">手取りは、年金を受け取ることで増える所得税・住民税・国保（後期高齢者医療）・介護保険料を差し引いた概算です。</div>
   `;
+}
+
+const CMP_COLORS = ['#F2B84B','#7AA7FF','#3ECF8E'];
+let cmpChartInstance = null;
+function renderComparison(){
+  const box = document.getElementById('cmp-result');
+  if(!box) return;
+  const birth = document.getElementById('st-birth').value;
+  const base65 = num(document.getElementById('st-base65').value);
+  if(!birth || !base65){
+    box.innerHTML = '<div class="empty">生年月日と65歳時の年金額を入力すると比較できます</div>';
+    return;
+  }
+  const ages = readCompareAges();
+  const uniq = [...new Set(ages)].sort((a,b)=>a-b);
+  if(uniq.length < 2){
+    box.innerHTML = '<div class="empty">異なる受給開始年齢を2つ以上選んでください</div>';
+    return;
+  }
+  const t = readTaxForm();
+  const res = buildComparison(base65, birth, uniq, t);
+  const colorOf = sa => CMP_COLORS[uniq.indexOf(sa)];
+
+  const head = res.map(r=>`<th><i style="background:${colorOf(r.startAge)}"></i>${r.startAge}歳</th>`).join('');
+  const row = (label, f, em)=>`<tr class="${em?'em':''}"><td>${label}</td>${res.map(r=>`<td>${f(r)}</td>`).join('')}</tr>`;
+  const table = `
+    <div class="cmp-wrap"><table class="cmp-table">
+      <thead><tr><th>受給開始</th>${head}</tr></thead>
+      <tbody>
+        ${row('増減率', r=>`${r.rate>=0?'+':''}${(r.rate*100).toFixed(1)}%`)}
+        ${row('額面年額', r=>yen(r.gross))}
+        ${row('手取り年額（開始時）', r=>yen(r.netAtStart), true)}
+        ${row('手取り年額（75歳〜）', r=>yen(r.net75))}
+      </tbody>
+    </table></div>`;
+
+  const pairs = [];
+  for(let i=0;i<res.length;i++) for(let j=i+1;j<res.length;j++) pairs.push([res[i],res[j]]);
+  const beHtml = pairs.map(([e,l])=>{
+    const nm = breakevenMonth(e, l, 'cumNet');
+    const gm = breakevenMonth(e, l, 'cumGross');
+    return `<div class="be-item">
+      <div class="pair">${e.startAge}歳開始 と ${l.startAge}歳開始</div>
+      <div class="res">${nm==null ? fmtAgeMonths(null) : `${fmtAgeMonths(nm)}で${l.startAge}歳開始が上回る`}<small>額面では${fmtAgeMonths(gm)}</small></div>
+    </div>`;
+  }).join('');
+
+  box.innerHTML = `
+    ${table}
+    <h2 style="margin-top:18px;">損益分岐点（手取りベース）</h2>
+    ${beHtml}
+    <h2 style="margin-top:18px;">累計受取額の推移（手取り）</h2>
+    <div class="chart-box"><canvas id="cmp-chart"></canvas></div>
+    <div class="field-note">線が交差する年齢が損益分岐点です。この年齢より長生きすると、受給開始が遅いほうが累計で多くなります。在職老齢年金による支給停止や、加給年金・医療費の自己負担は含みません。</div>
+  `;
+  drawComparisonChart(res, colorOf);
+}
+
+function drawComparisonChart(res, colorOf){
+  const canvas = document.getElementById('cmp-chart');
+  if(!canvas || typeof Chart === 'undefined') return;
+  applyChartDefaults();
+  const labels = [];
+  for(let a=CMP_START; a<=CMP_END; a++) labels.push(a+'歳');
+  if(cmpChartInstance){ cmpChartInstance.destroy(); }
+  cmpChartInstance = new Chart(canvas, {
+    type:'line',
+    data:{
+      labels,
+      datasets: res.map(r=>({
+        label: r.startAge+'歳開始',
+        data: labels.map((_,k)=> Math.round(r.cumNet[k*12])),
+        borderColor: colorOf(r.startAge), backgroundColor: colorOf(r.startAge),
+        borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:0
+      }))
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{ mode:'index', intersect:false },
+      plugins:{
+        legend:{ display:true, labels:{ boxWidth:10, boxHeight:10 } },
+        tooltip:{ callbacks:{ label: c => ` ${c.dataset.label}: ${yenCompact(c.raw)}` } }
+      },
+      scales:{
+        x:{ grid:{ display:false }, ticks:{ maxTicksLimit:9 } },
+        y:{ min:0, ticks:{ callback: v => yenCompact(v) }, border:{ display:false } }
+      }
+    }
+  });
 }
 
 function saveSettings(){
@@ -1256,9 +1607,13 @@ function saveSettings(){
   if(!birth){ alert('生年月日を入力してください'); return; }
   if(!endAge || endAge <= startAge){ alert('シミュレーション終了年齢は受給開始年齢より大きい値を入力してください'); return; }
 
-  state.settings = { birthDate:birth, pensionBase65:base65, startAge, simEndAge:endAge, monthlyBudget:budget };
+  state.settings = Object.assign({}, state.settings, {
+    birthDate:birth, pensionBase65:base65, startAge, simEndAge:endAge, monthlyBudget:budget,
+    tax: readTaxForm(),
+    compareAges: readCompareAges()
+  });
   saveState();
-  renderSettingsPreview(startAge);
+  refreshSettingsCalcs();
   alert('設定を保存しました');
 }
 
@@ -1291,6 +1646,9 @@ function renderSimTab(){
 
   const annual = pensionAnnual(s.pensionBase65, s.startAge);
   const pensionMonthly = Math.round(annual/12);
+  const tx = Object.assign({}, TAX_DEFAULTS, s.tax||{});
+  const useNet = tx.useNet !== false;
+  const netMonthlyStart = Math.round(netPensionAnnual(s.startAge, annual, tx)/12);
   const startDate = addYears(s.birthDate, s.startAge);
   const preNet = computeMonthlyNetFromEntries();
 
@@ -1308,12 +1666,14 @@ function renderSimTab(){
         <h2>前提条件</h2>
       </div>
       <div class="stat-line"><span>受給開始</span><span class="v">${fmtDate(startDate)}（${s.startAge}歳）</span></div>
-      <div class="stat-line"><span>年金月額</span><span class="v">${yen(pensionMonthly)}</span></div>
+      <div class="stat-line"><span>年金月額（額面）</span><span class="v">${yen(pensionMonthly)}</span></div>
+      <div class="stat-line"><span>年金月額（手取り・開始時）</span><span class="v">${yen(netMonthlyStart)}</span></div>
+      <div class="stat-line"><span>シミュレーションの年金額</span><span class="v">${useNet?'手取りで計算':'額面で計算'}</span></div>
       <div class="stat-line"><span>シミュレーション終了</span><span class="v">${s.simEndAge}歳まで</span></div>
       <div class="stat-line"><span>毎月の利用可能額（目標）</span><span class="v">${yen(s.monthlyBudget)}</span></div>
       <div class="stat-line"><span>現在の収支（月平均）</span><span class="v">${preNet>=0?'+':''}${yen(preNet)}</span></div>
       <div class="stat-line"><span>大きな支出の予定</span><span class="v">${bigExpenseCount}件 ／ 合計${yen(bigExpenseTotal)}</span></div>
-      <div class="field-note">受給開始日までは、収支入力の記録から算出した上記の月平均差額を毎月貯蓄額へ加算します。自動車購入・リフォームなど「資産管理」タブに登録した大きな支出は、予定年月に一括で貯蓄・投資運用額から差し引いてシミュレーションします。</div>
+      <div class="field-note">受給開始日までは、収支入力の記録から算出した上記の月平均差額を毎月貯蓄額へ加算します。自動車購入・リフォームなど「資産管理」タブに登録した大きな支出は、予定年月に一括で貯蓄・投資運用額から差し引いてシミュレーションします。${useNet?'年金は年齢ごとの手取り額（税金・国保・介護保険料を差し引き後）で計算するため、下の支出「税・社会保障」には年金以外にかかる分だけを入れてください。':''}</div>
     </div>
 
     <div class="card">
@@ -1354,11 +1714,21 @@ function runSimulation(){
   saveState();
 
   const annual = pensionAnnual(s.pensionBase65, s.startAge);
-  const pensionMonthly = annual/12;
+  const tx = Object.assign({}, TAX_DEFAULTS, s.tax||{});
+  const useNet = tx.useNet !== false;
+  const pensionCache = {};
+  function pensionMonthlyAtAge(age){
+    // 年齢ごとに手取り額が変わる（65歳・75歳・退職年齢で負担が変化）
+    if(!useNet) return annual/12;
+    if(pensionCache[age] == null) pensionCache[age] = netPensionAnnual(age, annual, tx)/12;
+    return pensionCache[age];
+  }
   const expenseTotal = Object.values(expenses).reduce((a,b)=>a+b,0);
-  const incomeMonthly = salary + pensionMonthly + dividend;
-  const netMonthly = incomeMonthly - expenseTotal;
-  const shortfall = s.monthlyBudget - netMonthly; // 受給開始後：> 0 なら資産を取り崩す
+  function shortfallAtAge(age){
+    const netMonthly = salary + pensionMonthlyAtAge(age) + dividend - expenseTotal;
+    return s.monthlyBudget - netMonthly; // 受給開始後：> 0 なら資産を取り崩す
+  }
+  const shortfall = shortfallAtAge(s.startAge); // 受給開始時の不足額（結果表示用）
 
   const preNetMonthly = computeMonthlyNetFromEntries(); // 受給開始前：現在の収支入力の月平均差額
 
@@ -1414,8 +1784,8 @@ function runSimulation(){
       // 年金受給開始日まで：現在の収支の差額を貯蓄額へ加算（マイナス収支ならその分減額）
       savings += preNetMonthly;
       if(savings < 0) savings = 0;
-    } else if(shortfall > 0){
-      if(drawDown(shortfall)){
+    } else if(shortfallAtAge(ageAt(s.birthDate, cursor)) > 0){
+      if(drawDown(shortfallAtAge(ageAt(s.birthDate, cursor)))){
         depletedAt = new Date(cursor);
         depletedAt.setMonth(depletedAt.getMonth()+1);
         cursor.setMonth(cursor.getMonth()+1);
@@ -1423,7 +1793,7 @@ function runSimulation(){
         break;
       }
     } else {
-      savings += (-shortfall);
+      savings += (-shortfallAtAge(ageAt(s.birthDate, cursor)));
     }
 
     cursor.setMonth(cursor.getMonth()+1);
@@ -1456,11 +1826,11 @@ function renderSimResult({shortfall, depletedAt, birthDate, endAgeSetting, final
   if(depletedAt){
     const age = ageAt(birthDate, depletedAt);
     headline = `${age}歳ごろ（${fmtDate(depletedAt)}）に資金が枯渇する見込みです`;
-    detail = `毎月の不足額は約${yen(shortfall)}です。不足分を貯蓄・投資運用額から取り崩しながら毎月の利用可能額（${yen(state.settings.monthlyBudget)}）を使い続けると、上記の時期に資産が尽きる計算になります。`;
+    detail = `受給開始時の毎月の不足額は約${yen(shortfall)}です。不足分を貯蓄・投資運用額から取り崩しながら毎月の利用可能額（${yen(state.settings.monthlyBudget)}）を使い続けると、上記の時期に資産が尽きる計算になります。`;
     bannerClass = 'warn'; iconSvg = warnIcon;
   } else if(shortfall > 0){
     headline = `${endAgeSetting}歳まで資金は維持できる見込みです`;
-    detail = `毎月の不足額は約${yen(shortfall)}で、貯蓄・投資運用額から取り崩しますが、${endAgeSetting}歳の時点で約${yen(finalBalance)}が残る見込みです。`;
+    detail = `受給開始時の毎月の不足額は約${yen(shortfall)}で、貯蓄・投資運用額から取り崩しますが、${endAgeSetting}歳の時点で約${yen(finalBalance)}が残る見込みです。`;
     bannerClass = 'ok'; iconSvg = okIcon;
   } else {
     headline = `${endAgeSetting}歳まで資金は減らずに維持できる見込みです`;
@@ -1528,22 +1898,26 @@ const pensionStartLinePlugin = {
   }
 };
 
+let chartDefaultsApplied = false;
+function applyChartDefaults(){
+  if(chartDefaultsApplied || typeof Chart === 'undefined') return;
+  Chart.defaults.color = '#94A5B8';
+  Chart.defaults.borderColor = 'rgba(255,255,255,.06)';
+  Chart.defaults.font.family = '"DM Sans","Zen Kaku Gothic New",sans-serif';
+  Chart.defaults.font.size = 12;
+  Chart.defaults.plugins.tooltip.backgroundColor = '#0B121B';
+  Chart.defaults.plugins.tooltip.borderColor = '#2B3D55';
+  Chart.defaults.plugins.tooltip.borderWidth = 1;
+  Chart.defaults.plugins.tooltip.padding = 10;
+  chartDefaultsApplied = true;
+}
+
 function drawBalanceChart(points, birthDate, startDate){
   const canvas = document.getElementById('sim-chart');
   if(!canvas || typeof Chart === 'undefined') return;
   if(points.length < 2) return;
 
-  if(!drawBalanceChart._defaultsSet){
-    Chart.defaults.color = '#94A5B8';
-    Chart.defaults.borderColor = 'rgba(255,255,255,.06)';
-    Chart.defaults.font.family = '"DM Sans","Zen Kaku Gothic New",sans-serif';
-    Chart.defaults.font.size = 12;
-    Chart.defaults.plugins.tooltip.backgroundColor = '#0B121B';
-    Chart.defaults.plugins.tooltip.borderColor = '#2B3D55';
-    Chart.defaults.plugins.tooltip.borderWidth = 1;
-    Chart.defaults.plugins.tooltip.padding = 10;
-    drawBalanceChart._defaultsSet = true;
-  }
+  applyChartDefaults();
 
   const labels = points.map(p => ageAt(birthDate, p.date) + '歳');
   const pensionIdx = points.findIndex(p => p.date >= startDate);
