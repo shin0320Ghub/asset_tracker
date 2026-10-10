@@ -1018,9 +1018,11 @@ function viewGoal(){
   const nx=new Date(today.getFullYear(),today.getMonth()+1,1),nym=`${nx.getFullYear()}-${pad(nx.getMonth()+1)}`;
   const past=Object.keys(S.goals).filter(k=>k<ym).sort().reverse();
   const won=past.filter(k=>monthInfo(k).ok).length;
-  return `<div class="top"><div class="brand"><span class="bi">${IC.target}</span>月間目標</div></div>
+  return `<div class="top"><div class="brand"><span class="bi">${IC.target}</span>目標とレポート</div></div>
   ${hero}
   <button class="wchip" onclick="openGoal('${nym}')"><div><div class="lbl">${nx.getMonth()+1}月の目標</div><div class="val num">${S.goals[nym]!=null?(+S.goals[nym]).toFixed(1)+' kg':'未設定'}</div></div><span class="chip on">${S.goals[nym]!=null?'変更':'設定する'}</span></button>
+  <div class="h2">健康レポート</div>
+  <button class="wchip" style="--c:var(--l);margin-top:0" onclick="openReport()"><div><div class="lbl">食事・血圧・歩数を評価</div><div class="val" style="font-size:18px;font-weight:700">PDFレポートを作成</div></div><span class="chip on">作成</span></button>
   <div class="h2">これまでの結果</div>
   ${past.length?`<section class="card"><div class="muted" style="margin-bottom:6px">${past.length}か月中 ${won}か月 達成</div><ul class="list">${past.map(k=>{const r=monthInfo(k);return `<li><div style="flex:1"><b>${r.y}年${r.m}月</b><div class="muted">目標 ${r.goal.toFixed(1)}kg → 月末 ${r.end!=null?r.end.toFixed(1)+'kg':'記録なし'}</div></div><span class="badge ${r.end==null?'wait':r.ok?'ok':'ng'}">${r.end==null?'判定なし':r.ok?'達成':'未達成'}</span></li>`}).join('')}</ul></section>`
   :`<section class="card muted">月が終わると、ここに達成結果が表示されます。月末の結果は、その月に記録した最後の体重で判定します。</section>`}
@@ -1046,6 +1048,368 @@ function checkMonthEnd(){
   <p>${r.end==null?'この月の体重記録がなかったため、判定できませんでした。':r.ok?`目標 ${r.goal.toFixed(1)}kg に対して月末 ${r.end.toFixed(1)}kg。<br><b>目標達成です！</b>`:`目標 ${r.goal.toFixed(1)}kg に対して月末 ${r.end.toFixed(1)}kg。<br>あと ${(r.end-r.goal).toFixed(1)}kg でした。`}</p>
   <p class="muted">${r.ok?'よく頑張りました。次の月も無理のないペースで続けましょう。':'結果より続けたことに価値があります。今月の目標を見直して、また一歩ずつ進みましょう。'}</p></div>
   <button class="btn" onclick="closeSheet();tab='goal';render()">今月の目標を見る</button>`);
+}
+
+/* ========== 健康レポート（PDF） ========== */
+let rpMode='range',rpFrom=null,rpTo=null,rpBusy=false;
+function openReport(){
+  if(!rpTo){rpTo=TODAY();rpFrom=addDays(TODAY(),-6)}
+  drawReportSheet();
+}
+function rpPreset(k){
+  const t=TODAY(),d=parse(t);
+  if(k==='today'){rpMode='day';rpFrom=rpTo=t}
+  else if(k==='yday'){rpMode='day';rpFrom=rpTo=addDays(t,-1)}
+  else if(k==='7'){rpMode='range';rpTo=t;rpFrom=addDays(t,-6)}
+  else if(k==='30'){rpMode='range';rpTo=t;rpFrom=addDays(t,-29)}
+  else if(k==='month'){rpMode='range';rpFrom=`${d.getFullYear()}-${pad(d.getMonth()+1)}-01`;rpTo=t}
+  else if(k==='last'){rpMode='range';const a=new Date(d.getFullYear(),d.getMonth()-1,1),b=new Date(d.getFullYear(),d.getMonth(),0);rpFrom=ymd(a);rpTo=ymd(b)}
+  drawReportSheet();
+}
+function drawReportSheet(){
+  if(rpMode==='day')rpTo=rpFrom;
+  const n=rpFrom&&rpTo?Math.round((parse(rpTo)-parse(rpFrom))/864e5)+1:0;
+  openSheet(`<h3 style="display:flex;align-items:center;gap:8px"><span style="color:var(--leaf)">${IC.note}</span>健康レポートを作成</h3>
+  <div class="muted">指定した日・期間の食事、血圧、歩数を評価してPDFにまとめます。</div>
+  <label class="f">対象</label>
+  <div class="seg">${[['day','1日'],['range','期間']].map(([k,l])=>`<button class="${rpMode===k?'on':''}" onclick="rpMode='${k}';drawReportSheet()">${l}</button>`).join('')}</div>
+  ${rpMode==='day'
+    ?`<label class="f">日付<input class="field" type="date" max="${TODAY()}" value="${rpFrom}" onchange="rpFrom=rpTo=this.value||rpFrom;drawReportSheet()"></label>`
+    :`<div class="grid2"><label class="f">開始日<input class="field" type="date" max="${TODAY()}" value="${rpFrom}" onchange="rpFrom=this.value||rpFrom;drawReportSheet()"></label>
+      <label class="f">終了日<input class="field" type="date" max="${TODAY()}" value="${rpTo}" onchange="rpTo=this.value||rpTo;drawReportSheet()"></label></div>`}
+  <div class="chips" style="margin-top:10px;display:flex;flex-wrap:wrap;border-radius:18px">${[['today','今日'],['yday','昨日'],['7','直近7日'],['30','直近30日'],['month','今月'],['last','先月']].map(([k,l])=>`<button class="chip" onclick="rpPreset('${k}')">${l}</button>`).join('')}</div>
+  <div class="calc" style="margin-top:14px">
+    <div><div class="v num">${n>0?n:'—'}</div><div class="l">日間</div></div>
+    <div><div class="v num">${n>0?rpDays(rpFrom,rpTo).filter(d=>(S.meals[d]||[]).length).length:'—'}</div><div class="l">食事の記録日</div></div>
+    <div><div class="v num">${n>0?rpDays(rpFrom,rpTo).filter(d=>S.bp[d]).length:'—'}</div><div class="l">血圧の記録日</div></div>
+    <div><div class="v num">${n>0?rpDays(rpFrom,rpTo).filter(d=>S.steps[d]!=null).length:'—'}</div><div class="l">歩数の記録日</div></div>
+  </div>
+  ${n<=0?`<div class="warnbox">終了日は開始日より後の日付にしてください。</div>`:n>366?`<div class="warnbox">期間は1年（366日）以内で指定してください。</div>`:''}
+  <div id="rpmsg"></div>
+  <button class="btn" id="rpgo" ${n<=0||n>366?'disabled':''} onclick="makeReport()">PDFを作成</button>
+  <p class="muted" style="text-align:center;margin:8px 0 0">作成後、共有メニューから「ファイルに保存」やAirDropで保存できます</p>`);
+}
+function rpDays(a,b){const out=[];let d=a;while(d<=b&&out.length<400){out.push(d);d=addDays(d,1)}return out}
+
+/* ---- 集計と評価 ---- */
+const RP_G={good:{t:'良好',c:'#1E9E6A',bg:'#E4F5EC'},fair:{t:'まずまず',c:'#B7860B',bg:'#FBF2DA'},poor:{t:'要改善',c:'#D64545',bg:'#FCE7E7'},none:{t:'記録なし',c:'#8A96A3',bg:'#EEF1F4'}};
+function rpGrade(pts){if(!pts.length)return 'none';const m=pts.reduce((a,b)=>a+b,0)/pts.length;return m>=1.5?'good':m>=0.8?'fair':'poor'}
+function rpTarget(day){
+  const p=S.profile,w=latestWeight(day),h=+p.height,a=+p.age;
+  if(+p.manualKcal>0)return +p.manualKcal;
+  if(w&&h&&a&&p.sex){const bmr=10*w+6.25*h-5*a+(p.sex==='male'?5:-161);return Math.round(Math.max(bmr*(+p.activity||1.375)-500,bmr,1200)/10)*10}
+  return 1800;
+}
+function bpClass(s,d){
+  if(s>=135||d>=85)return {t:'高血圧の基準',k:'poor'};
+  if(s>=125||d>=75)return {t:'高値血圧',k:'fair'};
+  if(s>=115)return {t:'正常高値血圧',k:'good'};
+  return {t:'正常血圧',k:'good'};
+}
+function rpStats(from,to){
+  const days=rpDays(from,to),single=days.length===1,target=rpTarget(to);
+  // 食事
+  const mDays=days.filter(d=>(S.meals[d]||[]).length);
+  const tot={kcal:0,p:0,f:0,c:0,by:{}};MEALS.forEach(m=>tot.by[m.k]=0);
+  const daily=days.map(d=>{const t=dayTotals(d);return (S.meals[d]||[]).length?t:null});
+  mDays.forEach(d=>{const t=dayTotals(d);tot.kcal+=t.kcal;tot.p+=t.p;tot.f+=t.f;tot.c+=t.c;MEALS.forEach(m=>tot.by[m.k]+=t.by[m.k])});
+  const nM=mDays.length,avg=nM?tot.kcal/nM:0;
+  const en=tot.p*4+tot.f*9+tot.c*4||1,pfc={p:tot.p*4/en*100,f:tot.f*9/en*100,c:tot.c*4/en*100};
+  const skipB=mDays.filter(d=>!dayTotals(d).by.breakfast).length,snackAvg=nM?tot.by.snack/nM:0;
+  const overDays=daily.filter(t=>t&&t.kcal>target*1.1).length;
+  const freq={};mDays.forEach(d=>(S.meals[d]||[]).forEach(i=>{freq[i.name]=(freq[i.name]||{n:0,k:0});freq[i.name].n++;freq[i.name].k+=i.kcal}));
+  const top=Object.entries(freq).sort((a,b)=>b[1].n-a[1].n||b[1].k-a[1].k).slice(0,6);
+  const meal={nM,avg,target,tot,pfc,skipB,snackAvg,overDays,daily,top,comments:[],pts:[]};
+  if(nM){
+    const r=avg/target,lead=single?'この日の摂取は':'1日の平均は';
+    meal.pts.push(Math.abs(r-1)<=0.1?2:(r<=1.25&&r>=0.75)?1:0);
+    if(r>1.1)meal.comments.push(`${lead}${Math.round(avg).toLocaleString()}kcalで、目標（${target.toLocaleString()}kcal）を${Math.round(avg-target).toLocaleString()}kcal上回っています。主食の量と揚げ物・間食を見直しましょう。`);
+    else if(r<0.8)meal.comments.push(`${lead}${Math.round(avg).toLocaleString()}kcalで、目標より${Math.round(target-avg).toLocaleString()}kcal少なめです。食べなさすぎは筋肉が落ちて代謝が下がります。記録漏れがないかも確認しましょう。`);
+    else meal.comments.push(`${lead}${Math.round(avg).toLocaleString()}kcalで、目標（${target.toLocaleString()}kcal）に近い良いペースです。`);
+    const inP=pfc.p>=13&&pfc.p<=20,inF=pfc.f>=20&&pfc.f<=30,inC=pfc.c>=50&&pfc.c<=65,okN=[inP,inF,inC].filter(Boolean).length;
+    meal.pts.push(okN===3?2:okN===2?1:0);
+    if(pfc.p<13)meal.comments.push(`たんぱく質がエネルギーの${pfc.p.toFixed(0)}%と少なめです（目安13〜20%）。毎食、卵・魚・大豆製品・鶏むね肉などを1品入れましょう。`);
+    if(pfc.f>30)meal.comments.push(`脂質がエネルギーの${pfc.f.toFixed(0)}%と多めです（目安20〜30%）。揚げ物や脂身の多い肉を「焼く・蒸す・煮る」料理に置きかえましょう。`);
+    if(pfc.c>65)meal.comments.push(`炭水化物の割合が${pfc.c.toFixed(0)}%と高めです（目安50〜65%）。ごはんの量を一定にし、甘い飲み物や菓子を控えましょう。`);
+    if(okN===3)meal.comments.push('PFC（たんぱく質・脂質・炭水化物）のバランスは目安の範囲内です。');
+    if(!single){const sr=skipB/nM;meal.pts.push(sr<=0.2?2:sr<=0.5?1:0);if(skipB)meal.comments.push(`朝食の記録がない日が${skipB}日ありました。朝食を抜くと昼・夜の食べすぎにつながりやすくなります。`)}
+    else if(!dayTotals(from).by.breakfast){meal.pts.push(0);meal.comments.push('朝食の記録がありません。簡単なものでも朝に食べる習慣をつけましょう。')}
+    meal.pts.push(snackAvg<=200?2:snackAvg<=300?1:0);
+    if(snackAvg>200)meal.comments.push(`間食が1日平均${Math.round(snackAvg)}kcalです。間食は1日200kcalまでが目安です。`);
+    if(!single&&nM<days.length*0.7)meal.comments.push(`期間${days.length}日のうち、食事の記録は${nM}日でした。記録のない日があると評価の精度が下がります。`);
+  }
+  meal.grade=rpGrade(meal.pts);
+  // 血圧
+  const reads=[];days.forEach(d=>{const r=S.bp[d];if(!r)return;['am','pm'].forEach(sl=>{if(r[sl])reads.push({...r[sl],day:d,sl})})});
+  const avgOf=a=>a.length?{s:a.reduce((x,y)=>x+y.s,0)/a.length,d:a.reduce((x,y)=>x+y.d,0)/a.length}:null;
+  const am=reads.filter(r=>r.sl==='am'),pm=reads.filter(r=>r.sl==='pm');
+  const bp={reads,am:avgOf(am),pm:avgOf(pm),all:avgOf(reads),days:new Set(reads.map(r=>r.day)).size,comments:[],grade:'none'};
+  if(reads.length){
+    bp.maxS=reads.reduce((a,b)=>b.s>a.s?b:a);bp.over=reads.filter(r=>r.s>=135||r.d>=85).length;
+    const pulses=reads.filter(r=>r.p);bp.pulse=pulses.length?pulses.reduce((a,b)=>a+b.p,0)/pulses.length:null;
+    const ref=bp.am||bp.all;bp.cls=bpClass(ref.s,ref.d);bp.grade=bp.cls.k;
+    bp.comments.push(`${bp.am?'朝':'全体'}の平均は${Math.round(ref.s)}/${Math.round(ref.d)}mmHgで、家庭血圧の分類では「${bp.cls.t}」にあたります。`);
+    if(bp.am&&bp.pm&&bp.am.s-bp.pm.s>=10)bp.comments.push(`朝の血圧が夜より${Math.round(bp.am.s-bp.pm.s)}mmHg高めです。朝の高血圧は見逃されやすいので、続けて朝の測定を記録しましょう。`);
+    if(bp.over)bp.comments.push(`基準（135/85mmHg）以上の測定が${bp.over}回ありました。`);
+    if(bp.grade==='poor')bp.comments.push('この状態が続く場合は、記録を持ってかかりつけ医に相談してください。');
+    else if(bp.grade==='fair')bp.comments.push('減塩（1日6g未満）、野菜・果物の摂取、適度な運動と減量で改善が期待できます。');
+    else bp.comments.push('良好な状態です。この調子で測定を続けましょう。');
+    if(!single&&bp.days<days.length*0.5)bp.comments.push(`測定は${bp.days}日分でした。毎日同じ時間に測ると変化がわかりやすくなります。`);
+  }
+  // 歩数
+  const sv=days.map(d=>S.steps[d]??null),have=sv.filter(v=>v!=null),goal=S.stepGoal||8000;
+  const st={vals:sv,goal,n:have.length,comments:[],grade:'none'};
+  if(have.length){
+    st.avg=have.reduce((a,b)=>a+b,0)/have.length;st.total=have.reduce((a,b)=>a+b,0);
+    st.hit=have.filter(v=>v>=goal).length;st.max=Math.max(...have);st.maxDay=days[sv.indexOf(st.max)];st.min=Math.min(...have);
+    const r=st.avg/goal;st.grade=r>=1?'good':r>=0.75?'fair':'poor';
+    if(single)st.comments.push(st.avg>=goal?`目標の${goal.toLocaleString()}歩を達成しました。`:`目標の${goal.toLocaleString()}歩まで、あと${Math.round(goal-st.avg).toLocaleString()}歩でした。`);
+    else{
+      st.comments.push(`1日平均${Math.round(st.avg).toLocaleString()}歩で、目標達成は${have.length}日中${st.hit}日（${Math.round(st.hit/have.length*100)}%）でした。`);
+      if(st.avg<goal)st.comments.push(`目標まで1日あたりあと${Math.round(goal-st.avg).toLocaleString()}歩です。10分歩くと約1,000歩、30〜40kcalの消費になります。`);
+      else st.comments.push('目標を上回る良い活動量です。');
+    }
+    st.kcal=Math.round(st.avg*0.035);
+  }
+  // 体重
+  const wk=wKeys().filter(k=>k>=from&&k<=to);
+  const wt=wk.length?{first:S.weights[wk[0]],last:S.weights[wk[wk.length-1]],firstD:wk[0],lastD:wk[wk.length-1],n:wk.length}:null;
+  // 総合
+  const overall=[];
+  if(meal.grade==='poor'||meal.grade==='fair')overall.push(meal.comments.find(c=>!c.includes('近い良い')&&!c.includes('範囲内'))||meal.comments[0]);
+  if(bp.grade==='poor')overall.push('血圧が高めの状態です。減塩を最優先に、医師への相談も検討してください。');
+  if(st.grade==='poor'||st.grade==='fair')overall.push(`歩数を増やしましょう。まずは今より1日1,000〜2,000歩多く歩くことを目標にします。`);
+  if(!overall.length&&(nM||reads.length||have.length))overall.push('食事・血圧・歩数のいずれも良好です。今の生活習慣を続けましょう。');
+  if(!nM&&!reads.length&&!have.length)overall.push('この期間には記録がありません。');
+  return {from,to,days,single,meal,bp,st,wt,overall:overall.filter(Boolean).slice(0,3)};
+}
+
+/* ---- グラフ（canvas） ---- */
+function rpCanvas(w,h){const c=document.createElement('canvas');c.width=w*2;c.height=h*2;c.style.width=w+'px';c.style.height=h+'px';const x=c.getContext('2d');x.scale(2,2);return [c,x]}
+const RPF='"DM Sans","Zen Kaku Gothic New",sans-serif';
+function rpNice(mx,n=4){const raw=mx/n||1,mag=10**Math.floor(Math.log10(raw)),f=raw/mag,st=(f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*mag;return Math.ceil(mx/st)*st}
+function rpAxes(x,W,H,L,R,T,B,lo,hi,n,fmt){
+  x.font=`10px ${RPF}`;x.fillStyle='#8A96A3';x.strokeStyle='#E6EAEF';x.lineWidth=1;x.textAlign='right';x.textBaseline='middle';
+  for(let i=0;i<=n;i++){const v=lo+(hi-lo)*i/n,y=T+(1-i/n)*(H-T-B);x.beginPath();x.moveTo(L,y);x.lineTo(W-R,y);x.stroke();x.fillText(fmt(v),L-6,y)}
+}
+function rpXLabels(x,labels,W,L,R,H,B){
+  const n=labels.length,bw=(W-L-R)/n,step=Math.ceil(n/10);
+  x.font=`10px ${RPF}`;x.fillStyle='#8A96A3';x.textAlign='center';x.textBaseline='top';
+  labels.forEach((l,i)=>{if(i%step===0||i===n-1)x.fillText(l,L+i*bw+bw/2,H-B+6)});
+}
+function rpBars(vals,labels,opt){
+  const W=opt.w||698,H=opt.h||200,L=44,R=10,T=14,B=24,[c,x]=rpCanvas(W,H);
+  const mx=rpNice(Math.max(...vals.map(v=>v||0),opt.line||0)*1.12||1),nt=Math.round(mx/(rpNice(mx/4)||1))||4;
+  rpAxes(x,W,H,L,R,T,B,0,mx,Math.min(Math.max(nt,2),6),opt.fmt||(v=>Math.round(v).toLocaleString()));
+  const n=vals.length,bw=(W-L-R)/n,Y=v=>T+(1-v/mx)*(H-T-B);
+  vals.forEach((v,i)=>{if(v==null)return;const bx=L+i*bw+bw*0.18,w=Math.max(bw*0.64,1.5),y=Y(v);x.fillStyle=opt.color(v,i);
+    const r=Math.min(3,w/2);x.beginPath();x.moveTo(bx,H-B);x.lineTo(bx,y+r);x.quadraticCurveTo(bx,y,bx+r,y);x.lineTo(bx+w-r,y);x.quadraticCurveTo(bx+w,y,bx+w,y+r);x.lineTo(bx+w,H-B);x.fill();
+    if(n<=8&&opt.valLabel){x.fillStyle='#1F2A37';x.font=`bold 11px ${RPF}`;x.textAlign='center';x.textBaseline='bottom';x.fillText(opt.valLabel(v),bx+w/2,y-3)}});
+  if(opt.line){const y=Y(opt.line);x.strokeStyle='#D64545';x.setLineDash([5,4]);x.lineWidth=1.5;x.beginPath();x.moveTo(L,y);x.lineTo(W-R,y);x.stroke();x.setLineDash([]);
+    x.fillStyle='#D64545';x.font=`bold 10px ${RPF}`;x.textAlign='right';x.textBaseline='bottom';x.fillText(opt.lineLabel||'',W-R,y-3)}
+  rpXLabels(x,labels,W,L,R,H,B);
+  return c;
+}
+function rpBPChart(s,W=698,H=175){
+  const days=s.days,L=44,R=10,T=14,B=24,[c,x]=rpCanvas(W,H),rd=s.bp.reads;
+  const lo=Math.floor((Math.min(...rd.map(r=>r.d),75)-5)/20)*20,hi=Math.ceil((Math.max(...rd.map(r=>r.s),140)+5)/20)*20;
+  rpAxes(x,W,H,L,R,T,B,lo,hi,(hi-lo)/20,v=>Math.round(v));
+  const n=days.length,bw=(W-L-R)/n,X=d=>L+days.indexOf(d)*bw+bw/2,Y=v=>T+(hi-v)/(hi-lo)*(H-T-B);
+  [[135,'135'],[85,'85']].forEach(([v])=>{x.strokeStyle='#C9CFD6';x.setLineDash([4,4]);x.beginPath();x.moveTo(L,Y(v));x.lineTo(W-R,Y(v));x.stroke();x.setLineDash([])});
+  const series=(sl,key,col,lw,alpha)=>{const a=rd.filter(r=>r.sl===sl);if(!a.length)return;x.globalAlpha=alpha;x.strokeStyle=col;x.fillStyle=col;x.lineWidth=lw;
+    if(a.length>1){x.beginPath();a.forEach((r,i)=>{i?x.lineTo(X(r.day),Y(r[key])):x.moveTo(X(r.day),Y(r[key]))});x.stroke()}
+    a.forEach(r=>{x.beginPath();x.arc(X(r.day),Y(r[key]),sl==='am'?3:2.4,0,7);x.fill()});x.globalAlpha=1};
+  series('pm','s','#E0605E',1.5,.5);series('pm','d','#3D7BEA',1.5,.5);series('am','s','#E0605E',2.4,1);series('am','d','#3D7BEA',2.4,1);
+  rpXLabels(x,days.map(d=>{const t=parse(d);return `${t.getMonth()+1}/${t.getDate()}`}),W,L,R,H,B);
+  return c;
+}
+
+/* ---- ページ組み立て ---- */
+const RP_CSS=`
+.rp-page{width:794px;height:1123px;background:#fff;color:#1F2A37;font-family:"Zen Kaku Gothic New","Hiragino Sans",sans-serif;position:relative;padding:44px 48px 60px;box-sizing:border-box;overflow:hidden;font-size:12.5px;line-height:1.6}
+.rp-page *{box-sizing:border-box}
+.rp-n{font-family:"DM Sans","Zen Kaku Gothic New",sans-serif;font-weight:700;font-variant-numeric:tabular-nums}
+.rp-head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #1E9E80;padding-bottom:12px;margin-bottom:18px}
+.rp-head h1{margin:0;font-size:24px;letter-spacing:.04em}
+.rp-head .per{font-size:15px;font-weight:700;color:#1E9E80;margin-top:2px}
+.rp-head .meta{text-align:right;font-size:11px;color:#6B7785}
+.rp-sub{display:flex;align-items:center;gap:8px;font-size:16px;font-weight:700;margin:20px 0 10px;padding-left:10px;border-left:4px solid var(--a,#1E9E80)}
+.rp-sub .gb{margin-left:auto}
+.rp-tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.rp-tile{border:1px solid #E3E8EE;border-radius:12px;padding:12px 14px;border-top:4px solid var(--a)}
+.rp-tile .l{font-size:12px;color:#6B7785}
+.rp-tile .v{font-size:22px;line-height:1.3}
+.rp-tile .v small{font-size:12px;color:#6B7785;font-weight:500}
+.rp-tile .s{font-size:11px;color:#6B7785}
+.gb{display:inline-block;font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px}
+.rp-box{background:#F3F8F6;border-radius:12px;padding:14px 16px}
+.rp-box b{color:#1E9E80}
+.rp-box ul,.rp-cm{margin:4px 0 0;padding-left:18px}
+.rp-box li,.rp-cm li{margin:3px 0}
+.rp-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px}
+.rp-kpi>div{background:#F6F8FA;border-radius:10px;padding:8px 12px}
+.rp-kpi .l{font-size:11px;color:#6B7785}
+.rp-kpi .v{font-size:18px}
+.rp-kpi .v small{font-size:11px;color:#6B7785;font-weight:500}
+.rp-cap{font-size:11px;color:#6B7785;margin:4px 0 2px}
+.rp-pfc{display:grid;grid-template-columns:90px 1fr 70px;gap:6px 10px;align-items:center;font-size:12px}
+.rp-bar{position:relative;height:12px;background:#EEF1F4;border-radius:6px}
+.rp-bar .rg{position:absolute;top:0;bottom:0;background:rgba(30,158,128,.18);border-left:1px dashed #1E9E80;border-right:1px dashed #1E9E80}
+.rp-bar .mk{position:absolute;top:-3px;width:4px;height:18px;border-radius:2px;margin-left:-2px}
+.rp-two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.rp-tbl{width:100%;border-collapse:collapse;font-size:11.5px}
+.rp-tbl th{background:#F1F4F7;color:#4B5563;font-weight:700;padding:6px 6px;text-align:right;white-space:nowrap}
+.rp-tbl th:first-child,.rp-tbl td:first-child{text-align:left}
+.rp-tbl td{padding:5px 6px;border-bottom:1px solid #EEF1F4;text-align:right;font-family:"DM Sans","Zen Kaku Gothic New",sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rp-tbl tr.we td{background:#FAFBFC}
+.rp-tbl .hi{color:#D64545;font-weight:700}
+.rp-tbl .ok{color:#1E9E6A;font-weight:700}
+.rp-foot{position:absolute;left:48px;right:48px;bottom:24px;display:flex;justify-content:space-between;font-size:10px;color:#8A96A3;border-top:1px solid #E6EAEF;padding-top:8px}
+.rp-dot{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px;vertical-align:0}
+.rp-meal{border:1px solid #E3E8EE;border-radius:10px;padding:8px 12px;margin-bottom:8px;border-left:4px solid var(--a)}
+.rp-meal .h{display:flex;justify-content:space-between;font-weight:700}
+.rp-meal .it{display:flex;justify-content:space-between;font-size:11.5px;color:#4B5563;padding:2px 0;border-top:1px dashed #EEF1F4}
+`;
+const RP_MC={breakfast:'#D9A21B',lunch:'#3D7BEA',dinner:'#8B5CF6',snack:'#F06A4A'};
+function gBadge(k,bp){const g=RP_G[k];const t=bp?{good:'良好',fair:'注意',poor:'要注意',none:'記録なし'}[k]:g.t;return `<span class="gb" style="color:${g.c};background:${g.bg}">${t}</span>`}
+function rpPeriod(s){return s.single?fmtDate(s.from):`${fmtDate(s.from)} 〜 ${fmtDate(s.to)}（${s.days.length}日間）`}
+function rpFoot(i,n){return `<div class="rp-foot"><span>からだノート 健康レポート　※記録にもとづく目安です。医学的な診断ではありません。</span><span class="rp-n">${i} / ${n}</span></div>`}
+function rpBuildPages(s){
+  const pages=[],p=S.profile,now=new Date();
+  const prof=[p.age?`${p.age}歳`:'',p.sex==='male'?'男性':p.sex==='female'?'女性':'',p.height?`身長${p.height}cm`:''].filter(Boolean).join('　');
+  const head=`<div class="rp-head"><div><h1>健康レポート</h1><div class="per">${rpPeriod(s)}</div></div>
+    <div class="meta">${prof?prof+'<br>':''}作成日 ${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日</div></div>`;
+  const M=s.meal,B=s.bp,T=s.st;
+  /* --- 1ページ目：総合・食事 --- */
+  const tiles=`<div class="rp-tiles">
+    <div class="rp-tile" style="--a:#1E9E80"><div class="l">食事 ${gBadge(M.grade)}</div><div class="v rp-n">${M.nM?Math.round(M.avg).toLocaleString():'—'}<small> kcal${s.single?'':'/日'}</small></div><div class="s">目標 ${M.target.toLocaleString()} kcal</div></div>
+    <div class="rp-tile" style="--a:#E0605E"><div class="l">血圧 ${gBadge(B.grade,1)}</div><div class="v rp-n">${B.all?`${Math.round((B.am||B.all).s)}/${Math.round((B.am||B.all).d)}`:'—'}<small> mmHg</small></div><div class="s">${B.all?(B.am?'朝の平均':'平均')+'・'+B.cls.t:'記録なし'}</div></div>
+    <div class="rp-tile" style="--a:#3D7BEA"><div class="l">歩数 ${gBadge(T.grade)}</div><div class="v rp-n">${T.n?Math.round(T.avg).toLocaleString():'—'}<small> 歩${s.single?'':'/日'}</small></div><div class="s">目標 ${T.goal.toLocaleString()} 歩</div></div></div>`;
+  const wline=s.wt?`<div class="rp-cap" style="margin-top:8px">体重：${s.wt.n>1?`${fmtDate(s.wt.firstD)} ${s.wt.first.toFixed(1)}kg → ${fmtDate(s.wt.lastD)} ${s.wt.last.toFixed(1)}kg（<b style="color:${s.wt.last<=s.wt.first?'#1E9E6A':'#D64545'}">${s.wt.last-s.wt.first>0?'+':''}${(s.wt.last-s.wt.first).toFixed(1)}kg</b>）`:`${s.wt.last.toFixed(1)}kg`}</div>`:'';
+  const summary=`<div class="rp-box" style="margin-top:14px"><b>管理栄養士からの総合コメント</b><ul>${s.overall.map(c=>`<li>${esc(c)}</li>`).join('')}</ul></div>`;
+  let mealHtml;
+  if(!M.nM)mealHtml=`<div class="rp-cap">この期間の食事の記録はありません。</div>`;
+  else{
+    const pfcRow=(lab,v,lo,hi,col)=>`<div>${lab}</div><div class="rp-bar"><div class="rg" style="left:${lo}%;width:${hi-lo}%"></div><div class="mk" style="left:${Math.min(v,100)}%;background:${col}"></div></div><div class="rp-n" style="text-align:right">${v.toFixed(0)}%<span style="color:#8A96A3;font-weight:500;font-size:10px"> (${lo}〜${hi})</span></div>`;
+    const dist=MEALS.map(m=>({m,v:M.tot.by[m.k]/M.nM}));
+    const kpi=`<div class="rp-kpi">
+      <div><div class="l">${s.single?'摂取エネルギー':'1日平均'}</div><div class="v rp-n">${Math.round(M.avg).toLocaleString()}<small> kcal</small></div></div>
+      <div><div class="l">目標との差</div><div class="v rp-n" style="color:${M.avg>M.target*1.1?'#D64545':'#1F2A37'}">${M.avg-M.target>0?'+':''}${Math.round(M.avg-M.target).toLocaleString()}<small> kcal</small></div></div>
+      <div><div class="l">${s.single?'品数':'記録した日'}</div><div class="v rp-n">${s.single?(S.meals[s.from]||[]).length+'<small> 品</small>':`${M.nM}<small> / ${s.days.length}日</small>`}</div></div>
+      <div><div class="l">${s.single?'間食':'目標超過の日'}</div><div class="v rp-n">${s.single?Math.round(M.tot.by.snack)+'<small> kcal</small>':M.overDays+'<small> 日</small>'}</div></div></div>`;
+    const chartBox=s.single?'<div id="rpc-meal"></div>':'<div class="rp-cap">日別の摂取エネルギー（kcal）</div><div id="rpc-meal"></div>';
+    mealHtml=`${kpi}${chartBox}
+    <div class="rp-two" style="margin-top:12px">
+      <div><div class="rp-cap">PFCバランス（エネルギー比・緑の帯が目安）</div><div class="rp-pfc">
+        ${pfcRow('たんぱく質',M.pfc.p,13,20,'#1E9E80')}${pfcRow('脂質',M.pfc.f,20,30,'#D9A21B')}${pfcRow('炭水化物',M.pfc.c,50,65,'#3D7BEA')}</div>
+        <div class="rp-cap" style="margin-top:10px">${s.single?'':'1日平均 '}P ${(M.tot.p/M.nM).toFixed(1)}g ・ F ${(M.tot.f/M.nM).toFixed(1)}g ・ C ${(M.tot.c/M.nM).toFixed(1)}g</div></div>
+      <div><div class="rp-cap">食事ごとの${s.single?'':'平均'}エネルギー</div>
+        ${dist.map(({m,v})=>`<div style="display:grid;grid-template-columns:56px 1fr 70px;gap:8px;align-items:center;margin:4px 0"><span><span class="rp-dot" style="background:${RP_MC[m.k]}"></span>${m.n}</span><div class="rp-bar" style="height:10px"><div style="height:100%;border-radius:6px;width:${M.avg?v/M.avg*100:0}%;background:${RP_MC[m.k]}"></div></div><span class="rp-n" style="text-align:right">${Math.round(v).toLocaleString()} kcal</span></div>`).join('')}
+      </div></div>
+    <div class="rp-cap" style="margin-top:12px;font-weight:700;color:#1F2A37">評価</div><ul class="rp-cm">${M.comments.map(c=>`<li>${esc(c)}</li>`).join('')}</ul>
+    ${!s.single&&M.top.length?`<div class="rp-cap" style="margin-top:8px">よく食べたもの：${M.top.map(([n,v])=>`${esc(n)}（${v.n}回）`).join('、')}</div>`:''}`;
+  }
+  pages.push(`${head}${tiles}${wline}${summary}<div class="rp-sub" style="--a:#1E9E80">食事の評価 ${gBadge(M.grade)}</div>${mealHtml}`);
+  /* --- 2ページ目：血圧・歩数 --- */
+  let bpHtml;
+  if(!B.reads.length)bpHtml=`<div class="rp-cap">この期間の血圧の記録はありません。</div>`;
+  else{
+    const f=a=>a?`${Math.round(a.s)}/${Math.round(a.d)}`:'—';
+    bpHtml=`<div class="rp-kpi">
+      <div><div class="l">朝の平均</div><div class="v rp-n">${f(B.am)}</div></div>
+      <div><div class="l">夜の平均</div><div class="v rp-n">${f(B.pm)}</div></div>
+      <div><div class="l">最高値</div><div class="v rp-n">${B.maxS.s}/${B.maxS.d}</div><div class="l">${fmtDate(B.maxS.day)} ${B.maxS.sl==='am'?'朝':'夜'}</div></div>
+      <div><div class="l">基準以上 / 測定回数</div><div class="v rp-n"><span style="color:${B.over?'#D64545':'#1E9E6A'}">${B.over}</span><small> / ${B.reads.length}回</small></div></div></div>
+    ${s.days.length>1?`<div class="rp-cap">血圧の推移（mmHg）　<span class="rp-dot" style="background:#E0605E"></span>最高　<span class="rp-dot" style="background:#3D7BEA"></span>最低　太線＝朝・細線＝夜　点線＝基準135/85</div><div id="rpc-bp"></div>`:''}
+    ${B.pulse?`<div class="rp-cap">脈拍の平均：${Math.round(B.pulse)} 回/分</div>`:''}
+    <div class="rp-cap" style="margin-top:8px">家庭血圧の分類（日本高血圧学会 2019）：正常 115/75未満 ・ 正常高値 115〜124/75未満 ・ 高値 125〜134/75〜84 ・ 高血圧 135/85以上</div>
+    <div class="rp-cap" style="margin-top:10px;font-weight:700;color:#1F2A37">評価</div><ul class="rp-cm">${B.comments.map(c=>`<li>${esc(c)}</li>`).join('')}</ul>`;
+  }
+  let stHtml;
+  if(!T.n)stHtml=`<div class="rp-cap">この期間の歩数の記録はありません。</div>`;
+  else stHtml=`<div class="rp-kpi">
+      <div><div class="l">${s.single?'歩数':'1日平均'}</div><div class="v rp-n">${Math.round(T.avg).toLocaleString()}<small> 歩</small></div></div>
+      <div><div class="l">${s.single?'目標':'目標達成日'}</div><div class="v rp-n">${s.single?T.goal.toLocaleString()+'<small> 歩</small>':`${T.hit}<small> / ${T.n}日</small>`}</div></div>
+      <div><div class="l">${s.single?'達成率':'最多'}</div><div class="v rp-n">${s.single?Math.round(T.avg/T.goal*100)+'<small> %</small>':T.max.toLocaleString()+'<small> 歩</small>'}</div>${s.single?'':`<div class="l">${fmtDate(T.maxDay)}</div>`}</div>
+      <div><div class="l">${s.single?'消費の目安':'合計'}</div><div class="v rp-n">${s.single?T.kcal+'<small> kcal</small>':T.total.toLocaleString()+'<small> 歩</small>'}</div></div></div>
+    ${s.days.length>1?`<div class="rp-cap">日別の歩数　<span class="rp-dot" style="background:#1E9E80"></span>目標達成　<span class="rp-dot" style="background:#7FA9F0"></span>未達　点線＝目標</div><div id="rpc-st"></div>`:''}
+    <div class="rp-cap" style="margin-top:10px;font-weight:700;color:#1F2A37">評価</div><ul class="rp-cm">${T.comments.map(c=>`<li>${esc(c)}</li>`).join('')}</ul>`;
+  pages.push(`${head}<div class="rp-sub" style="--a:#E0605E;margin-top:0">血圧の評価 ${gBadge(B.grade,1)}</div>${bpHtml}<div class="rp-sub" style="--a:#3D7BEA;margin-top:18px">歩数の評価 ${gBadge(T.grade)}</div>${stHtml}`);
+  /* --- 3ページ目以降：明細 --- */
+  if(s.single){
+    const list=S.meals[s.from]||[];
+    if(list.length){
+      const blocks=MEALS.map(m=>{const l=list.filter(i=>i.meal===m.k);if(!l.length)return '';const k=l.reduce((a,i)=>a+i.kcal,0);
+        return `<div class="rp-meal" style="--a:${RP_MC[m.k]}"><div class="h"><span>${m.n}</span><span class="rp-n">${Math.round(k).toLocaleString()} kcal</span></div>${l.map(i=>`<div class="it"><span>${esc(i.name)}${i.grams?`（${i.grams}g）`:''}</span><span class="rp-n" style="font-weight:500">P${r1(i.p)} F${r1(i.f)} C${r1(i.c)}　<b>${Math.round(i.kcal)}</b> kcal</span></div>`).join('')}</div>`}).join('');
+      pages.push(`${head}<div class="rp-sub" style="margin-top:0">食事の明細</div>${blocks}`);
+    }
+  }else{
+    const rows=s.days.map(d=>{const t=dayTotals(d),has=(S.meals[d]||[]).length,b=S.bp[d]||{},st=S.steps[d],w=S.weights[d],dw=parse(d).getDay();
+      const bpc=x=>x?`<span class="${x.s>=135||x.d>=85?'hi':''}">${x.s}/${x.d}</span>`:'—';
+      return `<tr class="${dw===0||dw===6?'we':''}"><td>${fmtDate(d)}</td><td class="${has&&t.kcal>M.target*1.1?'hi':''}">${has?Math.round(t.kcal).toLocaleString():'—'}</td><td>${has?t.p.toFixed(1):'—'}</td><td>${has?t.f.toFixed(1):'—'}</td><td>${has?t.c.toFixed(1):'—'}</td><td class="${st!=null&&st>=T.goal?'ok':''}">${st!=null?st.toLocaleString():'—'}</td><td>${bpc(b.am)}</td><td>${bpc(b.pm)}</td><td>${w!=null?w.toFixed(1):'—'}</td></tr>`});
+    const th=`<table class="rp-tbl"><thead><tr><th>日付</th><th>エネルギー kcal</th><th>P g</th><th>F g</th><th>C g</th><th>歩数</th><th>血圧 朝</th><th>血圧 夜</th><th>体重 kg</th></tr></thead><tbody>`;
+    for(let i=0;i<rows.length;i+=36)pages.push(`${head}<div class="rp-sub" style="margin-top:0">日別の記録${rows.length>36?`（${Math.floor(i/36)+1}）`:''}</div>${th}${rows.slice(i,i+36).join('')}</tbody></table>
+      <div class="rp-cap" style="margin-top:8px">赤字：目標の110%を超えた日・基準（135/85）以上の血圧　緑字：歩数の目標達成</div>`);
+  }
+  return pages;
+}
+function rpLoad(src){return new Promise((ok,ng)=>{const e=document.createElement('script');e.src=src;e.onload=ok;e.onerror=()=>ng(new Error('ライブラリを読み込めませんでした（通信を確認してください）'));document.head.appendChild(e)})}
+async function makeReport(){
+  if(rpBusy)return;rpBusy=true;
+  const msg=$('#rpmsg'),btn=$('#rpgo');
+  const say=t=>{if(msg)msg.innerHTML=`<div class="loading"><div class="spin"></div>${t}</div>`};
+  if(btn)btn.disabled=true;
+  let wrap;
+  try{
+    say('データを集計しています…');
+    const s=rpStats(rpFrom,rpTo);
+    say('レポートを組み立てています…');
+    if(!window.html2canvas)await rpLoad('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+    if(!window.jspdf)await rpLoad('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+    wrap=document.createElement('div');wrap.style.cssText='position:fixed;left:-10000px;top:0;z-index:-1';
+    wrap.innerHTML=`<style>${RP_CSS}</style>`;
+    const html=rpBuildPages(s),N=html.length;
+    const els=html.map((h,i)=>{const d=document.createElement('div');d.className='rp-page';d.innerHTML=h+rpFoot(i+1,N);wrap.appendChild(d);return d});
+    document.body.appendChild(wrap);
+    const put=(id,c)=>{const e=wrap.querySelector('#'+id);if(e)e.appendChild(c)};
+    const labels=s.days.map(d=>{const t=parse(d);return `${t.getMonth()+1}/${t.getDate()}`});
+    if(s.meal.nM){
+      if(s.single){const t=dayTotals(s.from);put('rpc-meal',rpBars(MEALS.map(m=>t.by[m.k]),MEALS.map(m=>m.n),{h:150,color:(v,i)=>RP_MC[MEALS[i].k],valLabel:v=>Math.round(v)+' kcal'}))}
+      else put('rpc-meal',rpBars(s.meal.daily.map(t=>t?t.kcal:null),labels,{h:190,line:s.meal.target,lineLabel:`目標 ${s.meal.target.toLocaleString()}`,color:v=>v>s.meal.target*1.1?'#E0605E':'#1E9E80',valLabel:v=>Math.round(v).toLocaleString()}));
+    }
+    if(s.bp.reads.length&&s.days.length>1)put('rpc-bp',rpBPChart(s));
+    if(s.st.n&&s.days.length>1)put('rpc-st',rpBars(s.st.vals,labels,{h:150,line:s.st.goal,lineLabel:`目標 ${s.st.goal.toLocaleString()}`,color:v=>v>=s.st.goal?'#1E9E80':'#7FA9F0',fmt:v=>Math.round(v).toLocaleString(),valLabel:v=>v.toLocaleString()}));
+    if(document.fonts&&document.fonts.ready)await document.fonts.ready;
+    const {jsPDF}=window.jspdf,pdf=new jsPDF({unit:'mm',format:'a4',orientation:'portrait'});
+    for(let i=0;i<els.length;i++){
+      say(`PDFを作成しています…（${i+1}/${N}ページ）`);
+      const cv=await html2canvas(els[i],{scale:2,backgroundColor:'#ffffff',useCORS:true,logging:false});
+      if(i)pdf.addPage();
+      pdf.addImage(cv.toDataURL('image/jpeg',0.88),'JPEG',0,0,210,297);
+    }
+    const name=`健康レポート_${s.from.replace(/-/g,'')}${s.single?'':'-'+s.to.replace(/-/g,'')}.pdf`;
+    const blob=pdf.output('blob');
+    wrap.remove();wrap=null;
+    if(msg)msg.innerHTML=`<div class="tip" style="margin:0 0 12px"><div class="face">${IC.note}</div><div><b>PDFができました</b>${N}ページ・${name}</div></div>
+      <button class="btn" style="margin-bottom:8px" onclick="rpShare()">保存・共有する</button>`;
+    window._rp={blob,name};
+    rpShare(true);
+  }catch(e){
+    if(msg)msg.innerHTML=`<div class="warnbox" style="margin-bottom:12px">PDFを作成できませんでした：${esc(e.message||e)}</div>`;
+  }finally{
+    if(wrap)wrap.remove();rpBusy=false;if(btn)btn.disabled=false;
+  }
+}
+async function rpShare(auto){
+  const r=window._rp;if(!r)return;
+  const file=new File([r.blob],r.name,{type:'application/pdf'});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){
+    try{await navigator.share({files:[file],title:r.name});return}
+    catch(e){if(e&&e.name==='AbortError')return;if(auto)return}
+  }
+  const url=URL.createObjectURL(r.blob),a=document.createElement('a');
+  a.href=url;a.download=r.name;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
 }
 
 /* ========== 設定 ========== */
@@ -1090,7 +1454,7 @@ function viewSettings(){
     <label class="btn sub" style="position:relative">バックアップから復元<input type="file" accept="application/json,.json" onchange="importData(this)" style="position:absolute;inset:0;opacity:0"></label></div>
     <button class="btn warn" style="margin-top:10px" onclick="if(confirm('すべての記録を削除します。よろしいですか？')){S=def();save();render();toast('すべて削除しました')}">すべてのデータを削除</button>
   </section>
-  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.6　食品の値は目安です</p>`;
+  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.7　食品の値は目安です</p>`;
 }
 async function testAI(){
   const gem=S.provider!=='claude';
