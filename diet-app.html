@@ -1119,7 +1119,9 @@ function rpStats(from,to){
   const overDays=daily.filter(t=>t&&t.kcal>target*1.1).length;
   const freq={};mDays.forEach(d=>(S.meals[d]||[]).forEach(i=>{freq[i.name]=(freq[i.name]||{n:0,k:0});freq[i.name].n++;freq[i.name].k+=i.kcal}));
   const top=Object.entries(freq).sort((a,b)=>b[1].n-a[1].n||b[1].k-a[1].k).slice(0,6);
-  const meal={nM,avg,target,tot,pfc,skipB,snackAvg,overDays,daily,top,comments:[],pts:[]};
+  const agg={};mDays.forEach(d=>(S.meals[d]||[]).forEach(i=>{const a=agg[i.name]=agg[i.name]||{name:i.name,n:0,kcal:0,p:0,f:0,c:0};a.n++;a.kcal+=i.kcal;a.p+=i.p;a.f+=i.f;a.c+=i.c}));
+  const rank={};['kcal','p','f','c'].forEach(k=>{const sum=tot[k]||0;rank[k]=Object.values(agg).filter(a=>a[k]>0).sort((a,b)=>b[k]-a[k]).slice(0,5).map(a=>({...a,v:a[k],share:sum?a[k]/sum*100:0}))});
+  const meal={nM,avg,target,tot,pfc,skipB,snackAvg,overDays,daily,top,rank,comments:[],pts:[]};
   if(nM){
     const r=avg/target,lead=single?'この日の摂取は':'1日の平均は';
     meal.pts.push(Math.abs(r-1)<=0.1?2:(r<=1.25&&r>=0.75)?1:0);
@@ -1264,6 +1266,17 @@ const RP_CSS=`
 .rp-tbl tr.we td{background:#FAFBFC}
 .rp-tbl .hi{color:#D64545;font-weight:700}
 .rp-tbl .ok{color:#1E9E6A;font-weight:700}
+.rp-rkg{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.rp-rk{border:1px solid #E3E8EE;border-top:4px solid var(--a);border-radius:12px;padding:10px 14px 8px}
+.rp-rk .h{display:flex;justify-content:space-between;align-items:baseline;font-weight:700;font-size:13.5px;margin-bottom:4px;color:var(--a)}
+.rp-rk .r{display:grid;grid-template-columns:22px 1fr;gap:6px;padding:6px 0;border-top:1px solid #F1F4F7}
+.rp-rk .no{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:11px;background:#EEF1F4;color:#4B5563;margin-top:1px}
+.rp-rk .r:nth-of-type(2) .no{background:var(--a);color:#fff}
+.rp-rk .t{display:flex;justify-content:space-between;gap:8px;font-size:12px;white-space:nowrap}
+.rp-rk .t small{font-size:10px;color:#6B7785;font-weight:500}
+.rp-rk .br{height:5px;background:#F1F4F7;border-radius:3px;margin:3px 0 2px}
+.rp-rk .br i{display:block;height:100%;border-radius:3px;background:var(--a);opacity:.85}
+.rp-rk .sb{display:flex;justify-content:space-between;font-size:10px;color:#8A96A3}
 .rp-foot{position:absolute;left:48px;right:48px;bottom:24px;display:flex;justify-content:space-between;font-size:10px;color:#8A96A3;border-top:1px solid #E6EAEF;padding-top:8px}
 .rp-dot{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px;vertical-align:0}
 .rp-meal{border:1px solid #E3E8EE;border-radius:10px;padding:8px 12px;margin-bottom:8px;border-left:4px solid var(--a)}
@@ -1335,6 +1348,25 @@ function rpBuildPages(s){
     ${s.days.length>1?`<div class="rp-cap">日別の歩数　<span class="rp-dot" style="background:#1E9E80"></span>目標達成　<span class="rp-dot" style="background:#7FA9F0"></span>未達　点線＝目標</div><div id="rpc-st"></div>`:''}
     <div class="rp-cap" style="margin-top:10px;font-weight:700;color:#1F2A37">評価</div><ul class="rp-cm">${T.comments.map(c=>`<li>${esc(c)}</li>`).join('')}</ul>`;
   pages.push(`${head}<div class="rp-sub" style="--a:#E0605E;margin-top:0">血圧の評価 ${gBadge(B.grade,1)}</div>${bpHtml}<div class="rp-sub" style="--a:#3D7BEA;margin-top:18px">歩数の評価 ${gBadge(T.grade)}</div>${stHtml}`);
+  /* --- ランキング --- */
+  if(M.nM){
+    const RK=[['kcal','エネルギー','kcal','#6B7785'],['p','たんぱく質','g','#1E9E80'],['f','脂質','g','#D9A21B'],['c','炭水化物','g','#3D7BEA']];
+    const cut=t=>t.length>13?t.slice(0,12)+'…':t;
+    const card=([k,lab,u,col])=>{const l=M.rank[k],top=l[0]?l[0].v:1;
+      return `<div class="rp-rk" style="--a:${col}"><div class="h"><span>${lab}が多い食べ物</span><span class="rp-cap" style="margin:0">${s.single?'':'期間の合計'}</span></div>
+      ${l.length?l.map((a,i)=>`<div class="r"><span class="no rp-n">${i+1}</span><div class="nm"><div class="t"><span>${esc(cut(a.name))}</span><span class="rp-n">${k==='kcal'?Math.round(a.v).toLocaleString():a.v.toFixed(1)}<small> ${u}</small></span></div>
+        <div class="br"><i style="width:${a.v/top*100}%"></i></div><div class="sb"><span>${s.single?'':`${a.n}回・1回あたり ${k==='kcal'?Math.round(a.v/a.n):(a.v/a.n).toFixed(1)}${u}`}</span><span>全体の ${a.share.toFixed(0)}%</span></div></div></div>`).join('')
+      :'<div class="rp-cap">該当なし</div>'}</div>`};
+    const cm=[];const one=(k,lab)=>M.rank[k][0];
+    const F=one('f'),C=one('c'),P=one('p'),K=one('kcal');
+    if(K)cm.push(`エネルギーがいちばん多かったのは「${esc(K.name)}」で、${s.single?'この日':'期間'}の摂取エネルギーの${K.share.toFixed(0)}%を占めています。`);
+    if(F)cm.push(`脂質の1位は「${esc(F.name)}」（全体の${F.share.toFixed(0)}%）。${M.pfc.f>30?'脂質が多めなので、量を減らすか「焼く・蒸す・煮る」料理への置きかえが効果的です。':'脂質のとりすぎにならないよう、この食べ物の量に気をつけましょう。'}`);
+    if(C)cm.push(`炭水化物の1位は「${esc(C.name)}」（全体の${C.share.toFixed(0)}%）。${M.pfc.c>65?'主食の量を少し減らすと、全体のバランスが整います。':'主食は毎食同じ量を目安にすると、安定して管理できます。'}`);
+    if(P)cm.push(`たんぱく質の1位は「${esc(P.name)}」。${M.pfc.p<13?'たんぱく質が不足ぎみなので、ランキング上位の食品を増やしましょう。':'筋肉を守る大切な栄養源です。今後も続けましょう。'}`);
+    pages.push(`${head}<div class="rp-sub" style="margin-top:0">PFCランキング<span class="rp-cap" style="margin:0 0 0 auto;font-weight:500">同じ名前の食べ物を合計して、多い順に表示</span></div>
+      <div class="rp-rkg">${RK.map(card).join('')}</div>
+      <div class="rp-box" style="margin-top:14px"><b>ランキングから見えること</b><ul>${cm.map(c=>`<li>${c}</li>`).join('')}</ul></div>`);
+  }
   /* --- 3ページ目以降：明細 --- */
   if(s.single){
     const list=S.meals[s.from]||[];
@@ -1454,7 +1486,7 @@ function viewSettings(){
     <label class="btn sub" style="position:relative">バックアップから復元<input type="file" accept="application/json,.json" onchange="importData(this)" style="position:absolute;inset:0;opacity:0"></label></div>
     <button class="btn warn" style="margin-top:10px" onclick="if(confirm('すべての記録を削除します。よろしいですか？')){S=def();save();render();toast('すべて削除しました')}">すべてのデータを削除</button>
   </section>
-  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.7　食品の値は目安です</p>`;
+  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.8　食品の値は目安です</p>`;
 }
 async function testAI(){
   const gem=S.provider!=='claude';
