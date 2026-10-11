@@ -28,7 +28,7 @@
 html,body{margin:0;min-height:100%}
 body{
   background:radial-gradient(1200px 600px at 10% -10%,#15263A 0%,transparent 60%),radial-gradient(900px 500px at 110% 10%,#2A1E14 0%,transparent 55%),var(--bg);
-  background-attachment:fixed;color:var(--ink);
+  color:var(--ink);
   font-family:"Zen Kaku Gothic New","Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;
   font-size:17px;line-height:1.55;-webkit-text-size-adjust:100%;
 }
@@ -168,8 +168,8 @@ body.sheet-open{overflow:hidden}
 </style>
 <!-- ===== Firebaseログイン(メール/パスワード)共通部品 ===== -->
 <style>
-#fbl{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;box-sizing:border-box;padding:24px;padding-top:max(24px,env(safe-area-inset-top));background:#eef1f5;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;color:#1d2433;-webkit-text-size-adjust:100%}
-#fbl .fbl-b{width:100%;max-width:360px;background:#fff;border-radius:14px;padding:26px 22px;box-shadow:0 6px 24px rgba(20,30,50,.12)}
+#fbl{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:flex-start;justify-content:center;box-sizing:border-box;padding:24px;padding-top:max(24px,env(safe-area-inset-top));overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;background:#eef1f5;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;color:#1d2433;-webkit-text-size-adjust:100%}
+#fbl .fbl-b{width:100%;max-width:360px;margin:auto;background:#fff;border-radius:14px;padding:26px 22px;box-shadow:0 6px 24px rgba(20,30,50,.12)}
 #fbl h1{font-size:19px;margin:0 0 6px;font-weight:700;letter-spacing:0}
 #fbl .fbl-s{font-size:13px;color:#5b6475;margin:0 0 8px;line-height:1.6}
 #fbl label{display:block;font-size:12px;color:#5b6475;margin:14px 0 5px}
@@ -178,9 +178,20 @@ body.sheet-open{overflow:hidden}
 #fbl button{width:100%;margin-top:20px;font-size:16px;font-weight:700;padding:13px;border:0;border-radius:9px;background:#2f6fdf;color:#fff;cursor:pointer}
 #fbl button:disabled{opacity:.6}
 #fbl .fbl-e{min-height:1.4em;margin-top:12px;font-size:13px;color:#c0392b;line-height:1.5}
+#fbl .fbl-v{margin-top:10px;font-size:11px;color:#8a93a3;text-align:right}
+#fbl.fbl-c{padding:12px;padding-top:max(12px,env(safe-area-inset-top))}
+#fbl.fbl-c .fbl-b{padding:14px 18px}
+#fbl.fbl-c h1{font-size:17px;margin:0 0 2px}
+#fbl.fbl-c .fbl-s{display:none}
+#fbl.fbl-c label{margin:8px 0 4px}
+#fbl.fbl-c input{padding:10px 12px}
+#fbl.fbl-c button{margin-top:12px;padding:11px}
+#fbl.fbl-c .fbl-e{margin-top:8px;min-height:1.2em}
+html.fbl-lock,html.fbl-lock body{overflow:hidden}
 @media (prefers-color-scheme:dark){#fbl{background:#12161d;color:#e8ebf0}#fbl .fbl-b{background:#1c222c;box-shadow:none}#fbl .fbl-s,#fbl label{color:#9aa3b2}#fbl input{background:#12161d;color:#e8ebf0;border-color:#3a4352}}
 </style>
 <script>
+window.FBL_VER='マイ資産ダッシュボード Ver2.1';
 (function(){
   var MSG={
     'auth/invalid-credential':'メールアドレスまたはパスワードが違います。',
@@ -203,7 +214,7 @@ body.sheet-open{overflow:hidden}
       '<p class="fbl-s">iPhone・iPad共通のアカウントでログインしてください。この端末では次回から自動でログインします。</p>'+
       '<label for="fbl-m">メールアドレス</label><input id="fbl-m" type="email" autocomplete="username" autocapitalize="off" spellcheck="false">'+
       '<label for="fbl-p">パスワード</label><input id="fbl-p" type="password" autocomplete="current-password">'+
-      '<button type="submit">ログイン</button><div class="fbl-e" role="alert"></div></form>';
+      '<button type="submit">ログイン</button><div class="fbl-e" role="alert"></div>'+(window.FBL_VER?'<div class="fbl-v">'+window.FBL_VER+'</div>':'')+'</form>';
     var f=box.querySelector('form'), btn=box.querySelector('button'), err=box.querySelector('.fbl-e');
     f.addEventListener('submit',function(ev){
       ev.preventDefault();
@@ -215,13 +226,31 @@ body.sheet-open{overflow:hidden}
       }).then(function(){btn.disabled=false; btn.textContent='ログイン';});
     });
     document.body.appendChild(box);
+    /* 入力欄をタップしたら、キーボードの上に見える位置までこの画面の中でスクロールする */
+    box.addEventListener('focusin',function(e){
+      var t=e.target;
+      if(t&&t.tagName==='INPUT'){ setTimeout(function(){ fit(); try{ t.scrollIntoView({block:'center',behavior:'smooth'}); }catch(_){ } },320); }
+    });
   }
+  /* iPadはキーボードを出しても画面(レイアウト)の大きさが変わらず、見えている範囲だけが小さくなる。
+     ログイン画面を「実際に見えている範囲」にぴったり合わせ、収まらない高さのときは小さく表示する。 */
+  function fit(){
+    if(!box) return;
+    var vv=window.visualViewport;
+    if(!vv) return;
+    box.style.right='auto'; box.style.bottom='auto';
+    box.style.top=vv.offsetTop+'px'; box.style.left=vv.offsetLeft+'px';
+    box.style.width=vv.width+'px'; box.style.height=vv.height+'px';
+    box.classList.toggle('fbl-c', vv.height<560);
+  }
+  if(window.visualViewport){ window.visualViewport.addEventListener('resize',fit); window.visualViewport.addEventListener('scroll',fit); }
+  window.addEventListener('orientationchange',function(){ setTimeout(fit,350); });
   function show(fn){
     submitFn=fn;
-    var go=function(){ if(!box) build(); box.style.display='flex'; };
+    var go=function(){ if(!box) build(); box.style.display='flex'; document.documentElement.classList.add('fbl-lock'); fit(); };
     if(document.body) go(); else document.addEventListener('DOMContentLoaded',go);
   }
-  function hide(){ if(box) box.style.display='none'; }
+  function hide(){ if(box) box.style.display='none'; document.documentElement.classList.remove('fbl-lock'); }
   /* o.onState(cb) / o.login(email,pw) / o.logout() を渡すと、ログイン済みユーザーで resolve する */
   window.fbLoginGate=function(o){
     return new Promise(function(resolve){
@@ -261,7 +290,7 @@ body.sheet-open{overflow:hidden}
 <div class="wrap hidden" id="scrDash">
   <header>
     <div class="title">
-      <h1>マイ資産ダッシュボード<span class="ver">Ver2.0</span></h1>
+      <h1>マイ資産ダッシュボード<span class="ver">Ver2.1</span></h1>
       <div class="today" id="today"></div>
     </div>
     <div class="hdr-right">
@@ -817,7 +846,11 @@ if (fb){
   });
   // メール/パスワードでログイン(未ログインならログイン画面を表示)
   window.fbLoginGate({
-    onState: cb => fb.onAuthStateChanged(fb.auth, cb),
+    onState: cb => fb.onAuthStateChanged(fb.auth, u => {
+      // 未ログインの間は、裏側の画面(読み込み中の表示など)を出さない
+      if (!u || u.isAnonymous) ['scrLoading','scrLogin','scrDash'].forEach(id => $(id).classList.add('hidden'));
+      cb(u);
+    }),
     login: (m, p) => fb.signInWithEmailAndPassword(fb.auth, m, p),
     logout: () => fb.signOut(fb.auth)
   });
