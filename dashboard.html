@@ -2,10 +2,10 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="ダッシュボード">
 <meta name="theme-color" content="#0B121B">
 <title>マイ資産ダッシュボード</title>
@@ -166,35 +166,73 @@ body.sheet-open{overflow:hidden}
 .frames iframe.on{display:block}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
-<!-- ===== 診断ログ:アドレスの末尾に ?debug=1 を付けて開いたときだけ動きます ===== -->
+<!-- ===== 診断ログ:?debug=1 を付けて開く、またはログイン画面のバージョン表示を3回続けてタップするとオン/オフできます ===== -->
 <script>
 (function(){
   window.__dbg=function(){};
-  if(!/[?&]debug=1(&|$)/.test(location.search)) return;
-  var KEY='dash_dbg_log', AL='dash_dbg_alive', lines=[], panel=null, body=null, head=null, boot=1;
-  if(/[?&]clear=1(&|$)/.test(location.search)){ try{ localStorage.removeItem(KEY); localStorage.removeItem(AL); }catch(e){} }
+  var FLAG='dash_dbg_on', KEY='dash_dbg_log', AL='dash_dbg_alive', VER='Ver2.3';
+  var q=location.search, on=/[?&]debug=1(&|$)/.test(q);
+  try{
+    if(/[?&]debug=0(&|$)/.test(q)) localStorage.removeItem(FLAG);
+    if(on) localStorage.setItem(FLAG,'1');
+    on = localStorage.getItem(FLAG)==='1';
+    if(/[?&]clear=1(&|$)/.test(q)){ localStorage.removeItem(KEY); localStorage.removeItem(AL); }
+  }catch(e){}
+
+  /* ログイン画面のバージョン表示を3回続けてタップ → 診断ログのオン/オフ(ホーム画面から開いた状態でも切り替えられる) */
+  function arm(){
+    var el=document.getElementById('verTap'); if(!el) return;
+    var n=0,t=0;
+    el.addEventListener('click',function(){
+      var now=Date.now(); n=(now-t<1500)?n+1:1; t=now;
+      if(n>=3){
+        n=0;
+        try{ if(localStorage.getItem(FLAG)==='1') localStorage.removeItem(FLAG); else localStorage.setItem(FLAG,'1'); }catch(e){}
+        location.replace(location.pathname);
+      }
+    });
+  }
+  if(document.body) arm(); else document.addEventListener('DOMContentLoaded',arm);
+  if(!on) return;
+
+  var lines=[], panel=null, body=null, head=null, boot=1;
   try{ lines=JSON.parse(localStorage.getItem(KEY)||'[]'); }catch(e){ lines=[]; }
   for(var i=0;i<lines.length;i++){ if(/ BOOT #\d+/.test(lines[i])) boot++; }
   function hms(d){ d=d||new Date(); return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+':'+('0'+d.getSeconds()).slice(-2); }
-  function save(){ try{ localStorage.setItem(KEY,JSON.stringify(lines.slice(-90))); }catch(e){} }
-  function draw(){ if(body){ body.textContent=lines.slice(-18).join('\n'); } if(head){ head.textContent='診断ログ  起動#'+boot+'  いま '+hms(); } }
+  function save(){ try{ localStorage.setItem(KEY,JSON.stringify(lines.slice(-120))); }catch(e){} }
+  function draw(){ if(body){ body.textContent=lines.slice(-20).join('\n'); } if(head){ head.textContent='診断ログ  起動#'+boot+'  いま '+hms(); } }
   function log(m){ lines.push(hms()+' '+m); save(); draw(); }
   window.__dbg=log;
   var prevAlive=''; try{ prevAlive=localStorage.getItem(AL)||''; }catch(e){}
   var ua=navigator.userAgent, ver=(/Version\/([\d.]+)/.exec(ua)||[])[1]||'?', os=(/OS ([\d_]+) like Mac/.exec(ua)||[])[1]||'';
-  var sub=false; try{ sub=!!(window.crypto&&window.crypto.subtle); }catch(e){}
-  log('BOOT #'+boot+' Ver2.2 Safari='+ver+(os?' iOS='+os:'')+' 画面='+innerWidth+'x'+innerHeight+' ホーム画面起動='+(navigator.standalone===true)+' 暗号='+sub+' ダーク='+(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches));
+  var sa=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
+  log('BOOT #'+boot+' '+VER+' Safari='+ver+(os?' iOS='+os:'')+' 画面='+innerWidth+'x'+innerHeight+' ホーム画面起動='+sa);
   if(boot>1) log('前回の最後の生存確認='+(prevAlive||'なし')+'(再読み込みされた場合はここまで動いていた)');
+
   function mount(){
     panel=document.createElement('div');
-    panel.style.cssText='position:fixed;left:0;right:0;top:0;z-index:2147483647;background:rgba(0,0,0,.9);color:#9f9;font:11px/1.35 ui-monospace,Menlo,monospace;padding:4px 6px;pointer-events:none';
+    panel.style.cssText='position:fixed;left:0;right:0;top:0;z-index:2147483647;background:rgba(0,0,0,.9);color:#9f9;font:11px/1.35 ui-monospace,Menlo,monospace;padding:4px 6px;padding-top:calc(4px + env(safe-area-inset-top,0px));pointer-events:none';
     head=document.createElement('div'); head.style.cssText='color:#ff9;font-weight:700';
     body=document.createElement('pre'); body.style.cssText='margin:0;white-space:pre-wrap;word-break:break-all;font:inherit';
     panel.appendChild(head); panel.appendChild(body); document.body.appendChild(panel); draw();
   }
   if(document.body) mount(); else document.addEventListener('DOMContentLoaded',mount);
   setInterval(function(){ try{ localStorage.setItem(AL,hms()); }catch(e){} draw(); },1000);
-  ['focusin','focusout'].forEach(function(ev){ document.addEventListener(ev,function(e){ var el=e.target; log(ev+' '+((el&&(el.id||el.tagName))||'?')); },true); });
+
+  /* 入力欄をタップした後の「画面の状態」を記録する(入力した文字そのものは記録しない) */
+  function snap(tag){
+    var em=document.getElementById('em'), r=em?em.getBoundingClientRect():null, vv=window.visualViewport, scr=document.getElementById('scrEmail');
+    log(tag+' スクロール='+Math.round(window.scrollY)+' 見える範囲='+(vv?Math.round(vv.width)+'x'+Math.round(vv.height)+' 上端='+Math.round(vv.offsetTop)+' ページ上端='+Math.round(vv.pageTop):'?')
+      +' メール欄top='+(r?Math.round(r.top):'-')+' ログイン画面を隠している='+(scr?scr.classList.contains('hidden'):'-')+' 表示='+document.visibilityState+' ページ高さ='+document.documentElement.scrollHeight);
+  }
+  document.addEventListener('focusin',function(e){
+    var el=e.target; log('focusin '+((el&&(el.id||el.tagName))||'?'));
+    if(el&&(el.id==='em'||el.id==='pwd')){ [150,600,1500].forEach(function(ms){ setTimeout(function(){ snap('タップ後'+ms+'ms'); },ms); }); }
+  },true);
+  document.addEventListener('focusout',function(e){ var el=e.target; log('focusout '+((el&&(el.id||el.tagName))||'?')); },true);
+  document.addEventListener('input',function(e){ var el=e.target; if(el&&(el.id==='em'||el.id==='pwd')) log('入力 '+el.id+' 文字数='+(el.value||'').length); },true);
+  var lastScroll=0;
+  window.addEventListener('scroll',function(){ var n=Date.now(); if(n-lastScroll>400){ lastScroll=n; log('scroll y='+Math.round(window.scrollY)); } },{passive:true});
   document.addEventListener('visibilitychange',function(){ log('表示状態='+document.visibilityState); });
   window.addEventListener('pagehide',function(e){ log('pagehide persisted='+e.persisted); });
   window.addEventListener('pageshow',function(e){ log('pageshow persisted='+e.persisted); });
@@ -222,7 +260,7 @@ body.sheet-open{overflow:hidden}
     <input id="pwd" name="password" type="password" autocomplete="current-password">
     <button class="go" type="submit" id="emailBtn">ログイン</button>
     <div class="err" id="emailErr" role="alert"></div>
-    <div class="note" style="margin-top:14px;text-align:right">マイ資産ダッシュボード Ver2.2</div>
+    <div class="note" id="verTap" style="margin-top:14px;padding:10px 0 4px;text-align:right;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent">マイ資産ダッシュボード Ver2.3</div>
   </form>
 </div>
 
@@ -247,7 +285,7 @@ body.sheet-open{overflow:hidden}
 <div class="wrap hidden" id="scrDash">
   <header>
     <div class="title">
-      <h1>マイ資産ダッシュボード<span class="ver">Ver2.2</span></h1>
+      <h1>マイ資産ダッシュボード<span class="ver">Ver2.3</span></h1>
       <div class="today" id="today"></div>
     </div>
     <div class="hdr-right">
