@@ -166,101 +166,44 @@ body.sheet-open{overflow:hidden}
 .frames iframe.on{display:block}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
-<!-- ===== Firebaseログイン(メール/パスワード)共通部品 ===== -->
-<style>
-#fbl{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:flex-start;justify-content:center;box-sizing:border-box;padding:24px;padding-top:max(24px,env(safe-area-inset-top));overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;background:#eef1f5;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;color:#1d2433;-webkit-text-size-adjust:100%}
-#fbl .fbl-b{width:100%;max-width:360px;margin:auto;background:#fff;border-radius:14px;padding:26px 22px;box-shadow:0 6px 24px rgba(20,30,50,.12)}
-#fbl h1{font-size:19px;margin:0 0 6px;font-weight:700;letter-spacing:0}
-#fbl .fbl-s{font-size:13px;color:#5b6475;margin:0 0 8px;line-height:1.6}
-#fbl label{display:block;font-size:12px;color:#5b6475;margin:14px 0 5px}
-#fbl input{width:100%;box-sizing:border-box;font-size:16px;padding:12px;border:1px solid #c9d0db;border-radius:9px;background:#fff;color:#1d2433;-webkit-appearance:none}
-#fbl input:focus{outline:2px solid #2f6fdf;outline-offset:0;border-color:#2f6fdf}
-#fbl button{width:100%;margin-top:20px;font-size:16px;font-weight:700;padding:13px;border:0;border-radius:9px;background:#2f6fdf;color:#fff;cursor:pointer}
-#fbl button:disabled{opacity:.6}
-#fbl .fbl-e{min-height:1.4em;margin-top:12px;font-size:13px;color:#c0392b;line-height:1.5}
-#fbl .fbl-v{margin-top:10px;font-size:11px;color:#8a93a3;text-align:right}
-#fbl.fbl-c{padding:12px;padding-top:max(12px,env(safe-area-inset-top))}
-#fbl.fbl-c .fbl-b{padding:14px 18px}
-#fbl.fbl-c h1{font-size:17px;margin:0 0 2px}
-#fbl.fbl-c .fbl-s{display:none}
-#fbl.fbl-c label{margin:8px 0 4px}
-#fbl.fbl-c input{padding:10px 12px}
-#fbl.fbl-c button{margin-top:12px;padding:11px}
-#fbl.fbl-c .fbl-e{margin-top:8px;min-height:1.2em}
-html.fbl-lock,html.fbl-lock body{overflow:hidden}
-@media (prefers-color-scheme:dark){#fbl{background:#12161d;color:#e8ebf0}#fbl .fbl-b{background:#1c222c;box-shadow:none}#fbl .fbl-s,#fbl label{color:#9aa3b2}#fbl input{background:#12161d;color:#e8ebf0;border-color:#3a4352}}
-</style>
+<!-- ===== 診断ログ:アドレスの末尾に ?debug=1 を付けて開いたときだけ動きます ===== -->
 <script>
-window.FBL_VER='マイ資産ダッシュボード Ver2.1';
 (function(){
-  var MSG={
-    'auth/invalid-credential':'メールアドレスまたはパスワードが違います。',
-    'auth/invalid-login-credentials':'メールアドレスまたはパスワードが違います。',
-    'auth/wrong-password':'メールアドレスまたはパスワードが違います。',
-    'auth/user-not-found':'メールアドレスまたはパスワードが違います。',
-    'auth/invalid-email':'メールアドレスの形式が正しくありません。',
-    'auth/missing-password':'パスワードを入力してください。',
-    'auth/too-many-requests':'失敗が続いたため一時的に制限されています。しばらく待ってからお試しください。',
-    'auth/network-request-failed':'通信できませんでした。インターネット接続を確認してください。',
-    'auth/operation-not-allowed':'Firebaseで「メール/パスワード」のログインが有効になっていません。',
-    'auth/user-disabled':'このアカウントは無効になっています。'
-  };
-  var box=null, submitFn=null;
-  function build(){
-    box=document.createElement('div');
-    box.id='fbl';
-    box.innerHTML='<form class="fbl-b" novalidate>'+
-      '<h1>ログイン</h1>'+
-      '<p class="fbl-s">iPhone・iPad共通のアカウントでログインしてください。この端末では次回から自動でログインします。</p>'+
-      '<label for="fbl-m">メールアドレス</label><input id="fbl-m" type="email" autocomplete="username" autocapitalize="off" spellcheck="false">'+
-      '<label for="fbl-p">パスワード</label><input id="fbl-p" type="password" autocomplete="current-password">'+
-      '<button type="submit">ログイン</button><div class="fbl-e" role="alert"></div>'+(window.FBL_VER?'<div class="fbl-v">'+window.FBL_VER+'</div>':'')+'</form>';
-    var f=box.querySelector('form'), btn=box.querySelector('button'), err=box.querySelector('.fbl-e');
-    f.addEventListener('submit',function(ev){
-      ev.preventDefault();
-      var m=box.querySelector('#fbl-m').value.trim(), p=box.querySelector('#fbl-p').value;
-      if(!m||!p){err.textContent='メールアドレスとパスワードを入力してください。';return;}
-      btn.disabled=true; btn.textContent='確認中…'; err.textContent='';
-      Promise.resolve().then(function(){return submitFn(m,p);}).catch(function(e){
-        err.textContent=MSG[e&&e.code]||('ログインできませんでした('+((e&&(e.code||e.message))||'不明なエラー')+')');
-      }).then(function(){btn.disabled=false; btn.textContent='ログイン';});
-    });
-    document.body.appendChild(box);
-    /* 入力欄をタップしたら、キーボードの上に見える位置までこの画面の中でスクロールする */
-    box.addEventListener('focusin',function(e){
-      var t=e.target;
-      if(t&&t.tagName==='INPUT'){ setTimeout(function(){ fit(); try{ t.scrollIntoView({block:'center',behavior:'smooth'}); }catch(_){ } },320); }
-    });
+  window.__dbg=function(){};
+  if(!/[?&]debug=1(&|$)/.test(location.search)) return;
+  var KEY='dash_dbg_log', AL='dash_dbg_alive', lines=[], panel=null, body=null, head=null, boot=1;
+  if(/[?&]clear=1(&|$)/.test(location.search)){ try{ localStorage.removeItem(KEY); localStorage.removeItem(AL); }catch(e){} }
+  try{ lines=JSON.parse(localStorage.getItem(KEY)||'[]'); }catch(e){ lines=[]; }
+  for(var i=0;i<lines.length;i++){ if(/ BOOT #\d+/.test(lines[i])) boot++; }
+  function hms(d){ d=d||new Date(); return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+':'+('0'+d.getSeconds()).slice(-2); }
+  function save(){ try{ localStorage.setItem(KEY,JSON.stringify(lines.slice(-90))); }catch(e){} }
+  function draw(){ if(body){ body.textContent=lines.slice(-18).join('\n'); } if(head){ head.textContent='診断ログ  起動#'+boot+'  いま '+hms(); } }
+  function log(m){ lines.push(hms()+' '+m); save(); draw(); }
+  window.__dbg=log;
+  var prevAlive=''; try{ prevAlive=localStorage.getItem(AL)||''; }catch(e){}
+  var ua=navigator.userAgent, ver=(/Version\/([\d.]+)/.exec(ua)||[])[1]||'?', os=(/OS ([\d_]+) like Mac/.exec(ua)||[])[1]||'';
+  var sub=false; try{ sub=!!(window.crypto&&window.crypto.subtle); }catch(e){}
+  log('BOOT #'+boot+' Ver2.2 Safari='+ver+(os?' iOS='+os:'')+' 画面='+innerWidth+'x'+innerHeight+' ホーム画面起動='+(navigator.standalone===true)+' 暗号='+sub+' ダーク='+(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches));
+  if(boot>1) log('前回の最後の生存確認='+(prevAlive||'なし')+'(再読み込みされた場合はここまで動いていた)');
+  function mount(){
+    panel=document.createElement('div');
+    panel.style.cssText='position:fixed;left:0;right:0;top:0;z-index:2147483647;background:rgba(0,0,0,.9);color:#9f9;font:11px/1.35 ui-monospace,Menlo,monospace;padding:4px 6px;pointer-events:none';
+    head=document.createElement('div'); head.style.cssText='color:#ff9;font-weight:700';
+    body=document.createElement('pre'); body.style.cssText='margin:0;white-space:pre-wrap;word-break:break-all;font:inherit';
+    panel.appendChild(head); panel.appendChild(body); document.body.appendChild(panel); draw();
   }
-  /* iPadはキーボードを出しても画面(レイアウト)の大きさが変わらず、見えている範囲だけが小さくなる。
-     ログイン画面を「実際に見えている範囲」にぴったり合わせ、収まらない高さのときは小さく表示する。 */
-  function fit(){
-    if(!box) return;
-    var vv=window.visualViewport;
-    if(!vv) return;
-    box.style.right='auto'; box.style.bottom='auto';
-    box.style.top=vv.offsetTop+'px'; box.style.left=vv.offsetLeft+'px';
-    box.style.width=vv.width+'px'; box.style.height=vv.height+'px';
-    box.classList.toggle('fbl-c', vv.height<560);
-  }
-  if(window.visualViewport){ window.visualViewport.addEventListener('resize',fit); window.visualViewport.addEventListener('scroll',fit); }
-  window.addEventListener('orientationchange',function(){ setTimeout(fit,350); });
-  function show(fn){
-    submitFn=fn;
-    var go=function(){ if(!box) build(); box.style.display='flex'; document.documentElement.classList.add('fbl-lock'); fit(); };
-    if(document.body) go(); else document.addEventListener('DOMContentLoaded',go);
-  }
-  function hide(){ if(box) box.style.display='none'; document.documentElement.classList.remove('fbl-lock'); }
-  /* o.onState(cb) / o.login(email,pw) / o.logout() を渡すと、ログイン済みユーザーで resolve する */
-  window.fbLoginGate=function(o){
-    return new Promise(function(resolve){
-      o.onState(function(u){
-        if(u && !u.isAnonymous){ hide(); resolve(u); return; }
-        if(u && u.isAnonymous){ Promise.resolve().then(o.logout).catch(function(){}); return; } // 以前の匿名ログインは破棄
-        show(o.login);
-      });
-    });
-  };
+  if(document.body) mount(); else document.addEventListener('DOMContentLoaded',mount);
+  setInterval(function(){ try{ localStorage.setItem(AL,hms()); }catch(e){} draw(); },1000);
+  ['focusin','focusout'].forEach(function(ev){ document.addEventListener(ev,function(e){ var el=e.target; log(ev+' '+((el&&(el.id||el.tagName))||'?')); },true); });
+  document.addEventListener('visibilitychange',function(){ log('表示状態='+document.visibilityState); });
+  window.addEventListener('pagehide',function(e){ log('pagehide persisted='+e.persisted); });
+  window.addEventListener('pageshow',function(e){ log('pageshow persisted='+e.persisted); });
+  window.addEventListener('beforeunload',function(){ log('beforeunload'); });
+  window.addEventListener('resize',function(){ log('resize '+innerWidth+'x'+innerHeight); });
+  window.addEventListener('orientationchange',function(){ log('orientationchange'); });
+  if(window.visualViewport){ window.visualViewport.addEventListener('resize',function(){ log('見える範囲 '+Math.round(visualViewport.width)+'x'+Math.round(visualViewport.height)+' 上端='+Math.round(visualViewport.offsetTop)); }); }
+  window.addEventListener('error',function(e){ log('ERROR '+e.message); });
+  window.addEventListener('unhandledrejection',function(e){ var r=e.reason; log('REJECT '+((r&&(r.code||r.message))||r)); });
 })();
 </script>
 
@@ -268,6 +211,20 @@ window.FBL_VER='マイ資産ダッシュボード Ver2.1';
 <body>
 
 <div class="loading" id="scrLoading">読み込み中…</div>
+
+<div class="login hidden" id="scrEmail">
+  <form class="login-card" id="emailForm" novalidate>
+    <h1>ログイン</h1>
+    <p>iPhone・iPad共通のアカウントでログインしてください。この端末では次回から自動でログインします。</p>
+    <label for="em">メールアドレス</label>
+    <input id="em" name="email" type="email" inputmode="email" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <label for="pwd">パスワード</label>
+    <input id="pwd" name="password" type="password" autocomplete="current-password">
+    <button class="go" type="submit" id="emailBtn">ログイン</button>
+    <div class="err" id="emailErr" role="alert"></div>
+    <div class="note" style="margin-top:14px;text-align:right">マイ資産ダッシュボード Ver2.2</div>
+  </form>
+</div>
 
 <div class="login hidden" id="scrLogin">
   <div class="login-card" id="loginForm">
@@ -290,7 +247,7 @@ window.FBL_VER='マイ資産ダッシュボード Ver2.1';
 <div class="wrap hidden" id="scrDash">
   <header>
     <div class="title">
-      <h1>マイ資産ダッシュボード<span class="ver">Ver2.1</span></h1>
+      <h1>マイ資産ダッシュボード<span class="ver">Ver2.2</span></h1>
       <div class="today" id="today"></div>
     </div>
     <div class="hdr-right">
@@ -376,7 +333,8 @@ const yen = n => (n==null||isNaN(n)) ? '-' : '¥' + Math.round(n).toLocaleString
 const man = n => { const v=n/10000; return (Math.abs(v)>=100 ? Math.round(v).toLocaleString('ja-JP') : (Math.round(v*10)/10).toLocaleString('ja-JP')) + '万'; };
 const numv = v => Number(String(v==null?'':v).replace(/,/g,'')) || 0;
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function show(id){ ['scrLoading','scrLogin','scrDash'].forEach(s=>$(s).classList.toggle('hidden', s!==id)); }
+const dbg = m => { try{ window.__dbg(m); }catch(e){} };
+function show(id){ ['scrLoading','scrEmail','scrLogin','scrDash'].forEach(s=>$(s).classList.toggle('hidden', s!==id)); dbg('画面='+id); }
 
 /* ===== Chart.js 共通設定 ===== */
 const hasChart = typeof Chart !== 'undefined';
@@ -832,27 +790,50 @@ if (fb){
     pinInput.value=''; renderPin(); $('loginErr').textContent=''; show('scrLogin');
   };
 
+  /* ---- ログインの流れ:メール/パスワード → 暗証番号(4桁) → ダッシュボード ---- */
+  const MSG = {
+    'auth/invalid-credential':'メールアドレスまたはパスワードが違います。',
+    'auth/invalid-login-credentials':'メールアドレスまたはパスワードが違います。',
+    'auth/wrong-password':'メールアドレスまたはパスワードが違います。',
+    'auth/user-not-found':'メールアドレスまたはパスワードが違います。',
+    'auth/invalid-email':'メールアドレスの形式が正しくありません。',
+    'auth/missing-password':'パスワードを入力してください。',
+    'auth/too-many-requests':'失敗が続いたため一時的に制限されています。しばらく待ってからお試しください。',
+    'auth/network-request-failed':'通信できませんでした。インターネット接続を確認してください。',
+    'auth/operation-not-allowed':'Firebaseで「メール/パスワード」のログインが有効になっていません。',
+    'auth/user-disabled':'このアカウントは無効になっています。'
+  };
+  $('emailForm').addEventListener('submit', async ev => {
+    ev.preventDefault();
+    const m = $('em').value.trim(), p = $('pwd').value, btn = $('emailBtn'), err = $('emailErr');
+    if (!m || !p){ err.textContent = 'メールアドレスとパスワードを入力してください。'; return; }
+    btn.disabled = true; btn.textContent = '確認中…'; err.textContent = '';
+    dbg('ログイン送信');
+    try{
+      await fb.signInWithEmailAndPassword(fb.auth, m, p);
+      $('pwd').value = '';
+    }catch(e){
+      dbg('ログイン失敗 ' + ((e && (e.code || e.message)) || ''));
+      err.textContent = MSG[e && e.code] || ('ログインできませんでした(' + ((e && (e.code || e.message)) || '不明なエラー') + ')');
+    }finally{
+      btn.disabled = false; btn.textContent = 'ログイン';
+    }
+  });
+
+  let pinShown = false;
   fb.onAuthStateChanged(fb.auth, u => {
-    if (!u || u.isAnonymous) return;  // 匿名ユーザーはデータベースを読めない
+    dbg('認証=' + (u ? (u.isAnonymous ? '匿名(破棄します)' : 'メールでログイン済み') : 'ログインなし'));
+    if (!u){ pinShown = false; show('scrEmail'); return; }
+    if (u.isAnonymous){ fb.signOut(fb.auth).catch(() => {}); return; }   // 以前の匿名ログインは破棄
     fb.onValue(fb.ref(fb.db, 'salary/pin'), s => {
       pinStored = s.val();
       $('loginLead').textContent = pinStored ? '給与管理アプリと同じ4桁の暗証番号を入力してください。' : '給与管理アプリで暗証番号がまだ設定されていません。先にそちらで設定してください。';
-      show('scrLogin');
+      if (!pinShown){ pinShown = true; show('scrLogin'); }   // 暗証番号の画面は最初の1回だけ出す
     }, err => {
       console.error(err);
       $('scrLoading').textContent = 'データベースを読み込めませんでした。通信状態を確認して再読み込みしてください。';
       show('scrLoading');
     });
-  });
-  // メール/パスワードでログイン(未ログインならログイン画面を表示)
-  window.fbLoginGate({
-    onState: cb => fb.onAuthStateChanged(fb.auth, u => {
-      // 未ログインの間は、裏側の画面(読み込み中の表示など)を出さない
-      if (!u || u.isAnonymous) ['scrLoading','scrLogin','scrDash'].forEach(id => $(id).classList.add('hidden'));
-      cb(u);
-    }),
-    login: (m, p) => fb.signInWithEmailAndPassword(fb.auth, m, p),
-    logout: () => fb.signOut(fb.auth)
   });
 }
 
