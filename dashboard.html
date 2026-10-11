@@ -135,6 +135,7 @@ header{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:20p
 .login-card input{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);background:#0E1722;font-size:17px}
 .login-card .go{width:100%;margin-top:22px;border:0;border-radius:999px;padding:14px;font-weight:700;font-size:17px;background:linear-gradient(90deg,var(--salary),var(--dividend));color:#0B121B}
 .login-card .go:disabled{opacity:.5}
+.login-card input.masked{-webkit-text-security:disc;text-security:disc}
 .sr-pin{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;left:-9999px}
 .pin-dots{display:flex;justify-content:center;gap:18px;margin:10px 0 4px;padding:10px 0}
 .pin-dots .dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--line);background:transparent;transition:background .12s,border-color .12s,transform .12s}
@@ -170,7 +171,7 @@ body.sheet-open{overflow:hidden}
 <script>
 (function(){
   window.__dbg=function(){};
-  var FLAG='dash_dbg_on', KEY='dash_dbg_log', AL='dash_dbg_alive', VER='Ver2.3';
+  var FLAG='dash_dbg_on', KEY='dash_dbg_log', AL='dash_dbg_alive', VER='Ver2.4';
   var q=location.search, on=/[?&]debug=1(&|$)/.test(q);
   try{
     if(/[?&]debug=0(&|$)/.test(q)) localStorage.removeItem(FLAG);
@@ -260,9 +261,24 @@ body.sheet-open{overflow:hidden}
     <input id="pwd" name="password" type="password" autocomplete="current-password">
     <button class="go" type="submit" id="emailBtn">ログイン</button>
     <div class="err" id="emailErr" role="alert"></div>
-    <div class="note" id="verTap" style="margin-top:14px;padding:10px 0 4px;text-align:right;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent">マイ資産ダッシュボード Ver2.3</div>
+    <div class="note" id="verTap" style="margin-top:14px;padding:10px 0 4px;text-align:right;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent">マイ資産ダッシュボード Ver2.4</div>
   </form>
 </div>
+<script>
+/* ホーム画面から開いたときは、iPadのパスワード自動入力まわりが不安定になるため、
+   メール/パスワード欄を「普通の文字入力欄」として扱う(パスワードは●で隠す)。
+   Safariで開いたときは今までどおり(自動入力も使えます)。 */
+(function(){
+  var sa=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
+  if(!sa) return;
+  var em=document.getElementById('em'), pw=document.getElementById('pwd');
+  if(!em||!pw) return;
+  em.type='text'; em.name='f_a'; em.removeAttribute('inputmode'); em.setAttribute('autocomplete','off');
+  pw.type='text'; pw.name='f_b'; pw.setAttribute('autocomplete','off'); pw.classList.add('masked'); pw.setAttribute('enterkeyhint','go');
+  [em,pw].forEach(function(el){ el.setAttribute('autocapitalize','off'); el.setAttribute('autocorrect','off'); el.setAttribute('spellcheck','false'); });
+  try{ window.__dbg('ホーム画面用の入力設定を適用(メール欄=text, パスワード欄=text+マスク)'); }catch(e){}
+})();
+</script>
 
 <div class="login hidden" id="scrLogin">
   <div class="login-card" id="loginForm">
@@ -285,7 +301,7 @@ body.sheet-open{overflow:hidden}
 <div class="wrap hidden" id="scrDash">
   <header>
     <div class="title">
-      <h1>マイ資産ダッシュボード<span class="ver">Ver2.3</span></h1>
+      <h1>マイ資産ダッシュボード<span class="ver">Ver2.4</span></h1>
       <div class="today" id="today"></div>
     </div>
     <div class="hdr-right">

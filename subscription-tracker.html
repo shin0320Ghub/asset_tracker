@@ -475,6 +475,7 @@
 #fbl input:focus{outline:2px solid #2f6fdf;outline-offset:0;border-color:#2f6fdf}
 #fbl button{width:100%;margin-top:20px;font-size:16px;font-weight:700;padding:13px;border:0;border-radius:9px;background:#2f6fdf;color:#fff;cursor:pointer}
 #fbl button:disabled{opacity:.6}
+#fbl input.masked{-webkit-text-security:disc;text-security:disc}
 #fbl .fbl-e{min-height:1.4em;margin-top:12px;font-size:13px;color:#c0392b;line-height:1.5}
 @media (prefers-color-scheme:dark){#fbl{background:#12161d;color:#e8ebf0}#fbl .fbl-b{background:#1c222c;box-shadow:none}#fbl .fbl-s,#fbl label{color:#9aa3b2}#fbl input{background:#12161d;color:#e8ebf0;border-color:#3a4352}}
 </style>
@@ -512,6 +513,17 @@
         err.textContent=MSG[e&&e.code]||('ログインできませんでした('+((e&&(e.code||e.message))||'不明なエラー')+')');
       }).then(function(){btn.disabled=false; btn.textContent='ログイン';});
     });
+    /* ホーム画面から開いたときは、iPadのパスワード自動入力まわりが不安定になるため、
+       メール/パスワード欄を「普通の文字入力欄」として扱う(パスワードは●で隠す)。Safariで開いたときは従来どおり */
+    try{
+      var sa=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
+      if(sa){
+        var em=box.querySelector('#fbl-m'), pw=box.querySelector('#fbl-p');
+        em.type='text'; em.name='f_a'; em.removeAttribute('inputmode'); em.setAttribute('autocomplete','off');
+        pw.type='text'; pw.name='f_b'; pw.setAttribute('autocomplete','off'); pw.className='masked'; pw.setAttribute('enterkeyhint','go');
+        [em,pw].forEach(function(el){ el.setAttribute('autocapitalize','off'); el.setAttribute('autocorrect','off'); el.setAttribute('spellcheck','false'); });
+      }
+    }catch(_){}
     document.body.appendChild(box);
   }
   function show(fn){
