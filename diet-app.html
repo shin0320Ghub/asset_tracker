@@ -1199,30 +1199,51 @@ function rpXLabels(x,labels,W,L,R,H,B){
   x.font=`10px ${RPF}`;x.fillStyle='#8A96A3';x.textAlign='center';x.textBaseline='top';
   labels.forEach((l,i)=>{if(i%step===0||i===n-1)x.fillText(l,L+i*bw+bw/2,H-B+6)});
 }
+const RP_SAT='#2F6FE0',RP_SUN='#D64545';
+function rpWeekend(x,days,W,L,R,T,H,B){
+  const bw=(W-L-R)/days.length;
+  days.forEach((d,i)=>{const w=parse(d).getDay();if(w!==0&&w!==6)return;x.fillStyle=w===6?'rgba(47,111,224,.07)':'rgba(214,69,69,.07)';x.fillRect(L+i*bw,T,bw,H-T-B)});
+}
+function rpXDays(x,days,W,L,R,H,B){
+  const n=days.length,bw=(W-L-R)/n,gap=30,step=Math.max(1,Math.ceil(gap/bw)),drawn=[];
+  const want=[];
+  if(n<=62)days.forEach((d,i)=>{const w=parse(d).getDay();if(w===0||w===6)want.push(i)});   // 土日を優先
+  want.push(0,n-1);for(let i=0;i<n;i+=step)want.push(i);
+  x.textAlign='center';x.textBaseline='top';
+  want.forEach(i=>{
+    const cx=L+i*bw+bw/2;if(drawn.some(px=>Math.abs(px-cx)<gap))return;drawn.push(cx);
+    const t=parse(days[i]),w=t.getDay(),we=w===0||w===6,col=w===6?RP_SAT:w===0?RP_SUN:'#8A96A3';
+    x.font=`${we?'bold ':''}10px ${RPF}`;
+    x.fillStyle=we?col:'#8A96A3';x.fillText(`${t.getMonth()+1}/${t.getDate()}`,cx,H-B+5);
+    x.fillStyle=col;x.fillText(`(${WD[w]})`,cx,H-B+17);
+  });
+}
 function rpBars(vals,labels,opt){
-  const W=opt.w||698,H=opt.h||200,L=44,R=10,T=14,B=24,[c,x]=rpCanvas(W,H);
+  const W=opt.w||698,H=opt.h||200,L=44,R=10,T=14,B=opt.days?36:24,[c,x]=rpCanvas(W,H);
   const mx=rpNice(Math.max(...vals.map(v=>v||0),opt.line||0)*1.12||1),nt=Math.round(mx/(rpNice(mx/4)||1))||4;
   rpAxes(x,W,H,L,R,T,B,0,mx,Math.min(Math.max(nt,2),6),opt.fmt||(v=>Math.round(v).toLocaleString()));
   const n=vals.length,bw=(W-L-R)/n,Y=v=>T+(1-v/mx)*(H-T-B);
+  if(opt.days)rpWeekend(x,opt.days,W,L,R,T,H,B);
   vals.forEach((v,i)=>{if(v==null)return;const bx=L+i*bw+bw*0.18,w=Math.max(bw*0.64,1.5),y=Y(v);x.fillStyle=opt.color(v,i);
     const r=Math.min(3,w/2);x.beginPath();x.moveTo(bx,H-B);x.lineTo(bx,y+r);x.quadraticCurveTo(bx,y,bx+r,y);x.lineTo(bx+w-r,y);x.quadraticCurveTo(bx+w,y,bx+w,y+r);x.lineTo(bx+w,H-B);x.fill();
     if(n<=8&&opt.valLabel){x.fillStyle='#1F2A37';x.font=`bold 11px ${RPF}`;x.textAlign='center';x.textBaseline='bottom';x.fillText(opt.valLabel(v),bx+w/2,y-3)}});
   if(opt.line){const y=Y(opt.line);x.strokeStyle='#D64545';x.setLineDash([5,4]);x.lineWidth=1.5;x.beginPath();x.moveTo(L,y);x.lineTo(W-R,y);x.stroke();x.setLineDash([]);
-    x.fillStyle='#D64545';x.font=`bold 10px ${RPF}`;x.textAlign='right';x.textBaseline='bottom';x.fillText(opt.lineLabel||'',W-R,y-3)}
-  rpXLabels(x,labels,W,L,R,H,B);
+    x.font=`bold 10px ${RPF}`;const lt=opt.lineLabel||'',tw=x.measureText(lt).width;x.fillStyle='rgba(255,255,255,.92)';x.fillRect(W-R-tw-6,y-16,tw+6,13);x.fillStyle='#D64545';x.textAlign='right';x.textBaseline='bottom';x.fillText(lt,W-R-3,y-4)}
+  if(opt.days)rpXDays(x,opt.days,W,L,R,H,B);else rpXLabels(x,labels,W,L,R,H,B);
   return c;
 }
-function rpBPChart(s,W=698,H=175){
-  const days=s.days,L=44,R=10,T=14,B=24,[c,x]=rpCanvas(W,H),rd=s.bp.reads;
+function rpBPChart(s,W=698,H=185){
+  const days=s.days,L=44,R=10,T=14,B=36,[c,x]=rpCanvas(W,H),rd=s.bp.reads;
   const lo=Math.floor((Math.min(...rd.map(r=>r.d),75)-5)/20)*20,hi=Math.ceil((Math.max(...rd.map(r=>r.s),140)+5)/20)*20;
   rpAxes(x,W,H,L,R,T,B,lo,hi,(hi-lo)/20,v=>Math.round(v));
   const n=days.length,bw=(W-L-R)/n,X=d=>L+days.indexOf(d)*bw+bw/2,Y=v=>T+(hi-v)/(hi-lo)*(H-T-B);
+  rpWeekend(x,days,W,L,R,T,H,B);
   [[135,'135'],[85,'85']].forEach(([v])=>{x.strokeStyle='#C9CFD6';x.setLineDash([4,4]);x.beginPath();x.moveTo(L,Y(v));x.lineTo(W-R,Y(v));x.stroke();x.setLineDash([])});
   const series=(sl,key,col,lw,alpha)=>{const a=rd.filter(r=>r.sl===sl);if(!a.length)return;x.globalAlpha=alpha;x.strokeStyle=col;x.fillStyle=col;x.lineWidth=lw;
     if(a.length>1){x.beginPath();a.forEach((r,i)=>{i?x.lineTo(X(r.day),Y(r[key])):x.moveTo(X(r.day),Y(r[key]))});x.stroke()}
     a.forEach(r=>{x.beginPath();x.arc(X(r.day),Y(r[key]),sl==='am'?3:2.4,0,7);x.fill()});x.globalAlpha=1};
   series('pm','s','#E0605E',1.5,.5);series('pm','d','#3D7BEA',1.5,.5);series('am','s','#E0605E',2.4,1);series('am','d','#3D7BEA',2.4,1);
-  rpXLabels(x,days.map(d=>{const t=parse(d);return `${t.getMonth()+1}/${t.getDate()}`}),W,L,R,H,B);
+  rpXDays(x,days,W,L,R,H,B);
   return c;
 }
 
@@ -1263,7 +1284,8 @@ const RP_CSS=`
 .rp-tbl th{background:#F1F4F7;color:#4B5563;font-weight:700;padding:6px 6px;text-align:right;white-space:nowrap}
 .rp-tbl th:first-child,.rp-tbl td:first-child{text-align:left}
 .rp-tbl td{padding:5px 6px;border-bottom:1px solid #EEF1F4;text-align:right;font-family:"DM Sans","Zen Kaku Gothic New",sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap}
-.rp-tbl tr.we td{background:#FAFBFC}
+.rp-tbl tr.sat td{background:#F3F7FE}.rp-tbl tr.sat td:first-child{color:#2F6FE0;font-weight:700}
+.rp-tbl tr.sun td{background:#FDF4F4}.rp-tbl tr.sun td:first-child{color:#D64545;font-weight:700}
 .rp-tbl .hi{color:#D64545;font-weight:700}
 .rp-tbl .ok{color:#1E9E6A;font-weight:700}
 .rp-rkg{display:grid;grid-template-columns:1fr 1fr;gap:14px}
@@ -1310,7 +1332,7 @@ function rpBuildPages(s){
       <div><div class="l">目標との差</div><div class="v rp-n" style="color:${M.avg>M.target*1.1?'#D64545':'#1F2A37'}">${M.avg-M.target>0?'+':''}${Math.round(M.avg-M.target).toLocaleString()}<small> kcal</small></div></div>
       <div><div class="l">${s.single?'品数':'記録した日'}</div><div class="v rp-n">${s.single?(S.meals[s.from]||[]).length+'<small> 品</small>':`${M.nM}<small> / ${s.days.length}日</small>`}</div></div>
       <div><div class="l">${s.single?'間食':'目標超過の日'}</div><div class="v rp-n">${s.single?Math.round(M.tot.by.snack)+'<small> kcal</small>':M.overDays+'<small> 日</small>'}</div></div></div>`;
-    const chartBox=s.single?'<div id="rpc-meal"></div>':'<div class="rp-cap">日別の摂取エネルギー（kcal）</div><div id="rpc-meal"></div>';
+    const chartBox=s.single?'<div id="rpc-meal"></div>':'<div class="rp-cap">日別の摂取エネルギー（kcal）　<span style="color:#2F6FE0;font-weight:700">土</span>・<span style="color:#D64545;font-weight:700">日</span>は色を変えて表示</div><div id="rpc-meal"></div>';
     mealHtml=`${kpi}${chartBox}
     <div class="rp-two" style="margin-top:12px">
       <div><div class="rp-cap">PFCバランス（エネルギー比・緑の帯が目安）</div><div class="rp-pfc">
@@ -1378,7 +1400,7 @@ function rpBuildPages(s){
   }else{
     const rows=s.days.map(d=>{const t=dayTotals(d),has=(S.meals[d]||[]).length,b=S.bp[d]||{},st=S.steps[d],w=S.weights[d],dw=parse(d).getDay();
       const bpc=x=>x?`<span class="${x.s>=135||x.d>=85?'hi':''}">${x.s}/${x.d}</span>`:'—';
-      return `<tr class="${dw===0||dw===6?'we':''}"><td>${fmtDate(d)}</td><td class="${has&&t.kcal>M.target*1.1?'hi':''}">${has?Math.round(t.kcal).toLocaleString():'—'}</td><td>${has?t.p.toFixed(1):'—'}</td><td>${has?t.f.toFixed(1):'—'}</td><td>${has?t.c.toFixed(1):'—'}</td><td class="${st!=null&&st>=T.goal?'ok':''}">${st!=null?st.toLocaleString():'—'}</td><td>${bpc(b.am)}</td><td>${bpc(b.pm)}</td><td>${w!=null?w.toFixed(1):'—'}</td></tr>`});
+      return `<tr class="${dw===6?'sat':dw===0?'sun':''}"><td>${fmtDate(d)}</td><td class="${has&&t.kcal>M.target*1.1?'hi':''}">${has?Math.round(t.kcal).toLocaleString():'—'}</td><td>${has?t.p.toFixed(1):'—'}</td><td>${has?t.f.toFixed(1):'—'}</td><td>${has?t.c.toFixed(1):'—'}</td><td class="${st!=null&&st>=T.goal?'ok':''}">${st!=null?st.toLocaleString():'—'}</td><td>${bpc(b.am)}</td><td>${bpc(b.pm)}</td><td>${w!=null?w.toFixed(1):'—'}</td></tr>`});
     const th=`<table class="rp-tbl"><thead><tr><th>日付</th><th>エネルギー kcal</th><th>P g</th><th>F g</th><th>C g</th><th>歩数</th><th>血圧 朝</th><th>血圧 夜</th><th>体重 kg</th></tr></thead><tbody>`;
     for(let i=0;i<rows.length;i+=36)pages.push(`${head}<div class="rp-sub" style="margin-top:0">日別の記録${rows.length>36?`（${Math.floor(i/36)+1}）`:''}</div>${th}${rows.slice(i,i+36).join('')}</tbody></table>
       <div class="rp-cap" style="margin-top:8px">赤字：目標の110%を超えた日・基準（135/85）以上の血圧　緑字：歩数の目標達成</div>`);
@@ -1407,10 +1429,10 @@ async function makeReport(){
     const labels=s.days.map(d=>{const t=parse(d);return `${t.getMonth()+1}/${t.getDate()}`});
     if(s.meal.nM){
       if(s.single){const t=dayTotals(s.from);put('rpc-meal',rpBars(MEALS.map(m=>t.by[m.k]),MEALS.map(m=>m.n),{h:150,color:(v,i)=>RP_MC[MEALS[i].k],valLabel:v=>Math.round(v)+' kcal'}))}
-      else put('rpc-meal',rpBars(s.meal.daily.map(t=>t?t.kcal:null),labels,{h:190,line:s.meal.target,lineLabel:`目標 ${s.meal.target.toLocaleString()}`,color:v=>v>s.meal.target*1.1?'#E0605E':'#1E9E80',valLabel:v=>Math.round(v).toLocaleString()}));
+      else put('rpc-meal',rpBars(s.meal.daily.map(t=>t?t.kcal:null),labels,{h:190,line:s.meal.target,days:s.days,lineLabel:`目標 ${s.meal.target.toLocaleString()}`,color:v=>v>s.meal.target*1.1?'#E0605E':'#1E9E80',valLabel:v=>Math.round(v).toLocaleString()}));
     }
     if(s.bp.reads.length&&s.days.length>1)put('rpc-bp',rpBPChart(s));
-    if(s.st.n&&s.days.length>1)put('rpc-st',rpBars(s.st.vals,labels,{h:150,line:s.st.goal,lineLabel:`目標 ${s.st.goal.toLocaleString()}`,color:v=>v>=s.st.goal?'#1E9E80':'#7FA9F0',fmt:v=>Math.round(v).toLocaleString(),valLabel:v=>v.toLocaleString()}));
+    if(s.st.n&&s.days.length>1)put('rpc-st',rpBars(s.st.vals,labels,{h:160,days:s.days,line:s.st.goal,lineLabel:`目標 ${s.st.goal.toLocaleString()}`,color:v=>v>=s.st.goal?'#1E9E80':'#7FA9F0',fmt:v=>Math.round(v).toLocaleString(),valLabel:v=>v.toLocaleString()}));
     if(document.fonts&&document.fonts.ready)await document.fonts.ready;
     const {jsPDF}=window.jspdf,pdf=new jsPDF({unit:'mm',format:'a4',orientation:'portrait'});
     for(let i=0;i<els.length;i++){
@@ -1486,7 +1508,7 @@ function viewSettings(){
     <label class="btn sub" style="position:relative">バックアップから復元<input type="file" accept="application/json,.json" onchange="importData(this)" style="position:absolute;inset:0;opacity:0"></label></div>
     <button class="btn warn" style="margin-top:10px" onclick="if(confirm('すべての記録を削除します。よろしいですか？')){S=def();save();render();toast('すべて削除しました')}">すべてのデータを削除</button>
   </section>
-  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.8　食品の値は目安です</p>`;
+  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.8.1　食品の値は目安です</p>`;
 }
 async function testAI(){
   const gem=S.provider!=='claude';
