@@ -810,11 +810,21 @@ function hkImport(t){
   if(!rows.length){toast('歩数のデータが見つかりませんでした');return 0}
   // 日付がすべて付いていて重複もなければ日付どおり。それ以外は「1行目=今日、2行目=昨日…」の順番で割り当てる
   const ks=rows.map(r=>r.k),trust=ks.every(Boolean)&&new Set(ks).size===ks.length&&ks.every(k=>k<=TODAY());
-  let n=0;
-  rows.forEach((r,i)=>{if(!(r.v>=0&&r.v<200000))return;const k=trust?r.k:addDays(TODAY(),-i);S.steps[k]=r.v;n++});
-  if(!n){toast('歩数のデータが見つかりませんでした');return 0}
+  let n=0,zero=[];
+  rows.forEach((r,i)=>{if(!(r.v>=0&&r.v<200000))return;const k=trust?r.k:addDays(TODAY(),-i);
+    if(r.v===0){zero.push(k);return}   // 0歩は「記録なし」とみなし、今の値を上書きしない
+    S.steps[k]=r.v;n++});
+  if(!n){toast(zero.length?'歩数が0歩のデータしかありませんでした':'歩数のデータが見つかりませんでした');if(zero.length)hkZeroWarn(zero);return 0}
   const d=new Date();S.hkLast=`${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}（${n}日分）`;
-  save();bodyMode='steps';tab='weight';render();toast(`ヘルスケアから${n}日分の歩数を取り込みました`);return n;
+  save();bodyMode='steps';tab='weight';render();toast(`ヘルスケアから${n}日分の歩数を取り込みました`);
+  if(zero.includes(TODAY())||zero.length>=2)hkZeroWarn(zero);
+  return n;
+}
+function hkZeroWarn(zero){
+  openSheet(`<h3>0歩の日がありました</h3>
+  <div class="muted">${zero.map(fmtDate).join('、')} の歩数が「0歩」でした。0歩のデータは取り込まず、今の記録をそのまま残しています。</div>
+  <div class="tip"><div class="face">${IC.steps}</div><div><b>考えられる原因</b>Apple WatchやiPhoneを<b>機種変更</b>した場合、ショートカットの検索条件の「ソース」が古い機器のままになっていると、0歩になります。ショートカットを開き、「ソース」を新しい機器に選び直してください。</div></div>
+  <button class="btn" style="margin-top:14px" onclick="closeSheet()">閉じる</button>`);
 }
 function hkHelp(){
   const st=(n,t)=>`<li style="display:flex;gap:10px;margin-top:10px"><span class="num" style="flex:none;width:24px;height:24px;border-radius:50%;background:color-mix(in srgb,var(--l) 20%,transparent);color:var(--l);display:grid;place-items:center;font-size:13px">${n}</span><div>${t}</div></li>`;
@@ -1508,7 +1518,7 @@ function viewSettings(){
     <label class="btn sub" style="position:relative">バックアップから復元<input type="file" accept="application/json,.json" onchange="importData(this)" style="position:absolute;inset:0;opacity:0"></label></div>
     <button class="btn warn" style="margin-top:10px" onclick="if(confirm('すべての記録を削除します。よろしいですか？')){S=def();save();render();toast('すべて削除しました')}">すべてのデータを削除</button>
   </section>
-  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.8.1　食品の値は目安です</p>`;
+  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.8.2　食品の値は目安です</p>`;
 }
 async function testAI(){
   const gem=S.provider!=='claude';
