@@ -817,7 +817,7 @@ function hkImport(t){
   if(!n){toast(zero.length?'歩数が0歩のデータしかありませんでした':'歩数のデータが見つかりませんでした');if(zero.length)hkZeroWarn(zero);return 0}
   const d=new Date();S.hkLast=`${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}（${n}日分）`;
   save();bodyMode='steps';tab='weight';render();toast(`ヘルスケアから${n}日分の歩数を取り込みました`);
-  if(zero.includes(TODAY())||zero.length>=2)hkZeroWarn(zero);
+  if(zero.includes(TODAY()))hkZeroWarn([TODAY()]);   // 過去の0歩（機種変更前など）は知らせない
   return n;
 }
 function hkZeroWarn(zero){
@@ -1518,7 +1518,7 @@ function viewSettings(){
     <label class="btn sub" style="position:relative">バックアップから復元<input type="file" accept="application/json,.json" onchange="importData(this)" style="position:absolute;inset:0;opacity:0"></label></div>
     <button class="btn warn" style="margin-top:10px" onclick="if(confirm('すべての記録を削除します。よろしいですか？')){S=def();save();render();toast('すべて削除しました')}">すべてのデータを削除</button>
   </section>
-  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.8.2　食品の値は目安です</p>`;
+  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.8.3　食品の値は目安です</p>`;
 }
 async function testAI(){
   const gem=S.provider!=='claude';
