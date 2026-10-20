@@ -171,7 +171,8 @@ textarea.field{height:auto;min-height:84px;padding:10px 12px;line-height:1.5}
 .seg button.on{background:var(--leaf);color:#0B121B;font-weight:700}
 
 /* ナビ */
-.nav{position:fixed;left:0;right:0;bottom:0;z-index:20;padding:8px 12px calc(8px + env(safe-area-inset-bottom,0px));background:rgba(11,18,27,.82);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:1px solid var(--line)}
+.nav{position:fixed;left:0;right:0;bottom:0;z-index:20;transform:translateZ(0);padding:8px 12px calc(8px + env(safe-area-inset-bottom,0px));background:rgba(11,18,27,.82);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:1px solid var(--line)}
+.kb .nav{display:none}
 .nav .in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
 .nav button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;font-size:11.5px;color:var(--dim);border-radius:12px}
 .nav button svg{width:24px;height:24px}
@@ -443,7 +444,23 @@ function go(n){cur=addDays(cur,n);render()}
 /* ========== 食事追加シート ========== */
 let addMeal='breakfast',addMode='search',cat='すべて',q='',aiItems=null,aiImg=null;
 function openSheet(html){$('#sheet').innerHTML='<div class="grab"></div>'+html;$('#sheet').classList.add('on');$('#back').classList.add('on')}
-function closeSheet(){$('#sheet').classList.remove('on');$('#back').classList.remove('on')}
+function closeSheet(){const a=document.activeElement;if(a&&a.blur&&a!==document.body)a.blur();$('#sheet').classList.remove('on');$('#back').classList.remove('on');setTimeout(fixViewport,150)}
+/* iPhone：キーボードを閉じた後に下のメニューが画面の途中に残る不具合の対策 */
+function fixViewport(){
+  document.body.classList.remove('kb');
+  const y=window.scrollY;window.scrollTo(0,y+1);window.scrollTo(0,y);
+  const nav=document.querySelector('.nav');if(nav){nav.style.display='none';void nav.offsetHeight;nav.style.display=''}
+}
+const isField=el=>el&&el.matches&&el.matches('input,textarea,select');
+document.addEventListener('focusout',e=>{if(isField(e.target))setTimeout(()=>{if(!isField(document.activeElement))fixViewport()},120)});
+if(window.visualViewport){
+  let last=visualViewport.height;
+  visualViewport.addEventListener('resize',()=>{const h=visualViewport.height;
+    document.body.classList.toggle('kb',h<window.innerHeight-150);   // キーボード表示中はメニューを隠す
+    if(h>last+80)setTimeout(fixViewport,60);last=h});
+}
+window.addEventListener('pageshow',()=>setTimeout(fixViewport,50));
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(fixViewport,50)});
 $('#back').onclick=closeSheet;
 function openAdd(m){addMeal=m;addMode='search';q='';cat='すべて';aiItems=null;aiImg=null;drawAdd()}
 function drawAdd(){
@@ -498,8 +515,8 @@ function drawCalc(){const k=pick.g/pick.base;$('#pc').innerHTML=[['kcal',pick.kc
 function pushItem(it){(S.meals[cur]=S.meals[cur]||[]).push(Object.assign({id:uid(),meal:addMeal},it))}
 function addPicked(){const k=pick.g/pick.base;pushItem({name:pick.name,grams:Math.round(pick.g),kcal:pick.kcal*k,p:pick.p*k,f:pick.f*k,c:pick.c*k});save();closeSheet();render();toast(`${pick.name}を追加しました`)}
 function addManual(){
-  const n=$('#mn').value.trim(),k=+$('#mk').value;
-  if(!n||!k){toast('食品名とカロリーを入力してください');return}
+  const n=$('#mn').value.trim(),kv=$('#mk').value.trim(),k=+kv;
+  if(!n||kv===''||!(k>=0)){toast('食品名とカロリーを入力してください（0kcalもOK）');return}
   pushItem({name:n,grams:+$('#mg').value||0,kcal:k,p:+$('#mp').value||0,f:+$('#mf').value||0,c:+$('#mc').value||0});
   save();closeSheet();render();toast(`${n}を追加しました`);
 }
@@ -1518,7 +1535,7 @@ function viewSettings(){
     <label class="btn sub" style="position:relative">バックアップから復元<input type="file" accept="application/json,.json" onchange="importData(this)" style="position:absolute;inset:0;opacity:0"></label></div>
     <button class="btn warn" style="margin-top:10px" onclick="if(confirm('すべての記録を削除します。よろしいですか？')){S=def();save();render();toast('すべて削除しました')}">すべてのデータを削除</button>
   </section>
-  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.8.3　食品の値は目安です</p>`;
+  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.8.4　食品の値は目安です</p>`;
 }
 async function testAI(){
   const gem=S.provider!=='claude';
