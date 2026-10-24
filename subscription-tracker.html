@@ -2,6 +2,8 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://www.gstatic.com; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src https://*.firebasedatabase.app wss://*.firebasedatabase.app https://*.firebaseio.com wss://*.firebaseio.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>定期コスト</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -182,6 +184,7 @@
     height:100%;
     border-radius:3px;
   }
+  .section-title{
     font-size:12px;
     color:var(--ink-soft);
     margin:0 0 10px 2px;
@@ -379,6 +382,47 @@
     padding:4px;
   }
 
+  /* login */
+  .login-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:var(--paper);
+    z-index:100;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+  }
+  body.locked .login-overlay{ display:flex; }
+  body.locked .wrap,
+  body.locked .fab,
+  body.locked .overlay{ display:none !important; }
+  body.booting .login-card{ visibility:hidden; }
+  .login-card{
+    width:100%;
+    max-width:360px;
+    background:var(--card);
+    border:1px solid var(--paper-line);
+    border-radius:var(--radius);
+    padding:24px 20px;
+  }
+  .login-card h2{
+    font-family:'Source Serif 4', serif;
+    font-size:22px;
+    margin:0 0 4px;
+  }
+  .login-card .login-note{
+    font-size:12px;
+    color:var(--ink-soft);
+    margin:0 0 18px;
+  }
+  .login-error{
+    min-height:18px;
+    font-size:12px;
+    color:var(--stamp);
+    margin:0 0 10px;
+  }
+
   /* modal */
   .overlay{
     position:fixed;
@@ -464,89 +508,25 @@
   .btn-ghost{ background:transparent; color:var(--ink-soft); border:1px solid var(--paper-line); }
   .btn-delete{ background:var(--stamp); color:#fff; }
 </style>
-<!-- ===== Firebaseログイン(メール/パスワード)共通部品 ===== -->
-<style>
-#fbl{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;box-sizing:border-box;padding:24px;padding-top:max(24px,env(safe-area-inset-top));background:#eef1f5;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;color:#1d2433;-webkit-text-size-adjust:100%}
-#fbl .fbl-b{width:100%;max-width:360px;background:#fff;border-radius:14px;padding:26px 22px;box-shadow:0 6px 24px rgba(20,30,50,.12)}
-#fbl h1{font-size:19px;margin:0 0 6px;font-weight:700;letter-spacing:0}
-#fbl .fbl-s{font-size:13px;color:#5b6475;margin:0 0 8px;line-height:1.6}
-#fbl label{display:block;font-size:12px;color:#5b6475;margin:14px 0 5px}
-#fbl input{width:100%;box-sizing:border-box;font-size:16px;padding:12px;border:1px solid #c9d0db;border-radius:9px;background:#fff;color:#1d2433;-webkit-appearance:none}
-#fbl input:focus{outline:2px solid #2f6fdf;outline-offset:0;border-color:#2f6fdf}
-#fbl button{width:100%;margin-top:20px;font-size:16px;font-weight:700;padding:13px;border:0;border-radius:9px;background:#2f6fdf;color:#fff;cursor:pointer}
-#fbl button:disabled{opacity:.6}
-#fbl input.masked{-webkit-text-security:disc;text-security:disc}
-#fbl .fbl-e{min-height:1.4em;margin-top:12px;font-size:13px;color:#c0392b;line-height:1.5}
-@media (prefers-color-scheme:dark){#fbl{background:#12161d;color:#e8ebf0}#fbl .fbl-b{background:#1c222c;box-shadow:none}#fbl .fbl-s,#fbl label{color:#9aa3b2}#fbl input{background:#12161d;color:#e8ebf0;border-color:#3a4352}}
-</style>
-<script>
-(function(){
-  var MSG={
-    'auth/invalid-credential':'メールアドレスまたはパスワードが違います。',
-    'auth/invalid-login-credentials':'メールアドレスまたはパスワードが違います。',
-    'auth/wrong-password':'メールアドレスまたはパスワードが違います。',
-    'auth/user-not-found':'メールアドレスまたはパスワードが違います。',
-    'auth/invalid-email':'メールアドレスの形式が正しくありません。',
-    'auth/missing-password':'パスワードを入力してください。',
-    'auth/too-many-requests':'失敗が続いたため一時的に制限されています。しばらく待ってからお試しください。',
-    'auth/network-request-failed':'通信できませんでした。インターネット接続を確認してください。',
-    'auth/operation-not-allowed':'Firebaseで「メール/パスワード」のログインが有効になっていません。',
-    'auth/user-disabled':'このアカウントは無効になっています。'
-  };
-  var box=null, submitFn=null;
-  function build(){
-    box=document.createElement('div');
-    box.id='fbl';
-    box.innerHTML='<form class="fbl-b" novalidate>'+
-      '<h1>ログイン</h1>'+
-      '<p class="fbl-s">iPhone・iPad共通のアカウントでログインしてください。この端末では次回から自動でログインします。</p>'+
-      '<label for="fbl-m">メールアドレス</label><input id="fbl-m" type="email" autocomplete="username" autocapitalize="off" spellcheck="false">'+
-      '<label for="fbl-p">パスワード</label><input id="fbl-p" type="password" autocomplete="current-password">'+
-      '<button type="submit">ログイン</button><div class="fbl-e" role="alert"></div></form>';
-    var f=box.querySelector('form'), btn=box.querySelector('button'), err=box.querySelector('.fbl-e');
-    f.addEventListener('submit',function(ev){
-      ev.preventDefault();
-      var m=box.querySelector('#fbl-m').value.trim(), p=box.querySelector('#fbl-p').value;
-      if(!m||!p){err.textContent='メールアドレスとパスワードを入力してください。';return;}
-      btn.disabled=true; btn.textContent='確認中…'; err.textContent='';
-      Promise.resolve().then(function(){return submitFn(m,p);}).catch(function(e){
-        err.textContent=MSG[e&&e.code]||('ログインできませんでした('+((e&&(e.code||e.message))||'不明なエラー')+')');
-      }).then(function(){btn.disabled=false; btn.textContent='ログイン';});
-    });
-    /* ホーム画面から開いたときは、iPadのパスワード自動入力まわりが不安定になるため、
-       メール/パスワード欄を「普通の文字入力欄」として扱う(パスワードは●で隠す)。Safariで開いたときは従来どおり */
-    try{
-      var sa=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
-      if(sa){
-        var em=box.querySelector('#fbl-m'), pw=box.querySelector('#fbl-p');
-        em.type='text'; em.name='f_a'; em.removeAttribute('inputmode'); em.setAttribute('autocomplete','off');
-        pw.type='text'; pw.name='f_b'; pw.setAttribute('autocomplete','off'); pw.className='masked'; pw.setAttribute('enterkeyhint','go');
-        [em,pw].forEach(function(el){ el.setAttribute('autocapitalize','off'); el.setAttribute('autocorrect','off'); el.setAttribute('spellcheck','false'); });
-      }
-    }catch(_){}
-    document.body.appendChild(box);
-  }
-  function show(fn){
-    submitFn=fn;
-    var go=function(){ if(!box) build(); box.style.display='flex'; };
-    if(document.body) go(); else document.addEventListener('DOMContentLoaded',go);
-  }
-  function hide(){ if(box) box.style.display='none'; }
-  /* o.onState(cb) / o.login(email,pw) / o.logout() を渡すと、ログイン済みユーザーで resolve する */
-  window.fbLoginGate=function(o){
-    return new Promise(function(resolve){
-      o.onState(function(u){
-        if(u && !u.isAnonymous){ hide(); resolve(u); return; }
-        if(u && u.isAnonymous){ Promise.resolve().then(o.logout).catch(function(){}); return; } // 以前の匿名ログインは破棄
-        show(o.login);
-      });
-    });
-  };
-})();
-</script>
-
 </head>
-<body>
+<body class="locked booting">
+
+<div class="login-overlay" id="loginOverlay">
+  <form class="login-card" id="loginForm" novalidate>
+    <h2>定期コスト</h2>
+    <p class="login-note">この端末で初回のみサインインしてください。</p>
+    <div class="field">
+      <label for="loginEmail">メールアドレス</label>
+      <input type="email" id="loginEmail" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="254">
+    </div>
+    <div class="field">
+      <label for="loginPassword">パスワード</label>
+      <input type="password" id="loginPassword" autocomplete="current-password" maxlength="128">
+    </div>
+    <div class="login-error" id="loginError" role="alert"></div>
+    <button type="submit" class="btn btn-primary" id="loginBtn" style="width:100%;">サインイン</button>
+  </form>
+</div>
 
 <div class="wrap">
   <header>
@@ -598,6 +578,7 @@
   <div class="backup-row">
     <button class="backup-link" id="backupBtn">バックアップを保存</button>
     <button class="backup-link" id="restoreBtn">バックアップから復元</button>
+    <button class="backup-link" id="logoutBtn">サインアウト</button>
   </div>
   <input type="file" id="restoreFile" accept="application/json" style="display:none;">
 </div>
@@ -610,7 +591,7 @@
     <input type="hidden" id="editId">
     <div class="field">
       <label>サービス名</label>
-      <input type="text" id="fName" placeholder="例：Netflix">
+      <input type="text" id="fName" placeholder="例：Netflix" maxlength="100">
     </div>
     <div class="field">
       <label>カテゴリ</label>
@@ -629,11 +610,11 @@
     </div>
     <div class="field">
       <label>次回課金日</label>
-      <input type="date" id="fDate">
+      <input type="date" id="fDate" min="2000-01-01" max="2100-12-31">
     </div>
     <div class="field">
       <label>解約予定・メモ（任意）</label>
-      <textarea id="fMemo" placeholder="例：来年3月に解約予定 / 家族プランで分担中"></textarea>
+      <textarea id="fMemo" placeholder="例：来年3月に解約予定 / 家族プランで分担中" maxlength="500"></textarea>
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="cancelBtn">キャンセル</button>
@@ -651,11 +632,11 @@ import {
   getDatabase, ref, onValue, set, remove, push
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import {
-  initializeAuth, browserLocalPersistence, onAuthStateChanged, signInWithEmailAndPassword, signOut
+  initializeAuth, indexedDBLocalPersistence, browserLocalPersistence,
+  onAuthStateChanged, signInWithEmailAndPassword, signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-// ▼▼▼ ここに自分の Firebase プロジェクトの設定を貼り付けてください ▼▼▼
-// Firebase コンソール > プロジェクトの設定 > マイアプリ > SDK の設定と構成 から取得できます
+// Firebase 接続設定（公開前提の識別子です。データの保護はサインイン＋データベースルールで行います）
 const firebaseConfig = {
   apiKey: "AIzaSyBUQjfeamTm1gCWNiXhZcxyBIUiQSptvDs",
   authDomain: "asset-tracker-b3fac.firebaseapp.com",
@@ -665,7 +646,6 @@ const firebaseConfig = {
   messagingSenderId: "36181399487",
   appId: "1:36181399487:web:0ef48412b814d81aaa330a"
 };
-// ▲▲▲ ここまで ▲▲▲
 
 /*
   定期コスト — バージョン履歴
@@ -677,144 +657,258 @@ const firebaseConfig = {
   v1.1.4 (2026-09-05) 更新ボタン押下時に確認ダイアログを表示するように変更（新しい次回課金日を提示して確認）
   v1.2.0 (2026-09-05) バックアップの保存（JSONファイルとしてダウンロード）と復元（ファイル選択して上書き）機能を追加
   v1.3.0 (2026-09-05) カテゴリ別集計セクションを追加。月別・年別を切り替えて各カテゴリの金額・割合をバー表示
-  v1.4.0 (2026-10-04) セキュリティ対策:メール/パスワードでのログインを追加。ログイン後にのみデータベースへ接続
+  v1.4.0 (2026-10-24) セキュリティ対策：Firebaseメール/パスワードのサインインを必須化（端末ごと初回のみ）、
+                      表示時のHTMLエスケープ徹底、読み込み/復元データの検証、日付計算の安全化、CSP追加。
+                      端末内保存モードは廃止。v1.3.0で崩れていた「登録リスト」見出しの表示を修正
 */
 const APP_VERSION = 'v1.4.0';
 document.getElementById('versionBadge').textContent = APP_VERSION;
 
-let db = null;
-let subsRef = null;
-let categoriesRef = null;
-let items = {};
-let firebaseReady = false;
+// ---------- 定数・検証ユーティリティ ----------
+const LIMIT = {
+  name: 100,
+  memo: 500,
+  catLabel: 30,
+  items: 1000,
+  categories: 30,
+  amountMax: 1000000000,
+  backupBytes: 2 * 1024 * 1024
+};
+const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const COLOR_RE = /^#[0-9A-Fa-f]{6}$/;
+const FALLBACK_COLOR = '#8A8F82';
 
 const DEFAULT_CATEGORIES = [
   { id: 'hobby',  label: '趣味・娯楽', color: '#B33A3A' },
   { id: 'car',    label: '車',       color: '#3A5FB3' },
   { id: 'tax',    label: '税金',     color: '#B08A3E' },
   { id: 'health', label: '医療',     color: '#4A6B5A' },
-  { id: 'other',  label: 'その他',   color: '#8A8F82' }
+  { id: 'other',  label: 'その他',   color: FALLBACK_COLOR }
 ];
 // 新規カテゴリ追加時に順番に割り当てる色パレット
 const COLOR_PALETTE = ['#7A4FA0','#3A9DA8','#C9743A','#5C7A9E','#9E5C7A','#6B8E4E','#A8763A','#4E6B8E'];
 
+function isPlainObject(v){
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+function esc(s){
+  return String(s == null ? '' : s).replace(/[&<>"'`]/g, c => ({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;', '`':'&#96;'
+  }[c]));
+}
+
+// YYYY-MM-DD を厳密に解釈（範囲外・存在しない日付は null）。ローカル日付として扱う
+function parseYMD(s){
+  if(typeof s !== 'string' || !DATE_RE.test(s)) return null;
+  const y = Number(s.slice(0, 4)), m = Number(s.slice(5, 7)), d = Number(s.slice(8, 10));
+  if(y < 2000 || y > 2100) return null;
+  const dt = new Date(y, m - 1, d);
+  if(dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) return null;
+  return dt;
+}
+
+function sanitizeItem(raw){
+  if(!isPlainObject(raw)) return null;
+  const name = typeof raw.name === 'string' ? raw.name.trim().slice(0, LIMIT.name) : '';
+  if(!name) return null;
+  let amount = NaN;
+  if(typeof raw.amount === 'number') amount = raw.amount;
+  else if(typeof raw.amount === 'string' && raw.amount.trim() !== '') amount = Number(raw.amount);
+  if(!Number.isFinite(amount) || amount < 0 || amount > LIMIT.amountMax) return null;
+  return {
+    name,
+    category: (typeof raw.category === 'string' && ID_RE.test(raw.category)) ? raw.category : 'other',
+    amount,
+    cycle: raw.cycle === 'year' ? 'year' : 'month',
+    nextDate: parseYMD(raw.nextDate) ? raw.nextDate : '',
+    memo: typeof raw.memo === 'string' ? raw.memo.trim().slice(0, LIMIT.memo) : ''
+  };
+}
+
+function sanitizeItems(raw){
+  const out = {};
+  if(raw === null || typeof raw !== 'object') return out;
+  let n = 0;
+  for(const id of Object.keys(raw)){
+    if(!ID_RE.test(id)) continue;
+    const it = sanitizeItem(raw[id]);
+    if(!it) continue;
+    out[id] = it;
+    if(++n >= LIMIT.items) break;
+  }
+  return out;
+}
+
+// Firebase形式 {id:{label,color}} とバックアップ形式 [{id,label,color}] の両方を受け付ける
+function sanitizeCategories(raw){
+  if(raw === null || typeof raw !== 'object') return null;
+  const entries = Array.isArray(raw)
+    ? raw.map(c => (isPlainObject(c) ? [c.id, c] : [null, null]))
+    : Object.keys(raw).map(id => [id, raw[id]]);
+  const list = [];
+  const seen = new Set();
+  for(const [id, c] of entries){
+    if(typeof id !== 'string' || !ID_RE.test(id) || seen.has(id) || !isPlainObject(c)) continue;
+    const label = typeof c.label === 'string' ? c.label.trim().slice(0, LIMIT.catLabel) : '';
+    if(!label) continue;
+    seen.add(id);
+    list.push({
+      id,
+      label,
+      color: (typeof c.color === 'string' && COLOR_RE.test(c.color)) ? c.color : FALLBACK_COLOR
+    });
+    if(list.length >= LIMIT.categories) break;
+  }
+  if(list.length === 0) return null;
+  if(!seen.has('other')) list.push({ id: 'other', label: 'その他', color: FALLBACK_COLOR });
+  return list;
+}
+
+// ---------- 状態 ----------
+let items = {};
 let CATEGORIES = DEFAULT_CATEGORIES.slice();
-let categoriesReady = false;
+let catSummaryMode = 'month';
 
 function categoryOf(id){
-  return CATEGORIES.find(c => c.id === id) || CATEGORIES[CATEGORIES.length - 1];
+  return CATEGORIES.find(c => c.id === id)
+    || CATEGORIES.find(c => c.id === 'other')
+    || CATEGORIES[CATEGORIES.length - 1];
 }
 
 function nextPaletteColor(){
-  const used = CATEGORIES.length - DEFAULT_CATEGORIES.length;
+  const used = Math.max(0, CATEGORIES.length - DEFAULT_CATEGORIES.length);
   return COLOR_PALETTE[used % COLOR_PALETTE.length];
 }
 
-function slugify(label){
-  return 'cat_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+function newCategoryId(){
+  return 'cat_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
 
-const catSelect = document.getElementById('fCategory');
-function renderCategoryOptions(selectedId){
-  const keep = selectedId || catSelect.value || 'other';
-  catSelect.innerHTML = CATEGORIES.map(c => `<option value="${c.id}">${c.label}</option>`).join('')
-    + `<option value="__add__">＋ 新しいカテゴリを追加…</option>`;
-  catSelect.value = CATEGORIES.some(c => c.id === keep) ? keep : 'other';
-}
-renderCategoryOptions();
-
-catSelect.addEventListener('change', () => {
-  if(catSelect.value === '__add__'){
-    const label = prompt('新しいカテゴリ名を入力してください');
-    if(label && label.trim()){
-      const newCat = { id: slugify(label), label: label.trim(), color: nextPaletteColor() };
-      CATEGORIES.push(newCat);
-      saveCategories();
-      renderCategoryOptions(newCat.id);
-    }else{
-      renderCategoryOptions('other');
-    }
-  }
-});
-
-function saveCategories(){
-  if(firebaseReady && categoriesRef){
-    const obj = {};
-    CATEGORIES.forEach(c => { obj[c.id] = { label: c.label, color: c.color }; });
-    set(categoriesRef, obj);
-  }else{
-    localStorage.setItem('categories_local', JSON.stringify(CATEGORIES));
-  }
-}
-
-function loadLocalCategories(){
-  const local = localStorage.getItem('categories_local');
-  if(local){
-    try{
-      const parsed = JSON.parse(local);
-      if(Array.isArray(parsed) && parsed.length) CATEGORIES = parsed;
-    }catch(e){}
-  }
-}
-
+// ---------- Firebase ----------
 const syncDot = document.getElementById('syncDot');
 const syncText = document.getElementById('syncText');
+function setSyncStatus(ok, text){
+  syncDot.classList.toggle('off', !ok);
+  syncText.textContent = text;
+}
 
-try{
-  if(firebaseConfig.apiKey === "YOUR_API_KEY"){
-    throw new Error("not configured");
+function isPermissionError(err){
+  return /permission[_ ]denied/i.test(String((err && (err.code || err.message)) || ''));
+}
+
+function handleWriteError(err){
+  if(isPermissionError(err)){
+    alert('保存できませんでした：権限がありません。いったんサインアウトして、もう一度サインインしてください。');
+  }else{
+    alert('保存に失敗しました。通信状態を確認してください。');
   }
+}
+
+let auth = null, db = null, subsRef = null, categoriesRef = null;
+try{
   const app = initializeApp(firebaseConfig);
-  const auth = initializeAuth(app, { persistence: browserLocalPersistence });
-  auth.languageCode = 'ja';
+  // initializeAuth を先に呼ぶこと（Realtime Database がサインイン情報を使うため）
+  auth = initializeAuth(app, { persistence: [indexedDBLocalPersistence, browserLocalPersistence] });
   db = getDatabase(app);
   subsRef = ref(db, 'subscriptions');
   categoriesRef = ref(db, 'costCategories');
-  syncText.textContent = 'ログイン確認中…';
-  window.fbLoginGate({
-    onState: cb => onAuthStateChanged(auth, cb),
-    login: (m, p) => signInWithEmailAndPassword(auth, m, p),
-    logout: () => signOut(auth)
-  }).then(() => {
-  if(firebaseReady) return;
-  firebaseReady = true;
-  syncText.textContent = 'iPhone / iPad 間で自動同期中';
-  onValue(subsRef, (snap) => {
-    items = snap.val() || {};
+}catch(e){
+  setSyncStatus(false, 'Firebaseの初期化に失敗しました');
+}
+
+let unsubscribers = [];
+let syncUid = null;
+
+function startSync(uid){
+  if(syncUid === uid) return;
+  stopSync();
+  syncUid = uid;
+  setSyncStatus(true, 'iPhone / iPad 間で自動同期中');
+  const onErr = (err) => {
+    setSyncStatus(false, '同期エラー：' + (isPermissionError(err)
+      ? '権限がありません（サインインまたはデータベースルールを確認してください）'
+      : ((err && err.message) || '不明なエラー')));
+  };
+  unsubscribers.push(onValue(subsRef, (snap) => {
+    items = sanitizeItems(snap.val());
     render();
-  }, (err) => {
-    syncDot.classList.add('off');
-    syncText.textContent = '同期エラー：' + err.message;
-  });
-  onValue(categoriesRef, (snap) => {
-    const val = snap.val();
-    if(val && Object.keys(val).length){
-      CATEGORIES = Object.keys(val).map(id => ({ id, label: val[id].label, color: val[id].color }));
+  }, onErr));
+  unsubscribers.push(onValue(categoriesRef, (snap) => {
+    const raw = snap.val();
+    const cats = sanitizeCategories(raw);
+    if(cats){
+      CATEGORIES = cats;
     }else{
-      // 初回：デフォルトカテゴリを書き込む
-      saveCategories();
       CATEGORIES = DEFAULT_CATEGORIES.slice();
+      // 初回のみ：データベースが空のときだけ初期カテゴリを書き込む
+      if(raw === null) saveCategories().catch(() => {});
     }
     renderCategoryOptions();
     render();
-  });
-  });
-}catch(e){
-  syncDot.classList.add('off');
-  syncText.textContent = 'Firebase未設定：この端末内のみに保存されます';
-  const local = localStorage.getItem('subs_local');
-  items = local ? JSON.parse(local) : {};
-  loadLocalCategories();
+  }, onErr));
+}
+
+function stopSync(){
+  unsubscribers.forEach(fn => { try{ fn(); }catch(e){} });
+  unsubscribers = [];
+  syncUid = null;
+  items = {};
+  CATEGORIES = DEFAULT_CATEGORIES.slice();
   renderCategoryOptions();
   render();
 }
 
-function saveLocal(){
-  if(!firebaseReady){
-    localStorage.setItem('subs_local', JSON.stringify(items));
-  }
+function saveCategories(list){
+  const obj = {};
+  (list || CATEGORIES).forEach(c => { obj[c.id] = { label: c.label, color: c.color }; });
+  return set(categoriesRef, obj);
 }
 
+// ---------- サインイン画面 ----------
+const loginForm = document.getElementById('loginForm');
+const loginEmail = document.getElementById('loginEmail');
+const loginPassword = document.getElementById('loginPassword');
+const loginError = document.getElementById('loginError');
+const loginBtn = document.getElementById('loginBtn');
+
+function authErrorMessage(err){
+  const code = String((err && err.code) || '');
+  if(['auth/invalid-credential','auth/wrong-password','auth/user-not-found','auth/invalid-email','auth/missing-password'].includes(code)){
+    return 'メールアドレスまたはパスワードが違います';
+  }
+  if(code === 'auth/too-many-requests') return '試行回数が多すぎます。しばらく待ってからやり直してください';
+  if(code === 'auth/network-request-failed') return '通信に失敗しました。ネットワークを確認してください';
+  if(code === 'auth/user-disabled') return 'このアカウントは無効化されています';
+  return 'サインインに失敗しました';
+}
+
+loginForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if(!auth){ loginError.textContent = 'Firebaseの初期化に失敗しました。ページを再読み込みしてください'; return; }
+  const email = loginEmail.value.trim();
+  const pw = loginPassword.value;
+  if(!email || !pw){ loginError.textContent = 'メールアドレスとパスワードを入力してください'; return; }
+  loginError.textContent = '';
+  loginBtn.disabled = true;
+  try{
+    await signInWithEmailAndPassword(auth, email, pw);
+    loginPassword.value = '';
+  }catch(err){
+    loginError.textContent = authErrorMessage(err);
+  }finally{
+    loginBtn.disabled = false;
+  }
+});
+
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+  if(!auth) return;
+  if(!confirm('サインアウトしますか？')) return;
+  try{ await signOut(auth); }catch(e){ alert('サインアウトに失敗しました'); }
+});
+
+// ---------- 計算・表示 ----------
 function formatYen(n){
   return Math.round(n).toLocaleString('ja-JP');
 }
@@ -826,23 +920,14 @@ function yearlyEquivalent(item){
   return item.cycle === 'year' ? item.amount : item.amount * 12;
 }
 
-function daysUntil(dateStr){
-  if(!dateStr) return Infinity;
-  const today = new Date();
-  today.setHours(0,0,0,0);
-  const target = new Date(dateStr);
-  target.setHours(0,0,0,0);
-  return Math.round((target - today) / 86400000);
-}
-
 function nextOccurrence(dateStr, cycle){
-  // 表示上、過去日付なら次の周期に繰り上げて見せる
-  if(!dateStr) return null;
-  let d = new Date(dateStr);
+  // 表示上、過去日付なら次の周期に繰り上げて見せる（日付は 2000〜2100 年のみ受け付けるため上限は有限）
+  const d = parseYMD(dateStr);
+  if(!d) return null;
   const today = new Date();
   today.setHours(0,0,0,0);
-  d.setHours(0,0,0,0);
-  while(d < today){
+  let guard = 0;
+  while(d < today && guard++ < 2000){
     if(cycle === 'year'){
       d.setFullYear(d.getFullYear() + 1);
     }else{
@@ -850,6 +935,35 @@ function nextOccurrence(dateStr, cycle){
     }
   }
   return d;
+}
+
+function formatDateJP(d){
+  const today = new Date();
+  if(d.getFullYear() !== today.getFullYear()){
+    return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
+  }
+  return `${d.getMonth()+1}/${d.getDate()}`;
+}
+
+function toYMD(d){
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+const catSelect = document.getElementById('fCategory');
+function renderCategoryOptions(selectedId){
+  const keep = selectedId || catSelect.value || 'other';
+  catSelect.textContent = '';
+  CATEGORIES.forEach(c => {
+    const o = document.createElement('option');
+    o.value = c.id;
+    o.textContent = c.label;
+    catSelect.appendChild(o);
+  });
+  const add = document.createElement('option');
+  add.value = '__add__';
+  add.textContent = '＋ 新しいカテゴリを追加…';
+  catSelect.appendChild(add);
+  catSelect.value = CATEGORIES.some(c => c.id === keep) ? keep : 'other';
 }
 
 function render(){
@@ -880,22 +994,21 @@ function render(){
   renderCategorySummary(ids);
 
   const sortMode = document.getElementById('sortSelect').value;
-  let sorted = ids.map(id => ({id, ...items[id]}));
+  const todayMid = new Date(); todayMid.setHours(0,0,0,0);
+  let sorted = ids.map(id => ({ id, ...items[id], next: nextOccurrence(items[id].nextDate, items[id].cycle) }));
   if(sortMode === 'date'){
     sorted.sort((a,b) => {
-      const na = nextOccurrence(a.nextDate, a.cycle);
-      const nb = nextOccurrence(b.nextDate, b.cycle);
-      if(!na && !nb) return 0;
-      if(!na) return 1;
-      if(!nb) return -1;
-      return na - nb;
+      if(!a.next && !b.next) return 0;
+      if(!a.next) return 1;
+      if(!b.next) return -1;
+      return a.next - b.next;
     });
   }else if(sortMode === 'amountDesc'){
     sorted.sort((a,b) => yearlyEquivalent(b) - yearlyEquivalent(a));
   }else if(sortMode === 'category'){
     sorted.sort((a,b) => {
-      const ia = CATEGORIES.findIndex(c => c.id === (a.category || 'other'));
-      const ib = CATEGORIES.findIndex(c => c.id === (b.category || 'other'));
+      const ia = CATEGORIES.findIndex(c => c.id === a.category);
+      const ib = CATEGORIES.findIndex(c => c.id === b.category);
       return ia - ib || a.name.localeCompare(b.name, 'ja');
     });
   }else{
@@ -903,94 +1016,45 @@ function render(){
   }
 
   list.innerHTML = sorted.map(it => {
-    const next = nextOccurrence(it.nextDate, it.cycle);
-    const todayMid = new Date(); todayMid.setHours(0,0,0,0);
+    const next = it.next;
     const dleft = next ? Math.round((next - todayMid) / 86400000) : null;
     const dueSoon = dleft !== null && dleft <= 5;
     const dueToday = dleft !== null && dleft <= 0;
-    const dateLabel = it.nextDate ? formatDateJP(next || new Date(it.nextDate)) : '未設定';
+    const dateLabel = next ? formatDateJP(next) : '未設定';
     const cat = categoryOf(it.category);
     return `
-      <div class="item ${dueSoon ? 'due-soon' : ''} ${dueToday ? 'due-today' : ''}" data-id="${it.id}">
+      <div class="item ${dueSoon ? 'due-soon' : ''} ${dueToday ? 'due-today' : ''}" data-id="${esc(it.id)}">
         <div class="item-main">
-          <div class="item-name"><span class="cat-dot" style="background:${cat.color}"></span>${escapeHtml(it.name)}</div>
+          <div class="item-name"><span class="cat-dot" style="background:${esc(cat.color)}"></span>${esc(it.name)}</div>
           <div class="item-meta">
-            <span class="badge cat" style="color:${cat.color}; background:${cat.color}1A;">${cat.label}</span>
+            <span class="badge cat" style="color:${esc(cat.color)}; background:${esc(cat.color)}1A;">${esc(cat.label)}</span>
             <span class="badge ${it.cycle === 'year' ? 'year' : ''}">${it.cycle === 'year' ? '年次' : '月次'}</span>
-            <span>次回: ${dateLabel}</span>
+            <span>次回: ${esc(dateLabel)}</span>
             ${dueSoon ? `<span class="badge due">${dleft <= 0 ? '本日' : dleft + '日後'}</span>` : ''}
           </div>
-          ${it.memo ? `<div class="item-memo">${escapeHtml(it.memo)}</div>` : ''}
+          ${it.memo ? `<div class="item-memo">${esc(it.memo)}</div>` : ''}
         </div>
         <div class="item-right">
           <div class="item-amount">¥${formatYen(it.amount)}</div>
           <div class="item-actions">
-            <button class="icon-btn renew-btn" data-id="${it.id}">更新</button>
-            <button class="icon-btn cancel-btn" data-id="${it.id}">解約</button>
-            <button class="icon-btn edit-btn" data-id="${it.id}">編集</button>
+            <button class="icon-btn renew-btn" data-act="renew" data-id="${esc(it.id)}">更新</button>
+            <button class="icon-btn cancel-btn" data-act="cancel" data-id="${esc(it.id)}">解約</button>
+            <button class="icon-btn edit-btn" data-act="edit" data-id="${esc(it.id)}">編集</button>
           </div>
         </div>
       </div>
     `;
   }).join('');
-
-  document.querySelectorAll('.edit-btn').forEach(btn => {
-    btn.addEventListener('click', () => openEdit(btn.dataset.id));
-  });
-  document.querySelectorAll('.renew-btn').forEach(btn => {
-    btn.addEventListener('click', () => renewItem(btn.dataset.id));
-  });
-  document.querySelectorAll('.cancel-btn').forEach(btn => {
-    btn.addEventListener('click', () => cancelItem(btn.dataset.id));
-  });
 }
 
-function renewItem(id){
-  const it = items[id];
-  if(!it) return;
-  const base = nextOccurrence(it.nextDate, it.cycle) || (() => { const t = new Date(); t.setHours(0,0,0,0); return t; })();
-  const d = new Date(base);
-  if(it.cycle === 'year'){
-    d.setFullYear(d.getFullYear() + 1);
-  }else{
-    d.setMonth(d.getMonth() + 1);
-  }
-  if(!confirm(`「${it.name}」の次回課金日を ${formatDateJP(d)} に更新しますか？`)) return;
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const newDate = `${y}-${m}-${day}`;
-  const data = { name: it.name, category: it.category, amount: it.amount, cycle: it.cycle, nextDate: newDate, memo: it.memo || '' };
-
-  if(firebaseReady){
-    set(ref(db, 'subscriptions/' + id), data);
-  }else{
-    items[id] = data;
-    saveLocal();
-    render();
-  }
-}
-
-function cancelItem(id){
-  const it = items[id];
-  if(!it) return;
-  if(!confirm(`「${it.name}」を解約として削除しますか？この操作は取り消せません。`)) return;
-  if(firebaseReady){
-    remove(ref(db, 'subscriptions/' + id));
-  }else{
-    delete items[id];
-    saveLocal();
-    render();
-  }
-}
-
-let catSummaryMode = 'month';
-document.getElementById('catToggle').addEventListener('click', (e) => {
-  const btn = e.target.closest('button[data-mode]');
+document.getElementById('list').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-act]');
   if(!btn) return;
-  catSummaryMode = btn.dataset.mode;
-  document.querySelectorAll('#catToggle button').forEach(b => b.classList.toggle('active', b === btn));
-  render();
+  const id = btn.dataset.id || '';
+  if(!ID_RE.test(id) || !items[id]) return;
+  if(btn.dataset.act === 'renew') renewItem(id);
+  else if(btn.dataset.act === 'cancel') cancelItem(id);
+  else if(btn.dataset.act === 'edit') openEdit(id);
 });
 
 function renderCategorySummary(ids){
@@ -998,7 +1062,7 @@ function renderCategorySummary(ids){
   const sums = {};
   ids.forEach(id => {
     const it = items[id];
-    const catId = it.category || 'other';
+    const catId = categoryOf(it.category).id;
     const val = catSummaryMode === 'year' ? yearlyEquivalent(it) : monthlyEquivalent(it);
     sums[catId] = (sums[catId] || 0) + val;
   });
@@ -1017,32 +1081,69 @@ function renderCategorySummary(ids){
     return `
       <div class="cat-row">
         <div class="cat-row-top">
-          <span class="cat-row-name"><span class="cat-dot" style="background:${r.cat.color}"></span>${escapeHtml(r.cat.label)}</span>
+          <span class="cat-row-name"><span class="cat-dot" style="background:${esc(r.cat.color)}"></span>${esc(r.cat.label)}</span>
           <span><span class="cat-row-amount">¥${formatYen(r.amount)}</span><span class="cat-row-pct">${pct}%</span></span>
         </div>
         <div class="cat-bar-track">
-          <div class="cat-bar-fill" style="width:${pct}%; background:${r.cat.color};"></div>
+          <div class="cat-bar-fill" style="width:${pct}%; background:${esc(r.cat.color)};"></div>
         </div>
       </div>
     `;
   }).join('');
 }
 
-function formatDateJP(d){
-  const today = new Date();
-  if(d.getFullYear() !== today.getFullYear()){
-    return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
-  }
-  return `${d.getMonth()+1}/${d.getDate()}`;
-}
-
-function escapeHtml(s){
-  return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
+document.getElementById('catToggle').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-mode]');
+  if(!btn) return;
+  catSummaryMode = btn.dataset.mode === 'year' ? 'year' : 'month';
+  document.querySelectorAll('#catToggle button').forEach(b => b.classList.toggle('active', b === btn));
+  render();
+});
 
 document.getElementById('sortSelect').addEventListener('change', render);
 
-// modal handling
+// ---------- 更新・解約 ----------
+function renewItem(id){
+  const it = items[id];
+  if(!it) return;
+  const base = nextOccurrence(it.nextDate, it.cycle) || (() => { const t = new Date(); t.setHours(0,0,0,0); return t; })();
+  const d = new Date(base);
+  if(it.cycle === 'year'){
+    d.setFullYear(d.getFullYear() + 1);
+  }else{
+    d.setMonth(d.getMonth() + 1);
+  }
+  if(!confirm(`「${it.name}」の次回課金日を ${formatDateJP(d)} に更新しますか？`)) return;
+  const data = { name: it.name, category: it.category, amount: it.amount, cycle: it.cycle, nextDate: toYMD(d), memo: it.memo || '' };
+  Promise.resolve(set(ref(db, 'subscriptions/' + id), data)).catch(handleWriteError);
+}
+
+function cancelItem(id){
+  const it = items[id];
+  if(!it) return;
+  if(!confirm(`「${it.name}」を解約として削除しますか？この操作は取り消せません。`)) return;
+  Promise.resolve(remove(ref(db, 'subscriptions/' + id))).catch(handleWriteError);
+}
+
+// ---------- カテゴリ追加 ----------
+catSelect.addEventListener('change', () => {
+  if(catSelect.value !== '__add__') return;
+  const label = (prompt('新しいカテゴリ名を入力してください（' + LIMIT.catLabel + '文字まで）') || '').trim().slice(0, LIMIT.catLabel);
+  if(!label){ renderCategoryOptions('other'); return; }
+  const dup = CATEGORIES.find(c => c.label === label);
+  if(dup){ renderCategoryOptions(dup.id); return; }
+  if(CATEGORIES.length >= LIMIT.categories){
+    alert('カテゴリ数の上限に達しました');
+    renderCategoryOptions('other');
+    return;
+  }
+  const newCat = { id: newCategoryId(), label, color: nextPaletteColor() };
+  CATEGORIES = CATEGORIES.concat(newCat);
+  renderCategoryOptions(newCat.id);
+  Promise.resolve(saveCategories()).catch(handleWriteError);
+});
+
+// ---------- 入力フォーム ----------
 const overlay = document.getElementById('overlay');
 const openAdd = document.getElementById('openAdd');
 const cancelBtn = document.getElementById('cancelBtn');
@@ -1116,42 +1217,29 @@ saveBtn.addEventListener('click', () => {
   const editId = document.getElementById('editId').value;
 
   if(!name){ alert('サービス名を入力してください'); return; }
-  if(isNaN(amount) || amount < 0){ alert('金額を正しく入力してください'); return; }
+  if(name.length > LIMIT.name){ alert('サービス名は' + LIMIT.name + '文字以内で入力してください'); return; }
+  if(!Number.isFinite(amount) || amount < 0 || amount > LIMIT.amountMax){ alert('金額を正しく入力してください（0〜10億円）'); return; }
+  if(nextDate && !parseYMD(nextDate)){ alert('次回課金日が正しくありません（2000〜2100年）'); return; }
+  if(memo.length > LIMIT.memo){ alert('メモは' + LIMIT.memo + '文字以内で入力してください'); return; }
+  if(editId && !ID_RE.test(editId)){ alert('編集対象が正しくありません'); return; }
 
-  const data = { name, category, amount, cycle: currentCycle, nextDate, memo };
+  const data = sanitizeItem({ name, category, amount, cycle: currentCycle, nextDate, memo });
+  if(!data){ alert('入力内容を確認してください'); return; }
 
-  if(firebaseReady){
-    if(editId){
-      set(ref(db, 'subscriptions/' + editId), data);
-    }else{
-      push(subsRef, data);
-    }
-  }else{
-    const id = editId || ('local_' + Date.now());
-    items[id] = data;
-    saveLocal();
-    render();
-  }
+  const p = editId ? set(ref(db, 'subscriptions/' + editId), data) : push(subsRef, data);
+  Promise.resolve(p).catch(handleWriteError);
   overlay.classList.remove('open');
 });
 
 deleteBtn.addEventListener('click', () => {
   const editId = document.getElementById('editId').value;
-  if(!editId) return;
+  if(!editId || !ID_RE.test(editId)) return;
   if(!confirm('この登録を削除しますか？')) return;
-  if(firebaseReady){
-    remove(ref(db, 'subscriptions/' + editId));
-  }else{
-    delete items[editId];
-    saveLocal();
-    render();
-  }
+  Promise.resolve(remove(ref(db, 'subscriptions/' + editId))).catch(handleWriteError);
   overlay.classList.remove('open');
 });
 
-render();
-
-// --- バックアップの保存・復元 ---
+// ---------- バックアップの保存・復元 ----------
 document.getElementById('backupBtn').addEventListener('click', () => {
   const backup = {
     exportedAt: new Date().toISOString(),
@@ -1180,6 +1268,10 @@ document.getElementById('restoreBtn').addEventListener('click', () => {
 restoreFile.addEventListener('change', () => {
   const file = restoreFile.files[0];
   if(!file) return;
+  if(file.size > LIMIT.backupBytes){
+    alert('バックアップファイルが大きすぎます（2MBまで）。');
+    return;
+  }
   const reader = new FileReader();
   reader.onload = () => {
     let backup;
@@ -1189,34 +1281,50 @@ restoreFile.addEventListener('change', () => {
       alert('バックアップファイルの読み込みに失敗しました。ファイル形式を確認してください。');
       return;
     }
-    if(!backup || typeof backup.subscriptions !== 'object'){
+    if(!isPlainObject(backup) || backup.subscriptions === null || typeof backup.subscriptions !== 'object'){
       alert('バックアップファイルの形式が正しくありません。');
       return;
     }
-    const count = Object.keys(backup.subscriptions).length;
-    const exportedLabel = backup.exportedAt ? new Date(backup.exportedAt).toLocaleString('ja-JP') : '不明な日時';
-    if(!confirm(`${exportedLabel} 時点のバックアップ（${count}件）を復元します。\n現在のデータはすべて上書きされます。よろしいですか？`)) return;
-
-    const newItems = backup.subscriptions;
-    const newCategories = Array.isArray(backup.categories) && backup.categories.length ? backup.categories : DEFAULT_CATEGORIES.slice();
-
-    if(firebaseReady){
-      const catObj = {};
-      newCategories.forEach(c => { catObj[c.id] = { label: c.label, color: c.color }; });
-      set(subsRef, newItems);
-      set(categoriesRef, catObj);
-    }else{
-      items = newItems;
-      CATEGORIES = newCategories;
-      saveLocal();
-      saveCategories();
-      renderCategoryOptions();
-      render();
+    const newItems = sanitizeItems(backup.subscriptions);
+    const count = Object.keys(newItems).length;
+    const dropped = Object.keys(backup.subscriptions).length - count;
+    if(count === 0){
+      alert('バックアップに有効なデータがありません。復元を中止しました。');
+      return;
     }
-    alert('バックアップを復元しました。');
+    const newCategories = sanitizeCategories(backup.categories) || DEFAULT_CATEGORIES.slice();
+    const t = new Date(backup.exportedAt);
+    const exportedLabel = isNaN(t.getTime()) ? '不明な日時' : t.toLocaleString('ja-JP');
+    const droppedNote = dropped > 0 ? `（形式が不正な${dropped}件は除外します）` : '';
+    if(!confirm(`${exportedLabel} 時点のバックアップ（${count}件）${droppedNote}を復元します。\n現在のデータはすべて上書きされます。よろしいですか？`)) return;
+
+    Promise.all([set(subsRef, newItems), saveCategories(newCategories)])
+      .then(() => alert('バックアップを復元しました。'))
+      .catch(handleWriteError);
   };
   reader.readAsText(file);
 });
+
+// ---------- 起動：サインイン状態に応じて同期を開始/停止 ----------
+renderCategoryOptions();
+render();
+
+if(auth){
+  onAuthStateChanged(auth, (user) => {
+    document.body.classList.remove('booting');
+    if(user){
+      document.body.classList.remove('locked');
+      startSync(user.uid);
+    }else{
+      document.body.classList.add('locked');
+      stopSync();
+      setSyncStatus(false, 'サインインしていません');
+    }
+  });
+}else{
+  document.body.classList.remove('booting');
+  loginError.textContent = 'Firebaseの初期化に失敗しました。ページを再読み込みしてください。';
+}
 </script>
 </body>
 </html>
