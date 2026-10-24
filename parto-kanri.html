@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="referrer" content="no-referrer">
 <title>パート管理</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -546,7 +548,7 @@
 
   <header class="topbar">
     <p>PART-TIME PAYROLL</p>
-    <h1>パート管理 <span class="version-badge">v1.2.0</span></h1>
+    <h1>パート管理 <span class="version-badge">v1.2.1</span></h1>
   </header>
 
   <main>
@@ -752,17 +754,6 @@
 const STORAGE_KEY = 'partoKanriData_v1';
 const JOB_COLORS = ['#2F6F5E', '#4C6FA6', '#A6763F'];
 
-function loadData() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultData();
-    const parsed = JSON.parse(raw);
-    return Object.assign(defaultData(), parsed);
-  } catch (e) {
-    return defaultData();
-  }
-}
-
 function defaultData() {
   return {
     jobs: [],
@@ -774,10 +765,112 @@ function defaultData() {
   };
 }
 
+/* ---------- セキュリティ: 入力の無害化・検証 ---------- */
+const LIMITS = {
+  maxJobs: 3,
+  maxEntries: 20000,
+  nameLen: 40,
+  wageMax: 100000,
+  transportMax: 100000,
+  fuyoMax: 100000000,
+  importBytes: 2 * 1024 * 1024
+};
+
+// HTMLとして解釈される文字を無効化（innerHTMLに差し込む値は必ず通す）
+function esc(v) {
+  return String(v == null ? '' : v)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function cleanId(v) {
+  const s = String(v == null ? '' : v);
+  return /^[A-Za-z0-9_-]{1,40}$/.test(s) ? s : '';
+}
+
+function cleanNum(v, min, max, fallback) {
+  const n = Number(v);
+  if (!isFinite(n) || n < min || n > max) return fallback;
+  return n;
+}
+
+function isValidDate(s) {
+  if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const y = Number(s.slice(0, 4));
+  if (y < 2000 || y > 2100) return false;
+  const d = new Date(s + 'T00:00:00Z');
+  return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
+
+function isValidTime(s) {
+  return typeof s === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(s);
+}
+
+// 保存データ／バックアップファイルの中身を、想定した形式の項目だけに作り直す
+function sanitizeState(raw) {
+  const base = defaultData();
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return base;
+
+  const jobs = [];
+  const seenJobIds = new Set();
+  (Array.isArray(raw.jobs) ? raw.jobs : []).forEach(j => {
+    if (jobs.length >= LIMITS.maxJobs || !j || typeof j !== 'object') return;
+    const id = cleanId(j.id);
+    const name = typeof j.name === 'string' ? j.name.trim().slice(0, LIMITS.nameLen) : '';
+    const wage = cleanNum(j.wage, 1, LIMITS.wageMax, null);
+    const transport = cleanNum(j.transport, 0, LIMITS.transportMax, 0);
+    if (!id || !name || wage === null || seenJobIds.has(id)) return;
+    seenJobIds.add(id);
+    jobs.push({ id, name, wage, transport });
+  });
+
+  const entries = [];
+  const seenEntryIds = new Set();
+  (Array.isArray(raw.entries) ? raw.entries : []).forEach(e => {
+    if (entries.length >= LIMITS.maxEntries || !e || typeof e !== 'object') return;
+    const id = cleanId(e.id);
+    const jobId = cleanId(e.jobId);
+    const breakMin = cleanNum(e.breakMin, 0, 600, 0);
+    if (!id || !jobId || seenEntryIds.has(id)) return;
+    if (!isValidDate(e.date) || !isValidTime(e.start) || !isValidTime(e.end)) return;
+    seenEntryIds.add(id);
+    entries.push({ id, jobId, date: e.date, start: e.start, end: e.end, breakMin });
+  });
+
+  const s = (raw.settings && typeof raw.settings === 'object') ? raw.settings : {};
+  const settings = {
+    fuyoLimit: cleanNum(s.fuyoLimit, 1, LIMITS.fuyoMax, base.settings.fuyoLimit),
+    includeTransportInFuyo: typeof s.includeTransportInFuyo === 'boolean'
+      ? s.includeTransportInFuyo
+      : base.settings.includeTransportInFuyo
+  };
+
+  return { jobs, entries, settings };
+}
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return defaultData();
+    return sanitizeState(JSON.parse(raw));
+  } catch (e) {
+    return defaultData();
+  }
+}
+
 let state = loadData();
 
 function saveData() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    return true;
+  } catch (e) {
+    alert('データを保存できませんでした。端末の空き容量やブラウザの設定（プライベートブラウズなど）を確認してください。');
+    return false;
+  }
 }
 
 function uid() {
@@ -983,6 +1076,14 @@ function submitEntry(ev) {
     alert('すべての項目を入力してください');
     return;
   }
+  if (!isValidDate(date) || !isValidTime(start) || !isValidTime(end)) {
+    alert('日付または時刻の形式が正しくありません');
+    return;
+  }
+  if (!editingEntryId && state.entries.length >= LIMITS.maxEntries) {
+    alert('記録できる件数の上限に達しました。不要な記録を削除してください');
+    return;
+  }
   const r = entryWage({ jobId, start, end, breakMin });
   if (r.hours <= 0) {
     alert('終了時刻を開始時刻より後にしてください');
@@ -1046,9 +1147,9 @@ function renderEntryList() {
     row.style.setProperty('--pill-color', JOB_COLORS[idx] || '#999');
     row.innerHTML =
       '<div class="entry-main">' +
-        '<div class="entry-date">' + e.date.replace(/-/g, '/') + '</div>' +
-        '<div class="entry-job">' + (job ? job.name : '（削除済み）') + '</div>' +
-        '<div class="entry-time">' + e.start + '〜' + e.end + '（休憩' + e.breakMin + '分）</div>' +
+        '<div class="entry-date">' + esc(e.date.replace(/-/g, '/')) + '</div>' +
+        '<div class="entry-job">' + esc(job ? job.name : '（削除済み）') + '</div>' +
+        '<div class="entry-time">' + esc(e.start) + '〜' + esc(e.end) + '（休憩' + esc(e.breakMin) + '分）</div>' +
       '</div>' +
       '<div class="entry-side">' +
         '<div class="entry-pay">' + fmtYen(r.total) + '</div>' +
@@ -1087,7 +1188,7 @@ function renderMonthView() {
     const row = document.createElement('div');
     row.className = 'summary-row';
     row.style.setProperty('--pill-color', JOB_COLORS[i]);
-    row.innerHTML = '<span class="dot"></span><span class="label">' + job.name + '</span><span class="value">' + fmtYen(t.total) + '</span>';
+    row.innerHTML = '<span class="dot"></span><span class="label">' + esc(job.name) + '</span><span class="value">' + fmtYen(t.total) + '</span>';
     perJobWrap.appendChild(row);
   });
   if (!anyJob) perJobWrap.innerHTML = '<p class="muted">この月の記録はありません。</p>';
@@ -1107,8 +1208,8 @@ function renderMonthView() {
     row.style.setProperty('--pill-color', JOB_COLORS[idx] || '#999');
     row.innerHTML =
       '<div class="entry-main">' +
-        '<div class="entry-date">' + e.date.slice(8) + '日</div>' +
-        '<div class="entry-job">' + (job ? job.name : '（削除済み）') + '</div>' +
+        '<div class="entry-date">' + esc(e.date.slice(8)) + '日</div>' +
+        '<div class="entry-job">' + esc(job ? job.name : '（削除済み）') + '</div>' +
       '</div>' +
       '<div class="entry-pay">' + fmtYen(r.total) + '</div>';
     body.appendChild(row);
@@ -1185,7 +1286,7 @@ function renderJobsSettings() {
     row.style.setProperty('--pill-color', JOB_COLORS[i]);
     row.innerHTML =
       '<div class="job-setting-main">' +
-        '<div class="job-setting-name">' + job.name + '</div>' +
+        '<div class="job-setting-name">' + esc(job.name) + '</div>' +
         '<div class="job-setting-sub">時給 ' + fmtYen(job.wage) + ' ・ 交通費/日 ' + fmtYen(job.transport) + '</div>' +
       '</div>' +
       '<div class="job-setting-actions">' +
@@ -1244,8 +1345,16 @@ function submitJobForm(ev) {
   const wage = Number(document.getElementById('jobWage').value);
   const transport = Number(document.getElementById('jobTransport').value || 0);
 
-  if (!name || !wage || wage <= 0) {
-    alert('会社名と時給を正しく入力してください');
+  if (!name || name.length > LIMITS.nameLen) {
+    alert('会社名は1〜' + LIMITS.nameLen + '文字で入力してください');
+    return;
+  }
+  if (!isFinite(wage) || wage <= 0 || wage > LIMITS.wageMax) {
+    alert('時給は1〜' + LIMITS.wageMax.toLocaleString('ja-JP') + '円の範囲で入力してください');
+    return;
+  }
+  if (!isFinite(transport) || transport < 0 || transport > LIMITS.transportMax) {
+    alert('交通費は0〜' + LIMITS.transportMax.toLocaleString('ja-JP') + '円の範囲で入力してください');
     return;
   }
 
@@ -1270,7 +1379,7 @@ function renderFuyoSettings() {
 function saveFuyoSettings() {
   const limit = Number(document.getElementById('fuyoLimitInput').value);
   const include = document.getElementById('includeTransportCheck').checked;
-  if (!limit || limit <= 0) { alert('扶養の上限額を正しく入力してください'); return; }
+  if (!isFinite(limit) || limit <= 0 || limit > LIMITS.fuyoMax) { alert('扶養の上限額を正しく入力してください'); return; }
   state.settings.fuyoLimit = limit;
   state.settings.includeTransportInFuyo = include;
   saveData();
@@ -1303,6 +1412,10 @@ function exportData() {
 }
 
 function importDataFromFile(file) {
+  if (file.size > LIMITS.importBytes) {
+    alert('ファイルが大きすぎます（2MBまで）。パート管理のバックアップファイルを選択してください。');
+    return;
+  }
   const reader = new FileReader();
   reader.onload = (ev) => {
     let parsed;
@@ -1316,10 +1429,15 @@ function importDataFromFile(file) {
       alert('このファイルはパート管理のバックアップ形式ではないようです。');
       return;
     }
-    if (!confirm('現在のデータを、選択したファイルの内容で上書きします。よろしいですか？')) return;
-    state = Object.assign(defaultData(), parsed);
-    if (!state.settings) state.settings = defaultData().settings;
-    saveData();
+    // 想定した形式の項目だけに作り直して取り込む（不正な項目は除外）
+    const cleaned = sanitizeState(parsed);
+    const dropped = (parsed.jobs.length - cleaned.jobs.length) + (parsed.entries.length - cleaned.entries.length);
+    let msg = 'バイト先' + cleaned.jobs.length + '件・勤務記録' + cleaned.entries.length + '件を読み込みます。現在のデータは上書きされます。よろしいですか？';
+    if (dropped > 0) msg += '\n（形式が正しくない項目 ' + dropped + '件は除外されます）';
+    if (!confirm(msg)) return;
+    const previous = state;
+    state = cleaned;
+    if (!saveData()) { state = previous; return; }
     renderAll();
     showBackupStatus('データを復元しました');
   };
