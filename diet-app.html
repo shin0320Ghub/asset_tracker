@@ -2,6 +2,8 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src https://generativelanguage.googleapis.com https://api.anthropic.com; frame-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="からだノート">
@@ -224,6 +226,9 @@ textarea.field{height:auto;min-height:84px;padding:10px 12px;line-height:1.5}
 <div class="toast" id="toast"></div>
 
 <script>
+/* ========== 他サイトの枠内での表示を防ぐ ========== */
+(function(){if(window.top===window.self)return;try{if(window.top.location.origin===location.origin)return}catch(e){}
+  document.documentElement.style.display='none';try{window.top.location=location.href}catch(e){}})();
 /* ========== アイコン ========== */
 const SV=(d,cls='i')=>`<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const IC={
@@ -325,7 +330,45 @@ const FOODS=[
 const CATS=['すべて','主食','主菜','副菜','果物・乳','間食','飲み物'];
 
 function def(){return {profile:{sex:'',age:'',height:'',activity:1.375,manualKcal:''},meals:{},weights:{},steps:{},bp:{},stepGoal:8000,goals:{},seen:{},provider:'gemini',geminiKey:'',geminiModel:'gemini-flash-latest',apiKey:'',model:'claude-sonnet-5-5'}}
-function load(){try{const d=JSON.parse(localStorage.getItem(KEY));if(d)return Object.assign(def(),d)}catch(e){}return def()}
+
+/* ========== データの検証（不正なデータを取り込まない） ========== */
+const RE_DAY=/^\d{4}-\d{2}-\d{2}$/,RE_YM=/^\d{4}-\d{2}$/,RE_ID=/^[0-9a-z]{1,24}$/,RE_MODEL=/^[A-Za-z0-9._-]{1,64}$/;
+const vNum=(v,lo,hi)=>{if(v===''||v==null)return null;v=+v;return Number.isFinite(v)&&v>=lo&&v<=hi?v:null};
+const vStr=(v,n)=>typeof v==='string'?v.replace(/[\u0000-\u001f\u007f]/g,'').slice(0,n):'';
+const isObj=o=>o&&typeof o==='object'&&!Array.isArray(o);
+const MEAL_KEYS=['breakfast','lunch','dinner','snack'];
+function sanitizeItem(i){
+  if(!isObj(i))return null;const name=vStr(i.name,80).trim();if(!name)return null;
+  return {id:RE_ID.test(i.id)?i.id:Date.now().toString(36)+Math.random().toString(36).slice(2,8),meal:MEAL_KEYS.includes(i.meal)?i.meal:'snack',name,
+    grams:Math.round(vNum(i.grams,0,5000)??0),kcal:vNum(i.kcal,0,10000)??0,p:vNum(i.p,0,1000)??0,f:vNum(i.f,0,1000)??0,c:vNum(i.c,0,2000)??0};
+}
+function sanitizeBP(r){
+  const o={};if(!isObj(r))return null;
+  for(const sl of ['am','pm']){const x=r[sl];if(!isObj(x))continue;const sv=vNum(x.s,40,300),dv=vNum(x.d,20,200);if(sv==null||dv==null)continue;
+    const y={s:Math.round(sv),d:Math.round(dv)};const pv=vNum(x.p,20,250);if(pv)y.p=Math.round(pv);o[sl]=y}
+  return o.am||o.pm?o:null;
+}
+function sanitizeState(d){
+  const o=def();if(!isObj(d))return o;
+  const p=isObj(d.profile)?d.profile:{};
+  o.profile={sex:['male','female'].includes(p.sex)?p.sex:'',age:vNum(p.age,1,120)??'',height:vNum(p.height,50,250)??'',
+    activity:[1.2,1.375,1.55,1.725].includes(+p.activity)?+p.activity:1.375,manualKcal:vNum(p.manualKcal,0,10000)??''};
+  const days=(src,fn)=>{const out={};if(!isObj(src))return out;for(const k of Object.keys(src)){if(!RE_DAY.test(k))continue;const v=fn(src[k]);if(v!=null)out[k]=v}return out};
+  o.meals=days(d.meals,a=>{if(!Array.isArray(a))return null;const l=a.slice(0,200).map(sanitizeItem).filter(Boolean);return l.length?l:null});
+  o.weights=days(d.weights,v=>{const x=vNum(v,20,300);return x==null?null:Math.round(x*10)/10});
+  o.steps=days(d.steps,v=>{const x=vNum(v,0,200000);return x==null?null:Math.round(x)});
+  o.bp=days(d.bp,sanitizeBP);
+  o.stepGoal=Math.round(vNum(d.stepGoal,1000,100000)??8000);
+  if(isObj(d.goals))for(const k of Object.keys(d.goals)){if(!RE_YM.test(k))continue;const v=vNum(d.goals[k],20,300);if(v!=null)o.goals[k]=Math.round(v*10)/10}
+  if(isObj(d.seen))for(const k of Object.keys(d.seen))if(RE_YM.test(k))o.seen[k]=1;
+  o.provider=d.provider==='claude'?'claude':'gemini';
+  o.geminiModel=RE_MODEL.test(d.geminiModel)?d.geminiModel:'gemini-flash-latest';
+  o.model=RE_MODEL.test(d.model)?d.model:'claude-sonnet-5-5';
+  o.geminiKey=vStr(d.geminiKey,300).trim();o.apiKey=vStr(d.apiKey,300).trim();
+  if(typeof d.hkLast==='string'&&/^[0-9/:（）日分 ]{1,40}$/.test(d.hkLast))o.hkLast=d.hkLast;
+  return o;
+}
+function load(){let raw=null;try{raw=localStorage.getItem(KEY);const d=JSON.parse(raw);if(d)return sanitizeState(d)}catch(e){try{if(raw)localStorage.setItem(KEY+'-rescue',raw)}catch(_){}}return def()}
 let S=load();
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('保存できませんでした（容量不足の可能性）')}}
 
@@ -624,7 +667,7 @@ async function askAI(text,img){
     const raw=gem?await callGemini(text,img):await callClaude(text,img);
     const txt=raw.replace(/```json|```/g,'');
     const j=JSON.parse(txt.slice(txt.indexOf('{'),txt.lastIndexOf('}')+1));
-    aiItems={items:(j.items||[]).map(i=>({name:i.name,grams:+i.grams||0,base:+i.grams||0,kcal:+i.kcal||0,p:+i.p||0,f:+i.f||0,c:+i.c||0,on:true})),comment:j.comment||''};
+    aiItems={items:(Array.isArray(j.items)?j.items:[]).slice(0,30).map(i=>{const g=vNum(i&&i.grams,0,3000)??0;return {name:vStr(i&&i.name,60).trim()||'（名称不明）',grams:g,base:g,kcal:vNum(i&&i.kcal,0,5000)??0,p:vNum(i&&i.p,0,500)??0,f:vNum(i&&i.f,0,500)??0,c:vNum(i&&i.c,0,800)??0,on:true}}),comment:vStr(j.comment,200)};
   }catch(e){
     aiItems=null;
     $('#aiout').innerHTML=(aiImg?`<img class="preview" src="${aiImg}" alt="">`:'')+`<div class="warnbox">分析できませんでした：${esc(e.message)}<br>APIキー・モデル名・通信状況を確認してください。</div>`;
@@ -793,7 +836,7 @@ function viewSteps(){
 const SC_NAME='からだノート歩数';
 let hkWaiting=false;
 function hkCard(){
-  const last=S.hkLast?`最終取り込み：${S.hkLast}`:'まだ取り込んでいません';
+  const last=S.hkLast?`最終取り込み：${esc(S.hkLast)}`:'まだ取り込んでいません';
   return `<section class="card" style="--c:var(--l);margin-bottom:12px">
     <div style="display:flex;align-items:center;gap:10px"><div class="ic" style="width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:color-mix(in srgb,var(--l) 18%,transparent);color:var(--l)">${IC.heart}</div>
     <div><b>iPhoneヘルスケアと連動</b><div class="muted">${last}</div></div></div>
@@ -861,7 +904,7 @@ function hkHelp(){
 }
 function hkFromURL(){
   try{const u=new URL(location.href),v=u.searchParams.get('steps');if(v==null)return;
-    history.replaceState(null,'',u.pathname);hkImport(v);}catch(e){}
+    history.replaceState(null,'',u.pathname);if(v.length>2000)return;if(confirm('リンクから歩数のデータを取り込みますか？\n（ショートカットから開いた場合は「OK」）'))hkImport(v);}catch(e){}
 }
 
 function stepS(d){const e=$('#sv');e.value=Math.max(0,(+e.value||0)+d)}
@@ -1434,7 +1477,7 @@ function rpBuildPages(s){
   }
   return pages;
 }
-function rpLoad(src){return new Promise((ok,ng)=>{const e=document.createElement('script');e.src=src;e.onload=ok;e.onerror=()=>ng(new Error('ライブラリを読み込めませんでした（通信を確認してください）'));document.head.appendChild(e)})}
+function rpLoad(src,sri){return new Promise((ok,ng)=>{const e=document.createElement('script');e.src=src;e.integrity=sri;e.crossOrigin='anonymous';e.referrerPolicy='no-referrer';e.onload=ok;e.onerror=()=>ng(new Error('ライブラリを読み込めませんでした（通信を確認してください）'));document.head.appendChild(e)})}
 async function makeReport(){
   if(rpBusy)return;rpBusy=true;
   const msg=$('#rpmsg'),btn=$('#rpgo');
@@ -1445,8 +1488,8 @@ async function makeReport(){
     say('データを集計しています…');
     const s=rpStats(rpFrom,rpTo);
     say('レポートを組み立てています…');
-    if(!window.html2canvas)await rpLoad('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
-    if(!window.jspdf)await rpLoad('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+    if(!window.html2canvas)await rpLoad('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js','sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H');
+    if(!window.jspdf)await rpLoad('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js','sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk');
     wrap=document.createElement('div');wrap.style.cssText='position:fixed;left:-10000px;top:0;z-index:-1';
     wrap.innerHTML=`<style>${RP_CSS}</style>`;
     const html=rpBuildPages(s),N=html.length;
@@ -1471,7 +1514,7 @@ async function makeReport(){
     const name=`健康レポート_${s.from.replace(/-/g,'')}${s.single?'':'-'+s.to.replace(/-/g,'')}.pdf`;
     const blob=pdf.output('blob');
     wrap.remove();wrap=null;
-    if(msg)msg.innerHTML=`<div class="tip" style="margin:0 0 12px"><div class="face">${IC.note}</div><div><b>PDFができました</b>${N}ページ・${name}</div></div>
+    if(msg)msg.innerHTML=`<div class="tip" style="margin:0 0 12px"><div class="face">${IC.note}</div><div><b>PDFができました</b>${N}ページ・${esc(name)}</div></div>
       <button class="btn" style="margin-bottom:8px" onclick="rpShare()">保存・共有する</button>`;
     window._rp={blob,name};
     rpShare(true);
@@ -1526,7 +1569,7 @@ function viewSettings(){
     <label class="f">Claude APIキー<input class="field" type="password" autocomplete="off" placeholder="sk-ant-..." value="${esc(S.apiKey)}" onchange="S.apiKey=this.value.trim();save();toast('APIキーを保存しました')"></label>
     <label class="f">モデル名<input class="field" value="${esc(S.model)}" onchange="S.model=this.value.trim()||'claude-sonnet-5-5';save()"></label>`}
     <div class="muted" style="margin-top:8px">キーはこの端末の中だけに保存されます。</div>
-    <button class="btn sub" style="margin-top:12px" onclick="testAI()">接続テスト</button>
+    <div class="grid2" style="margin-top:12px"><button class="btn sub" onclick="testAI()">接続テスト</button><button class="btn warn" onclick="if(confirm('この端末に保存したAPIキーを削除しますか？')){S.geminiKey='';S.apiKey='';save();render();toast('APIキーを削除しました')}">キーを削除</button></div>
   </section>
   <section class="card">
     <b>データ</b>
@@ -1535,7 +1578,7 @@ function viewSettings(){
     <label class="btn sub" style="position:relative">バックアップから復元<input type="file" accept="application/json,.json" onchange="importData(this)" style="position:absolute;inset:0;opacity:0"></label></div>
     <button class="btn warn" style="margin-top:10px" onclick="if(confirm('すべての記録を削除します。よろしいですか？')){S=def();save();render();toast('すべて削除しました')}">すべてのデータを削除</button>
   </section>
-  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.8.4　食品の値は目安です</p>`;
+  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.9　食品の値は目安です</p>`;
 }
 async function testAI(){
   const gem=S.provider!=='claude';
@@ -1551,7 +1594,12 @@ function exportData(){
 }
 function importData(inp){
   const f=inp.files[0];if(!f)return;const r=new FileReader();
-  r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.meals||!d.weights)throw 0;d.steps=d.steps||{};d.bp=d.bp||{};const key=S.apiKey,gk=S.geminiKey;S=Object.assign(def(),d);if(!S.apiKey)S.apiKey=key;if(!S.geminiKey)S.geminiKey=gk;save();render();toast('復元しました')}catch(e){toast('バックアップファイルを読み込めませんでした')}};
+  if(f.size>20*1024*1024){toast('ファイルが大きすぎます');inp.value='';return}
+  r.onload=()=>{try{const d=JSON.parse(r.result);if(!isObj(d)||!isObj(d.meals)||!isObj(d.weights))throw 0;
+    const n=sanitizeState(d);
+    if(!confirm(`バックアップを復元します。\n食事${Object.keys(n.meals).length}日分・体重${Object.keys(n.weights).length}日分\n今のデータは上書きされます。よろしいですか？`)){inp.value='';return}
+    n.apiKey=S.apiKey;n.geminiKey=S.geminiKey;n.provider=S.provider;n.model=S.model;n.geminiModel=S.geminiModel;   // APIの設定はファイルから読み込まない
+    S=n;save();render();toast('復元しました')}catch(e){toast('バックアップファイルを読み込めませんでした')}inp.value=''};
   r.readAsText(f);
 }
 
