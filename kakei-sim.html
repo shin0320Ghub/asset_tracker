@@ -294,7 +294,7 @@
   <header>
     <div class="title-row">
       <h1>家計・年金シミュレーター</h1>
-      <span class="version">Ver2.0</span>
+      <span class="version">Ver2.1</span>
     </div>
     <div class="kpi" style="margin-top:14px;">
       <div><div class="lbl">資産合計（貯蓄＋投資）</div><div class="val" id="hdr-total">¥0</div></div>
@@ -641,7 +641,7 @@ async function verifyPinInteractive(message){
 
 function checkAuthAndInit(){
   if(state.auth && state.auth.pinHash){
-    if(localStorage.getItem(AUTH_LOCAL_KEY) === '1'){
+    if(sessionStorage.getItem(AUTH_LOCAL_KEY) === '1'){
       unlockApp();
     } else {
       showAuthScreen('login');
@@ -760,7 +760,7 @@ function showAuthScreen(mode){
       if(await verifySecret(pin, state.auth.pinHash, state.auth.pinSalt)){
         clearPinFailures();
         await upgradeLegacyPin(pin);
-        localStorage.setItem(AUTH_LOCAL_KEY, '1');
+        sessionStorage.setItem(AUTH_LOCAL_KEY, '1');
         unlockApp();
       } else {
         registerPinFailure();
@@ -854,7 +854,7 @@ function showSetupQuestion(pin1){
       recoveryAnswerHash: ansSecret.hash, recoveryAnswerSalt: ansSecret.salt
     };
     saveState();
-    localStorage.setItem(AUTH_LOCAL_KEY, '1');
+    sessionStorage.setItem(AUTH_LOCAL_KEY, '1');
     unlockApp();
   });
 }
@@ -884,15 +884,27 @@ function showResetConfirm(pin1){
     state.auth.pinHash = pinSecret.hash;
     state.auth.pinSalt = pinSecret.salt;
     saveState();
-    localStorage.setItem(AUTH_LOCAL_KEY, '1');
+    sessionStorage.setItem(AUTH_LOCAL_KEY, '1');
     unlockApp();
   });
 }
 
 function logoutApp(){
-  localStorage.removeItem(AUTH_LOCAL_KEY);
+  try{ sessionStorage.removeItem(AUTH_LOCAL_KEY); localStorage.removeItem(AUTH_LOCAL_KEY); }catch(e){}
+  appUnlocked = false;
   showAuthScreen('login');
 }
+/* 自動ロック：アプリを閉じる／5分以上バックグラウンドにするとロック（以前の永続ログイン状態は廃止） */
+try{ localStorage.removeItem(AUTH_LOCAL_KEY); }catch(e){}
+const IDLE_LOCK_MS = 5 * 60 * 1000;
+let hiddenAt = 0;
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden){ hiddenAt = Date.now(); return; }
+  if(appUnlocked && hiddenAt && Date.now() - hiddenAt >= IDLE_LOCK_MS && state.auth && state.auth.pinHash){
+    logoutApp();
+  }
+  hiddenAt = 0;
+});
 
 async function changePin(){
   if(!state.auth || !state.auth.pinHash){ alert('暗証番号が未設定です'); return; }
@@ -1329,7 +1341,7 @@ function renderSettingsTab(){
 function exportBackup(){
   const payload = {
     app: 'kakei-sim',
-    version: 'Ver2.0',
+    version: 'Ver2.1',
     exportedAt: new Date().toISOString(),
     data: Object.assign({}, state, { auth: undefined }) // 暗証番号のハッシュ等はバックアップに含めない
   };
