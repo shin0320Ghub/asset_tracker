@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>株評価損益</title>
+<meta http-equiv="Content-Security-Policy" content="object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+<style>
+  :root{
+    --navy:#1b2a4a;
+    --navy-deep:#131f38;
+    --paper:#f2ede4;
+    --paper-line:#e2d9c8;
+    --gold:#c9a227;
+    --green:#3b7a57;
+    --red:#b23a48;
+    --ink:#2a2f36;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--navy-deep);
+    background-image:
+      radial-gradient(circle at 20% 0%, rgba(201,162,39,0.08), transparent 40%),
+      radial-gradient(circle at 90% 100%, rgba(201,162,39,0.06), transparent 45%);
+    font-family:"Noto Sans JP",sans-serif;
+    color:var(--ink);
+    min-height:100vh;
+    padding:env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 24px) 0;
+  }
+  .app{
+    max-width:480px;
+    margin:0 auto;
+    padding:20px 16px 0 16px;
+  }
+
+  /* Tablet (iPad mini and larger) */
+  @media (min-width: 700px){
+    .app{ max-width:640px; padding-top:32px; }
+    .brand h1{ font-size:26px; }
+    .total-value{ font-size:40px; }
+    .total-label{ font-size:12px; }
+    canvas{ max-height:300px; }
+    .stat .v{ font-size:16px; }
+    .stat .p{ font-size:11px; }
+    .stat .k{ font-size:11px; }
+    .passbook, .input-card, .chart-card, .history-card, .csv-card, .sync-card{ padding-left:26px; padding-right:26px; }
+    .save-btn, .csv-btn, .sync-btn{ font-size:14px; padding:13px; }
+    table{ font-size:14px; }
+    .field input{ font-size:16px; height:50px; }
+  }
+
+  /* iPad landscape / wider */
+  @media (min-width: 1000px){
+    .app{ max-width:760px; }
+    canvas{ max-height:340px; }
+  }
+  .brand{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    padding:4px 4px 18px 4px;
+  }
+  .brand h1{
+    font-family:"Shippori Mincho",serif;
+    font-weight:700;
+    font-size:22px;
+    color:var(--paper);
+    letter-spacing:.08em;
+    margin:0;
+  }
+  .brand .sub{
+    font-size:10px;
+    color:rgba(242,237,228,0.55);
+    letter-spacing:.15em;
+  }
+  .version{
+    font-family:"Noto Sans JP",sans-serif;
+    font-weight:500;
+    font-size:10px;
+    color:var(--gold);
+    letter-spacing:.05em;
+    margin-left:8px;
+    vertical-align:middle;
+  }
+
+  /* Passbook card */
+  .passbook{
+    background:var(--paper);
+    border-radius:6px;
+    box-shadow:0 18px 40px rgba(0,0,0,0.35), 0 2px 0 rgba(0,0,0,0.06) inset;
+    position:relative;
+    overflow:hidden;
+    padding:24px 20px 20px 20px;
+  }
+  .passbook::before{
+    content:"";
+    position:absolute; top:0; left:0; right:0; height:6px;
+    background:linear-gradient(90deg,var(--navy),var(--gold) 50%,var(--navy));
+  }
+  .total-label{
+    font-size:11px;
+    letter-spacing:.2em;
+    color:#7a7263;
+    margin-bottom:2px;
+  }
+  .total-value{
+    font-family:"Shippori Mincho",serif;
+    font-weight:700;
+    font-size:34px;
+    line-height:1.15;
+    color:var(--navy);
+    display:flex;
+    align-items:baseline;
+    gap:4px;
+  }
+  .total-value .yen{font-size:18px; color:#9a8f76;}
+  .total-date{
+    font-size:11px;
+    color:#9a8f76;
+    margin-top:4px;
+  }
+
+  .stamp{
+    position:absolute;
+    top:18px; right:18px;
+    width:52px;height:52px;
+    border-radius:50%;
+    border:2px solid var(--red);
+    color:var(--red);
+    display:flex;align-items:center;justify-content:center;
+    font-family:"Shippori Mincho",serif;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.05em;
+    transform:rotate(-8deg);
+    opacity:.85;
+    text-align:center;
+    line-height:1.2;
+  }
+  .record-badge{
+    position:absolute;
+    top:30px; right:78px;
+    background:var(--gold);
+    color:var(--navy-deep);
+    font-family:"Shippori Mincho",serif;
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:.05em;
+    padding:4px 9px;
+    border-radius:3px;
+    white-space:nowrap;
+    box-shadow:0 2px 6px rgba(0,0,0,0.25);
+    display:none;
+  }
+  .record-badge.show{ display:block; }
+
+  .ledger-rule{
+    height:1px;
+    background:repeating-linear-gradient(90deg, var(--paper-line) 0 6px, transparent 6px 12px);
+    margin:18px 0;
+  }
+
+  /* Stats row */
+  .stats{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:8px;
+  }
+  .stat{
+    background:rgba(27,42,74,0.04);
+    border:1px solid var(--paper-line);
+    border-radius:6px;
+    padding:10px 8px;
+    text-align:center;
+  }
+  .stat .k{
+    font-size:10px;
+    color:#8a8371;
+    letter-spacing:.1em;
+    margin-bottom:6px;
+  }
+  .stat .v{
+    font-size:14px;
+    font-weight:700;
+    font-variant-numeric:tabular-nums;
+  }
+  .stat .p{
+    font-size:10px;
+    margin-top:2px;
+    font-variant-numeric:tabular-nums;
+  }
+  .up{color:var(--green);}
+  .down{color:var(--red);}
+  .flat{color:#8a8371;}
+
+  /* Input card */
+  .input-card{
+    background:var(--paper);
+    border-radius:6px;
+    margin-top:14px;
+    padding:16px 18px 18px 18px;
+    box-shadow:0 10px 24px rgba(0,0,0,0.28);
+  }
+  .input-card h2{
+    font-family:"Shippori Mincho",serif;
+    font-size:14px;
+    color:var(--navy);
+    margin:0 0 12px 0;
+    letter-spacing:.05em;
+  }
+  .row{display:flex; gap:8px;}
+  .field{flex:1; display:flex; flex-direction:column; gap:4px;}
+  .field label{font-size:10px; color:#8a8371; letter-spacing:.05em;}
+  .field input{
+    font-family:"Noto Sans JP",sans-serif;
+    font-size:15px;
+    height:46px;
+    padding:0 12px;
+    border-radius:4px;
+    border:1px solid var(--paper-line);
+    background:#fff;
+    color:var(--ink);
+    width:100%;
+    line-height:normal;
+    -webkit-appearance:none;
+    appearance:none;
+  }
+  .field input:focus{outline:2px solid var(--navy); outline-offset:1px;}
+  .save-btn{
+    margin-top:12px;
+    width:100%;
+    padding:12px;
+    border:none;
+    border-radius:4px;
+    background:var(--navy);
+    color:var(--paper);
+    font-size:14px;
+    font-weight:700;
+    letter-spacing:.1em;
+    font-family:"Noto Sans JP",sans-serif;
+  }
+  .save-btn:active{background:var(--navy-deep);}
+  .hint{font-size:10px; color:#8a8371; margin-top:8px; text-align:center;}
+
+  /* Chart card */
+  .chart-card{
+    background:var(--paper);
+    border-radius:6px;
+    margin-top:14px;
+    padding:16px 12px 8px 6px;
+    box-shadow:0 10px 24px rgba(0,0,0,0.28);
+  }
+  .chart-card h2{
+    font-family:"Shippori Mincho",serif;
+    font-size:14px;
+    color:var(--navy);
+    margin:0 0 8px 14px;
+    letter-spacing:.05em;
+  }
+  .range-toggle{
+    display:flex; gap:6px; margin:0 8px 10px 8px;
+  }
+  .range-toggle button{
+    flex:1;
+    padding:6px 0;
+    font-size:11px;
+    border-radius:4px;
+    border:1px solid var(--paper-line);
+    background:transparent;
+    color:#8a8371;
+    font-family:"Noto Sans JP",sans-serif;
+  }
+  .range-toggle button.active{
+    background:var(--navy);
+    border-color:var(--navy);
+    color:var(--paper);
+    font-weight:700;
+  }
+  canvas{max-height:220px;}
+
+  /* History */
+  .history-card{
+    background:var(--paper);
+    border-radius:6px;
+    margin-top:14px;
+    padding:14px 6px 6px 6px;
+    box-shadow:0 10px 24px rgba(0,0,0,0.28);
+  }
+  .history-card h2{
+    font-family:"Shippori Mincho",serif;
+    font-size:14px;
+    color:var(--navy);
+    margin:0 0 6px 16px;
+    letter-spacing:.05em;
+  }
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  th,td{padding:8px 10px; text-align:right;}
+  th{font-size:10px; color:#8a8371; font-weight:500; text-align:right;}
+  th:first-child, td:first-child{text-align:left;}
+  tbody tr{border-top:1px solid var(--paper-line);}
+  td.amt{font-variant-numeric:tabular-nums; font-weight:600;}
+  .del{
+    background:none; border:none; color:var(--red); font-size:12px; padding:4px 6px;
+  }
+  .empty{
+    text-align:center; padding:24px 0; color:#a49b87; font-size:12px;
+  }
+  footer{
+    text-align:center;
+    color:rgba(242,237,228,0.35);
+    font-size:10px;
+    margin-top:18px;
+    letter-spacing:.1em;
+  }
+
+  /* Sync card */
+  .sync-card{
+    background:var(--paper);
+    border-radius:6px;
+    margin-top:14px;
+    padding:14px 18px 16px 18px;
+    box-shadow:0 10px 24px rgba(0,0,0,0.28);
+  }
+  .sync-card h2{
+    font-family:"Shippori Mincho",serif;
+    font-size:14px;
+    color:var(--navy);
+    margin:0 0 10px 0;
+    letter-spacing:.05em;
+  }
+  .sync-status{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-size:11px;
+    color:#8a8371;
+    margin-bottom:10px;
+  }
+  .sync-dot{
+    width:8px;height:8px;border-radius:50%;
+    background:#b8ae95;
+    flex-shrink:0;
+  }
+  .sync-dot.on{background:var(--green);}
+  .sync-dot.off{background:var(--red);}
+  .sync-row{display:flex; gap:8px;}
+  .sync-row input{
+    flex:1;
+    font-family:"Noto Sans JP",sans-serif;
+    font-size:14px;
+    padding:10px 10px;
+    border-radius:4px;
+    border:1px solid var(--paper-line);
+    background:#fff;
+    color:var(--ink);
+  }
+  .sync-btn{
+    padding:0 16px;
+    border:none;
+    border-radius:4px;
+    background:var(--navy);
+    color:var(--paper);
+    font-size:13px;
+    font-weight:700;
+    font-family:"Noto Sans JP",sans-serif;
+  }
+  .sync-btn:active{background:var(--navy-deep);}
+  .sync-hint{font-size:10px; color:#8a8371; margin-top:8px; line-height:1.5;}
+
+  /* CSV export card */
+  .csv-card{
+    background:var(--paper);
+    border-radius:6px;
+    margin-top:14px;
+    padding:14px 18px 16px 18px;
+    box-shadow:0 10px 24px rgba(0,0,0,0.28);
+  }
+  .csv-card h2{
+    font-family:"Shippori Mincho",serif;
+    font-size:14px;
+    color:var(--navy);
+    margin:0 0 10px 0;
+    letter-spacing:.05em;
+  }
+  .export-row{
+    display:flex;
+    gap:8px;
+  }
+  .csv-btn{
+    flex:1;
+    width:100%;
+    padding:11px;
+    border:1px solid var(--navy);
+    border-radius:4px;
+    background:transparent;
+    color:var(--navy);
+    font-size:13px;
+    font-weight:700;
+    letter-spacing:.05em;
+    font-family:"Noto Sans JP",sans-serif;
+  }
+  .csv-btn:active{background:rgba(27,42,74,0.08);}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="brand">
+    <h1>株評価損益<span class="version">Ver1.1</span></h1>
+    <div class="sub">STOCK&nbsp;VALUATION&nbsp;P&amp;L</div>
+  </div>
+
+  <div class="passbook">
+    <div class="stamp" id="stamp">記帳<br>済</div>
+    <div class="record-badge" id="recordBadge">最高値</div>
+    <div class="total-label">評価損益</div>
+    <div class="total-value"><span class="yen">¥</span><span id="totalValue">0</span></div>
+    <div class="total-date" id="totalDate">データがありません</div>
+
+    <div class="ledger-rule"></div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="k">前日比</div>
+        <div class="v" id="dayVal">—</div>
+        <div class="p" id="dayPct">—</div>
+      </div>
+      <div class="stat">
+        <div class="k">前月比</div>
+        <div class="v" id="monthVal">—</div>
+        <div class="p" id="monthPct">—</div>
+      </div>
+      <div class="stat">
+        <div class="k">前年比</div>
+        <div class="v" id="yearVal">—</div>
+        <div class="p" id="yearPct">—</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="input-card">
+    <h2>今日の評価損益を記帳</h2>
+    <div class="row">
+      <div class="field">
+        <label for="dateInput">日付(平日のみ)</label>
+        <input type="date" id="dateInput">
+      </div>
+      <div class="field">
+        <label for="amountInput">評価損益（円）</label>
+        <input type="number" id="amountInput" inputmode="numeric" placeholder="例: -50000">
+      </div>
+    </div>
+    <button class="save-btn" id="saveBtn">記帳する</button>
+    <div class="hint">同じ日付で記帳すると上書きされます。土日は記帳できません(祝日はチェックされません)</div>
+  </div>
+
+  <div class="chart-card">
+    <h2>推移グラフ</h2>
+    <div class="range-toggle" id="rangeToggle">
+      <button data-range="3m">3ヶ月</button>
+      <button data-range="6m">6ヶ月</button>
+      <button data-range="1y" class="active">1年</button>
+      <button data-range="all">全期間</button>
+    </div>
+    <canvas id="chart" height="220"></canvas>
+  </div>
+
+  <div class="history-card">
+    <h2>記帳履歴</h2>
+    <table>
+      <thead>
+        <tr><th>日付</th><th>評価損益</th><th></th></tr>
+      </thead>
+      <tbody id="historyBody"></tbody>
+    </table>
+    <div class="empty" id="emptyMsg" style="display:none;">まだ記帳がありません</div>
+  </div>
+
+  <div class="csv-card">
+    <h2>データ書き出し・取込</h2>
+    <div class="export-row">
+      <button class="csv-btn" id="jsonExportBtn">JSONを出力</button>
+      <button class="csv-btn" id="jsonImportBtn">JSONを取込</button>
+    </div>
+    <input type="file" id="jsonImportInput" accept=".json,application/json" style="display:none;">
+    <div class="sync-hint">記帳履歴をJSONファイルとして書き出し、または取り込みます</div>
+  </div>
+
+  <div class="sync-card">
+    <h2>iPhone / iPad 同期</h2>
+    <div class="sync-status"><span class="sync-dot" id="syncDot"></span><span id="syncStatusText">未接続(この端末のみ)</span></div>
+    <div class="sync-row">
+      <input type="text" id="syncCodeInput" placeholder="同期コードを入力(16文字以上)" maxlength="64" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <button class="sync-btn" id="syncConnectBtn">接続</button>
+    </div>
+    <div class="sync-hint">同期コードは自分だけの合言葉です。半角英数字と「-」「_」で16文字以上にしてください。iPhoneとiPadで同じコードを入力すると、記帳データが自動的に共有されます。他人に教えないでください。</div>
+  </div>
+
+  <footer>同期未設定の場合、データは端末内にのみ保存されます</footer>
+</div>
+
+<script>
+// 他サイトの枠内(iframe)に埋め込まれた場合は表示しない(クリックジャッキング対策)
+if(window.top !== window.self){ document.documentElement.style.display = 'none'; }
+
+const STORAGE_KEY = 'asset-passbook-entries';
+const SYNC_CODE_KEY = 'asset-passbook-sync-code';
+const firebaseConfig = {
+  apiKey: "AIzaSyBUQjfeamTm1gCWNiXhZcxyBIUiQSptvDs",
+  authDomain: "asset-tracker-b3fac.firebaseapp.com",
+  databaseURL: "https://asset-tracker-b3fac-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  projectId: "asset-tracker-b3fac",
+  storageBucket: "asset-tracker-b3fac.firebasestorage.app",
+  messagingSenderId: "36181399487",
+  appId: "1:36181399487:web:0ef48412b814d81aaa330a"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+let entries = [];
+let currentRange = '1y';
+let chart = null;
+let syncCode = null;
+let entriesRef = null;
+
+// ---- 入力値の検証(端末内データ・クラウドのデータ・取込ファイルすべてに適用) ----
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const SYNC_CODE_RE = /^[A-Za-z0-9_-]{16,64}$/;
+const MAX_ABS_AMOUNT = 1e12;      // 評価損益の上限(±1兆円)
+const MAX_ENTRIES = 20000;        // 記帳件数の上限
+const MAX_IMPORT_BYTES = 1024 * 1024;  // 取込ファイルの上限(1MB)
+
+function isValidDateStr(s){
+  if(typeof s !== 'string' || !DATE_RE.test(s)) return false;
+  const d = new Date(s + 'T00:00:00');
+  return !isNaN(d.getTime()) && toLocalISO(d) === s;
+}
+function isValidAmount(n){
+  return typeof n === 'number' && Number.isFinite(n) && Math.abs(n) <= MAX_ABS_AMOUNT;
+}
+// 不正な行を取り除き、日付の重複を解消して昇順に並べる
+function sanitizeEntries(list){
+  const map = new Map();
+  for(const e of list){
+    if(e && isValidDateStr(e.date) && isValidAmount(e.amount)){
+      map.set(e.date, e.amount);
+      if(map.size >= MAX_ENTRIES) break;
+    }
+  }
+  return [...map].map(([date, amount]) => ({date, amount}))
+    .sort((a,b)=> a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+}
+function showSyncWriteError(){
+  alert('クラウドへの保存に失敗しました。通信状況と同期コードを確認してください。');
+}
+
+function loadEntries(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    entries = Array.isArray(parsed) ? sanitizeEntries(parsed) : [];
+  }catch(e){ entries = []; }
+}
+function saveLocalCache(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  }catch(e){ /* 保存領域が使えない場合は無視 */ }
+}
+function saveEntries(){
+  // local-only path (used when sync is not connected)
+  saveLocalCache();
+}
+
+function setSyncStatus(connected, label){
+  const dot = document.getElementById('syncDot');
+  const text = document.getElementById('syncStatusText');
+  dot.className = 'sync-dot ' + (connected ? 'on' : 'off');
+  text.textContent = label;
+}
+
+function connectSync(code){
+  if(!SYNC_CODE_RE.test(code)){
+    return false;
+  }
+  // 以前の接続が残っていれば切断してから接続し直す
+  if(entriesRef){ entriesRef.off(); entriesRef = null; }
+  syncCode = code;
+  try{ localStorage.setItem(SYNC_CODE_KEY, code); }catch(e){}
+  document.getElementById('syncCodeInput').value = code;
+  setSyncStatus(true, '接続中…');
+  entriesRef = db.ref('syncData/' + code + '/entries');
+  entriesRef.on('value', (snapshot)=>{
+    const val = snapshot.val();
+    const raw = [];
+    if(val && typeof val === 'object'){
+      for(const date of Object.keys(val)){
+        raw.push({date, amount: val[date]});
+      }
+    }
+    entries = sanitizeEntries(raw);
+    saveLocalCache();
+    setSyncStatus(true, '同期中(この端末と共有中)');
+    render();
+  }, (err)=>{
+    setSyncStatus(false, '同期エラー:接続を確認してください');
+  });
+  return true;
+}
+function fmtYen(n){
+  const r = Math.round(n);
+  return r.toLocaleString('ja-JP');
+}
+function isWeekday(dateStr){
+  const d = new Date(dateStr+'T00:00:00');
+  const day = d.getDay();
+  return day !== 0 && day !== 6;
+}
+function lastWeekdayOnOrBefore(dateStr){
+  const d = new Date(dateStr+'T00:00:00');
+  while(d.getDay() === 0 || d.getDay() === 6){ d.setDate(d.getDate()-1); }
+  return toLocalISO(d);
+}
+function todayStr(){
+  return toLocalISO(new Date());
+}
+function toLocalISO(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function addDaysStr(dateStr, days){
+  const d = new Date(dateStr+'T00:00:00');
+  d.setDate(d.getDate()+days);
+  return toLocalISO(d);
+}
+function addMonthsStr(dateStr, months){
+  const d = new Date(dateStr+'T00:00:00');
+  d.setMonth(d.getMonth()+months);
+  return toLocalISO(d);
+}
+function addYearsStr(dateStr, years){
+  const d = new Date(dateStr+'T00:00:00');
+  d.setFullYear(d.getFullYear()+years);
+  return toLocalISO(d);
+}
+// find entry on-or-before target date, closest to it (used for "previous entry" comparisons)
+function findOnOrBefore(targetDate){
+  let found = null;
+  for(const e of entries){
+    if(e.date <= targetDate){
+      if(!found || e.date > found.date) found = e;
+    }
+  }
+  return found;
+}
+// last recorded entry within a given "YYYY-MM" month (i.e. that month's month-end value)
+function lastEntryInMonth(monthKey){
+  let found = null;
+  for(const e of entries){
+    if(e.date.slice(0,7) === monthKey){
+      if(!found || e.date > found.date) found = e;
+    }
+  }
+  return found;
+}
+// last recorded entry within a given "YYYY" year (i.e. that year's year-end value)
+function lastEntryInYear(yearKey){
+  let found = null;
+  for(const e of entries){
+    if(e.date.slice(0,4) === yearKey){
+      if(!found || e.date > found.date) found = e;
+    }
+  }
+  return found;
+}
+function prevMonthKey(dateStr){
+  const d = new Date(dateStr+'T00:00:00');
+  d.setDate(1);
+  d.setMonth(d.getMonth()-1);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+function prevYearKey(dateStr){
+  return String(parseInt(dateStr.slice(0,4),10) - 1);
+}
+
+function renderStat(elVal, elPct, latest, compare){
+  if(!compare){
+    elVal.textContent = '—';
+    elPct.textContent = 'データなし';
+    elVal.className = 'v flat';
+    return;
+  }
+  const diff = latest.amount - compare.amount;
+  const pct = compare.amount !== 0 ? (diff/compare.amount*100) : 0;
+  const sign = diff > 0 ? '+' : diff < 0 ? '' : '';
+  const cls = diff > 0 ? 'up' : diff < 0 ? 'down' : 'flat';
+  elVal.textContent = sign + fmtYen(diff);
+  elVal.className = 'v ' + cls;
+  elPct.textContent = (diff>0?'+':'') + pct.toFixed(1) + '%';
+  elPct.className = 'p ' + cls;
+}
+
+function render(){
+  const totalValue = document.getElementById('totalValue');
+  const totalDate = document.getElementById('totalDate');
+  const recordBadge = document.getElementById('recordBadge');
+
+  if(entries.length === 0){
+    totalValue.textContent = '0';
+    totalValue.className = '';
+    totalDate.textContent = 'データがありません';
+    recordBadge.classList.remove('show');
+    renderStat(document.getElementById('dayVal'), document.getElementById('dayPct'), null, null);
+    renderStat(document.getElementById('monthVal'), document.getElementById('monthPct'), null, null);
+    renderStat(document.getElementById('yearVal'), document.getElementById('yearPct'), null, null);
+  } else {
+    const latest = entries[entries.length-1];
+    totalValue.textContent = fmtYen(latest.amount);
+    totalValue.className = latest.amount > 0 ? 'up' : latest.amount < 0 ? 'down' : 'flat';
+    totalDate.textContent = latest.date + ' 時点';
+
+    const maxAmount = entries.reduce((m, e)=> e.amount > m ? e.amount : m, -Infinity);
+    recordBadge.classList.toggle('show', latest.amount === maxAmount);
+
+    const dayCompare = findOnOrBefore(addDaysStr(latest.date, -1));
+    const monthCompare = lastEntryInMonth(prevMonthKey(latest.date));
+    const yearCompare = lastEntryInYear(prevYearKey(latest.date));
+
+    renderStat(document.getElementById('dayVal'), document.getElementById('dayPct'), latest, dayCompare && dayCompare.date !== latest.date ? dayCompare : null);
+    renderStat(document.getElementById('monthVal'), document.getElementById('monthPct'), latest, monthCompare);
+    renderStat(document.getElementById('yearVal'), document.getElementById('yearPct'), latest, yearCompare);
+  }
+
+  renderHistory();
+  renderChart();
+}
+
+function renderHistory(){
+  const body = document.getElementById('historyBody');
+  const emptyMsg = document.getElementById('emptyMsg');
+  body.innerHTML = '';
+  if(entries.length === 0){
+    emptyMsg.style.display = 'block';
+    return;
+  }
+  emptyMsg.style.display = 'none';
+  const rev = [...entries].reverse();
+  for(const e of rev){
+    // 値はすべて textContent で挿入する(HTMLとして解釈させない)
+    const cls = e.amount > 0 ? 'up' : e.amount < 0 ? 'down' : 'flat';
+    const sign = e.amount > 0 ? '+' : '';
+    const tr = document.createElement('tr');
+
+    const tdDate = document.createElement('td');
+    tdDate.textContent = e.date;
+
+    const tdAmt = document.createElement('td');
+    tdAmt.className = 'amt ' + cls;
+    tdAmt.textContent = sign + '¥' + fmtYen(e.amount);
+
+    const tdDel = document.createElement('td');
+    const btn = document.createElement('button');
+    btn.className = 'del';
+    btn.textContent = '削除';
+    btn.addEventListener('click', ()=> deleteEntry(e.date));
+    tdDel.appendChild(btn);
+
+    tr.appendChild(tdDate);
+    tr.appendChild(tdAmt);
+    tr.appendChild(tdDel);
+    body.appendChild(tr);
+  }
+}
+
+function deleteEntry(d){
+  if(entriesRef){
+    entriesRef.child(d).remove().catch(showSyncWriteError);
+    // listener will update entries and re-render
+  } else {
+    entries = entries.filter(e=>e.date !== d);
+    saveEntries();
+    render();
+  }
+}
+
+function filteredForRange(){
+  if(entries.length === 0) return [];
+  if(currentRange === 'all') return entries;
+  const latestDate = entries[entries.length-1].date;
+  let cutoff;
+  if(currentRange === '3m') cutoff = addMonthsStr(latestDate, -3);
+  else if(currentRange === '6m') cutoff = addMonthsStr(latestDate, -6);
+  else cutoff = addYearsStr(latestDate, -1);
+  return entries.filter(e=> e.date >= cutoff);
+}
+
+function renderChart(){
+  const ctx = document.getElementById('chart');
+  const data = filteredForRange();
+  const labels = data.map(e=>e.date);
+  const values = data.map(e=>e.amount);
+
+  if(chart){ chart.destroy(); }
+  chart = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels,
+      datasets:[{
+        data: values,
+        borderColor:'#1b2a4a',
+        backgroundColor:'rgba(201,162,39,0.15)',
+        borderWidth:2,
+        pointRadius: values.length > 60 ? 0 : 2,
+        pointBackgroundColor:'#c9a227',
+        fill:true,
+        tension:0.25
+      }]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{ legend:{display:false},
+        tooltip:{
+          callbacks:{
+            label: (item)=> '¥' + fmtYen(item.parsed.y)
+          }
+        }
+      },
+      scales:{
+        x:{ ticks:{ maxTicksLimit:6, font:{size:10}, color:'#8a8371' }, grid:{ display:false } },
+        y:{ ticks:{ font:{size:10}, color:'#8a8371',
+              callback:(v)=> (v/10000).toLocaleString('ja-JP') + '万' },
+            grid:{ color:'#e2d9c8' } }
+      }
+    }
+  });
+}
+
+document.getElementById('saveBtn').addEventListener('click', ()=>{
+  const date = document.getElementById('dateInput').value;
+  const amountRaw = document.getElementById('amountInput').value;
+  if(!date || amountRaw === ''){
+    alert('日付と評価損益を入力してください');
+    return;
+  }
+  if(!isValidDateStr(date)){
+    alert('日付の形式が正しくありません');
+    return;
+  }
+  if(!isWeekday(date)){
+    alert('土日は記帳できません。平日(東証営業日)を選択してください。');
+    return;
+  }
+  const amount = Number(amountRaw);
+  if(!isValidAmount(amount)){
+    alert('評価損益は数値で入力してください(絶対値は1兆円以下)');
+    return;
+  }
+  if(entriesRef){
+    entriesRef.child(date).set(amount).catch(showSyncWriteError);
+    // listener will update entries and re-render
+  } else {
+    const idx = entries.findIndex(e=>e.date === date);
+    if(idx >= 0){ entries[idx].amount = amount; }
+    else{ entries.push({date, amount}); }
+    entries.sort((a,b)=> a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+    saveEntries();
+    render();
+  }
+  document.getElementById('amountInput').value = '';
+});
+
+document.getElementById('jsonExportBtn').addEventListener('click', ()=>{
+  if(entries.length === 0){
+    alert('書き出せる記帳データがありません');
+    return;
+  }
+  const json = JSON.stringify(entries, null, 2);
+  const blob = new Blob([json], {type:'application/json;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '株評価損益_' + todayStr() + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('jsonImportBtn').addEventListener('click', ()=>{
+  document.getElementById('jsonImportInput').click();
+});
+
+document.getElementById('jsonImportInput').addEventListener('change', (ev)=>{
+  const file = ev.target.files[0];
+  if(!file) return;
+  if(file.size > MAX_IMPORT_BYTES){
+    alert('ファイルが大きすぎます(上限1MB)');
+    ev.target.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    let data;
+    try{
+      data = JSON.parse(reader.result);
+    }catch(e){
+      alert('JSONファイルの読み込みに失敗しました(形式が正しくありません)');
+      ev.target.value = '';
+      return;
+    }
+    if(!Array.isArray(data)){
+      alert('JSONファイルの形式が正しくありません(配列形式である必要があります)');
+      ev.target.value = '';
+      return;
+    }
+    // 日付形式・金額の範囲を満たす行だけを取り込む
+    const valid = sanitizeEntries(data);
+    if(valid.length === 0){
+      alert('取り込めるデータが見つかりませんでした');
+      ev.target.value = '';
+      return;
+    }
+    const skipped = data.length - valid.length;
+    const msg = valid.length + '件のデータを取り込みます。同じ日付のデータは上書きされます。'
+      + (skipped > 0 ? '\n(形式が正しくない・重複した' + skipped + '件は除外されます)' : '')
+      + '\nよろしいですか?';
+    if(!confirm(msg)){
+      ev.target.value = '';
+      return;
+    }
+    if(entriesRef){
+      // 1回の書き込みでまとめて反映する
+      const updates = {};
+      for(const e of valid){ updates[e.date] = e.amount; }
+      entriesRef.update(updates).then(()=>{
+        alert('取り込みが完了しました');
+      }).catch(showSyncWriteError);
+      // listener will update entries and re-render
+    } else {
+      const merged = new Map(entries.map(e => [e.date, e.amount]));
+      for(const e of valid){ merged.set(e.date, e.amount); }
+      entries = sanitizeEntries([...merged].map(([date, amount]) => ({date, amount})));
+      saveEntries();
+      render();
+      alert('取り込みが完了しました');
+    }
+    ev.target.value = '';
+  };
+  reader.readAsText(file);
+});
+
+document.getElementById('syncConnectBtn').addEventListener('click', ()=>{
+  const code = document.getElementById('syncCodeInput').value.trim();
+  if(!code){
+    alert('同期コードを入力してください');
+    return;
+  }
+  if(!SYNC_CODE_RE.test(code)){
+    alert('同期コードは半角英数字と「-」「_」で、16文字以上64文字以下にしてください。');
+    return;
+  }
+  connectSync(code);
+});
+
+document.getElementById('rangeToggle').addEventListener('click', (ev)=>{
+  const btn = ev.target.closest('button');
+  if(!btn) return;
+  currentRange = btn.getAttribute('data-range');
+  [...document.getElementById('rangeToggle').children].forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderChart();
+});
+
+document.getElementById('dateInput').value = lastWeekdayOnOrBefore(todayStr());
+loadEntries();
+render();
+
+let savedSyncCode = null;
+try{ savedSyncCode = localStorage.getItem(SYNC_CODE_KEY); }catch(e){}
+if(savedSyncCode && connectSync(savedSyncCode)){
+  // 接続済み
+} else if(savedSyncCode){
+  // 保存されていたコードが新しい条件(16文字以上の英数字等)を満たさない
+  setSyncStatus(false, '同期コードを16文字以上の新しいものに変更してください');
+} else {
+  setSyncStatus(false, '未接続(この端末のみ)');
+}
+</script>
+</body>
+</html>
