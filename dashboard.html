@@ -172,7 +172,7 @@ body.sheet-open{overflow:hidden}
 <script>
 (function(){
   window.__dbg=function(){};
-  var FLAG='dash_dbg_on', KEY='dash_dbg_log', AL='dash_dbg_alive', VER='Ver2.6';
+  var FLAG='dash_dbg_on', KEY='dash_dbg_log', AL='dash_dbg_alive', VER='Ver2.7';
   var q=location.search, on=/[?&]debug=1(&|$)/.test(q);
   try{
     if(/[?&]debug=0(&|$)/.test(q)) localStorage.removeItem(FLAG);
@@ -262,7 +262,7 @@ body.sheet-open{overflow:hidden}
     <input id="pwd" name="password" type="password" autocomplete="current-password">
     <button class="go" type="submit" id="emailBtn">ログイン</button>
     <div class="err" id="emailErr" role="alert"></div>
-    <div class="note" id="verTap" style="margin-top:14px;padding:10px 0 4px;text-align:right;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent">マイ資産ダッシュボード Ver2.6</div>
+    <div class="note" id="verTap" style="margin-top:14px;padding:10px 0 4px;text-align:right;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent">マイ資産ダッシュボード Ver2.7</div>
   </form>
 </div>
 <script>
@@ -302,7 +302,7 @@ body.sheet-open{overflow:hidden}
 <div class="wrap hidden" id="scrDash">
   <header>
     <div class="title">
-      <h1>マイ資産ダッシュボード<span class="ver">Ver2.6</span></h1>
+      <h1>マイ資産ダッシュボード<span class="ver">Ver2.7</span></h1>
       <div class="today" id="today"></div>
     </div>
     <div class="hdr-right">
@@ -758,15 +758,16 @@ $('sheetReload').onclick = () => { if(openId && frames[openId]) frames[openId].s
 const B='https://www.gstatic.com/firebasejs/10.12.2/';
 let fb;
 try{
-  const [{ initializeApp }, { initializeAuth, browserLocalPersistence, indexedDBLocalPersistence, onAuthStateChanged, signInWithEmailAndPassword, signOut }, { getDatabase, ref, onValue }] =
+  const [{ initializeApp }, { initializeAuth, browserLocalPersistence, onAuthStateChanged, signInWithEmailAndPassword, signOut }, { getDatabase, ref, onValue }] =
     await Promise.all([import(B+'firebase-app.js'), import(B+'firebase-auth.js'), import(B+'firebase-database.js')]);
-  const app = initializeApp(firebaseConfig);
+  /* 詳細アプリとログイン情報の保存場所を分けるため、専用の名前('dashboard')で接続する(アプリ同士で奪い合わないようにする) */
+  const app = initializeApp(firebaseConfig, 'dashboard');
   /* App Check:このサイト以外からの接続を拒否する(給与管理アプリと同じサイトキー) */
   try{
     const { initializeAppCheck, ReCaptchaV3Provider } = await import(B+'firebase-app-check.js');
     initializeAppCheck(app, { provider: new ReCaptchaV3Provider('6LclW_4tAAAAAJSQM7xK1aHe2-gO55w7XDjiWpyh'), isTokenAutoRefreshEnabled: true });
   }catch(e){ console.warn('App Check 初期化に失敗:', e); }
-  const auth = initializeAuth(app, { persistence: [browserLocalPersistence, indexedDBLocalPersistence] });  // 他のアプリがログイン情報を別の保存場所へ移した場合も見つけられるようにする
+  const auth = initializeAuth(app, { persistence: browserLocalPersistence });
   auth.languageCode = 'ja';
   const db = getDatabase(app);
   fb = { auth, db, ref, onValue, onAuthStateChanged, signInWithEmailAndPassword, signOut };
