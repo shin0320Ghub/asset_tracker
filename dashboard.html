@@ -172,7 +172,7 @@ body.sheet-open{overflow:hidden}
 <script>
 (function(){
   window.__dbg=function(){};
-  var FLAG='dash_dbg_on', KEY='dash_dbg_log', AL='dash_dbg_alive', VER='Ver2.5';
+  var FLAG='dash_dbg_on', KEY='dash_dbg_log', AL='dash_dbg_alive', VER='Ver2.6';
   var q=location.search, on=/[?&]debug=1(&|$)/.test(q);
   try{
     if(/[?&]debug=0(&|$)/.test(q)) localStorage.removeItem(FLAG);
@@ -262,7 +262,7 @@ body.sheet-open{overflow:hidden}
     <input id="pwd" name="password" type="password" autocomplete="current-password">
     <button class="go" type="submit" id="emailBtn">ログイン</button>
     <div class="err" id="emailErr" role="alert"></div>
-    <div class="note" id="verTap" style="margin-top:14px;padding:10px 0 4px;text-align:right;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent">マイ資産ダッシュボード Ver2.5</div>
+    <div class="note" id="verTap" style="margin-top:14px;padding:10px 0 4px;text-align:right;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent">マイ資産ダッシュボード Ver2.6</div>
   </form>
 </div>
 <script>
@@ -302,7 +302,7 @@ body.sheet-open{overflow:hidden}
 <div class="wrap hidden" id="scrDash">
   <header>
     <div class="title">
-      <h1>マイ資産ダッシュボード<span class="ver">Ver2.5</span></h1>
+      <h1>マイ資産ダッシュボード<span class="ver">Ver2.6</span></h1>
       <div class="today" id="today"></div>
     </div>
     <div class="hdr-right">
@@ -758,7 +758,7 @@ $('sheetReload').onclick = () => { if(openId && frames[openId]) frames[openId].s
 const B='https://www.gstatic.com/firebasejs/10.12.2/';
 let fb;
 try{
-  const [{ initializeApp }, { initializeAuth, browserLocalPersistence, onAuthStateChanged, signInWithEmailAndPassword, signOut }, { getDatabase, ref, onValue }] =
+  const [{ initializeApp }, { initializeAuth, browserLocalPersistence, indexedDBLocalPersistence, onAuthStateChanged, signInWithEmailAndPassword, signOut }, { getDatabase, ref, onValue }] =
     await Promise.all([import(B+'firebase-app.js'), import(B+'firebase-auth.js'), import(B+'firebase-database.js')]);
   const app = initializeApp(firebaseConfig);
   /* App Check:このサイト以外からの接続を拒否する(給与管理アプリと同じサイトキー) */
@@ -766,7 +766,7 @@ try{
     const { initializeAppCheck, ReCaptchaV3Provider } = await import(B+'firebase-app-check.js');
     initializeAppCheck(app, { provider: new ReCaptchaV3Provider('6LclW_4tAAAAAJSQM7xK1aHe2-gO55w7XDjiWpyh'), isTokenAutoRefreshEnabled: true });
   }catch(e){ console.warn('App Check 初期化に失敗:', e); }
-  const auth = initializeAuth(app, { persistence: browserLocalPersistence });
+  const auth = initializeAuth(app, { persistence: [browserLocalPersistence, indexedDBLocalPersistence] });  // 他のアプリがログイン情報を別の保存場所へ移した場合も見つけられるようにする
   auth.languageCode = 'ja';
   const db = getDatabase(app);
   fb = { auth, db, ref, onValue, onAuthStateChanged, signInWithEmailAndPassword, signOut };
@@ -889,17 +889,35 @@ if (fb){
     }
   });
 
-  let pinShown = false;
+  let pinShown = false, pinUnsub = null;
+  /* 詳細アプリ(同じサイト内)がログイン情報の保存場所を移すと、こちらでは一瞬ログイン情報が消えたように見える。
+     その場合は1回だけ自動で読み込み直して、保存されたログイン情報を探し直す。 */
+  function recoverOnce(){
+    try{
+      const last = Number(sessionStorage.getItem('dash_recover')||0);
+      if (Date.now() - last < 60000) return false;
+      sessionStorage.setItem('dash_recover', String(Date.now()));
+    }catch(e){ return false; }
+    dbg('ログイン情報を探し直すため再読み込み');
+    location.reload(); return true;
+  }
   fb.onAuthStateChanged(fb.auth, u => {
     dbg('認証=' + (u ? (u.isAnonymous ? '匿名(破棄します)' : 'メールでログイン済み') : 'ログインなし'));
-    if (!u){ pinShown = false; show('scrEmail'); return; }
+    if (pinUnsub){ pinUnsub(); pinUnsub = null; }
+    if (!u){
+      const wasIn = pinShown; pinShown = false;
+      if (wasIn && recoverOnce()) return;
+      unsubs.forEach(x=>x()); unsubs=[]; show('scrEmail'); return;
+    }
     if (u.isAnonymous){ fb.signOut(fb.auth).catch(() => {}); return; }   // 以前の匿名ログインは破棄
-    fb.onValue(fb.ref(fb.db, 'salary/pin'), s => {
+    pinUnsub = fb.onValue(fb.ref(fb.db, 'salary/pin'), s => {
       pinStored = s.val();
       $('loginLead').textContent = pinStored ? '給与管理アプリと同じ4桁の暗証番号を入力してください。' : '給与管理アプリで暗証番号がまだ設定されていません。先にそちらで設定してください。';
       if (!pinShown){ pinShown = true; show('scrLogin'); }   // 暗証番号の画面は最初の1回だけ出す
     }, err => {
       console.error(err);
+      if (!fb.auth.currentUser) return;   // ログイン情報が消えただけなら、上の処理に任せる
+      if (pinShown) return;               // 表示中の画面は壊さない
       $('scrLoading').textContent = 'データベースを読み込めませんでした。通信状態を確認して再読み込みしてください。';
       show('scrLoading');
     });
