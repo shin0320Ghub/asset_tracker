@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="ダッシュボード">
 <meta name="theme-color" content="#0B121B">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://cdnjs.cloudflare.com https://www.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://www.gstatic.com https://www.google.com; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebasedatabase.app wss://*.firebaseio.com wss://*.firebasedatabase.app https://www.gstatic.com https://www.google.com; frame-src 'self' https://www.google.com https://*.firebaseapp.com; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>マイ資産ダッシュボード</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -171,7 +172,7 @@ body.sheet-open{overflow:hidden}
 <script>
 (function(){
   window.__dbg=function(){};
-  var FLAG='dash_dbg_on', KEY='dash_dbg_log', AL='dash_dbg_alive', VER='Ver2.4';
+  var FLAG='dash_dbg_on', KEY='dash_dbg_log', AL='dash_dbg_alive', VER='Ver2.5';
   var q=location.search, on=/[?&]debug=1(&|$)/.test(q);
   try{
     if(/[?&]debug=0(&|$)/.test(q)) localStorage.removeItem(FLAG);
@@ -261,7 +262,7 @@ body.sheet-open{overflow:hidden}
     <input id="pwd" name="password" type="password" autocomplete="current-password">
     <button class="go" type="submit" id="emailBtn">ログイン</button>
     <div class="err" id="emailErr" role="alert"></div>
-    <div class="note" id="verTap" style="margin-top:14px;padding:10px 0 4px;text-align:right;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent">マイ資産ダッシュボード Ver2.4</div>
+    <div class="note" id="verTap" style="margin-top:14px;padding:10px 0 4px;text-align:right;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent">マイ資産ダッシュボード Ver2.5</div>
   </form>
 </div>
 <script>
@@ -301,7 +302,7 @@ body.sheet-open{overflow:hidden}
 <div class="wrap hidden" id="scrDash">
   <header>
     <div class="title">
-      <h1>マイ資産ダッシュボード<span class="ver">Ver2.4</span></h1>
+      <h1>マイ資産ダッシュボード<span class="ver">Ver2.5</span></h1>
       <div class="today" id="today"></div>
     </div>
     <div class="hdr-right">
@@ -760,6 +761,11 @@ try{
   const [{ initializeApp }, { initializeAuth, browserLocalPersistence, onAuthStateChanged, signInWithEmailAndPassword, signOut }, { getDatabase, ref, onValue }] =
     await Promise.all([import(B+'firebase-app.js'), import(B+'firebase-auth.js'), import(B+'firebase-database.js')]);
   const app = initializeApp(firebaseConfig);
+  /* App Check:このサイト以外からの接続を拒否する(給与管理アプリと同じサイトキー) */
+  try{
+    const { initializeAppCheck, ReCaptchaV3Provider } = await import(B+'firebase-app-check.js');
+    initializeAppCheck(app, { provider: new ReCaptchaV3Provider('6LclW_4tAAAAAJSQM7xK1aHe2-gO55w7XDjiWpyh'), isTokenAutoRefreshEnabled: true });
+  }catch(e){ console.warn('App Check 初期化に失敗:', e); }
   const auth = initializeAuth(app, { persistence: browserLocalPersistence });
   auth.languageCode = 'ja';
   const db = getDatabase(app);
@@ -783,9 +789,18 @@ function subscribe(){
   on('.info/connected', v=>{ $('sync').classList.toggle('off', !v); $('sync').querySelector('span').textContent = v ? '同期中' : 'オフライン'; });
 }
 
-async function hashPin(pin){
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('salary-tracker:'+pin));
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+const hexOf = buf => Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+/* 給与管理アプリの保存形式に合わせて確認する(旧:文字列=SHA-256 / 新:{v:2,salt,iter,hash}=PBKDF2)。ここでは書き換えない */
+async function verifyPin(pin, stored){
+  if (!stored) return false;
+  if (typeof stored === 'string'){
+    return hexOf(await crypto.subtle.digest('SHA-256', new TextEncoder().encode('salary-tracker:'+pin))) === stored;
+  }
+  if (stored.v !== 2 || typeof stored.salt !== 'string' || typeof stored.hash !== 'string') return false;
+  const salt = new Uint8Array((stored.salt.match(/../g)||[]).map(h=>parseInt(h,16)));
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({name:'PBKDF2', salt, iterations:Math.min(Number(stored.iter)||250000, 1000000), hash:'SHA-256'}, key, 256);
+  return hexOf(bits) === stored.hash;
 }
 const TRY_KEY = 'dash_pin_try';
 const tryState = () => { try{ return JSON.parse(localStorage.getItem(TRY_KEY))||{n:0,until:0}; }catch(e){ return {n:0,until:0}; } };
@@ -825,7 +840,7 @@ if (fb){
     if (Date.now() < st.until){ shakePin(`しばらく待ってからお試しください(あと${Math.ceil((st.until-Date.now())/60000)}分)`); return; }
     $('pinPad').querySelectorAll('button').forEach(b=>b.disabled=true);
     try{
-      if (await hashPin(pin) === pinStored){
+      if (await verifyPin(pin, pinStored)){
         setTry({n:0,until:0});
         pinInput.value=''; renderPin();
         show('scrDash'); renderAll(); subscribe();
