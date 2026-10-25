@@ -660,8 +660,10 @@ const firebaseConfig = {
   v1.4.0 (2026-10-24) セキュリティ対策：Firebaseメール/パスワードのサインインを必須化（端末ごと初回のみ）、
                       表示時のHTMLエスケープ徹底、読み込み/復元データの検証、日付計算の安全化、CSP追加。
                       端末内保存モードは廃止。v1.3.0で崩れていた「登録リスト」見出しの表示を修正
+  v1.4.1 (2026-10-25) 月末の請求日の不具合を修正：31日の請求を更新すると 1/31→3/3 とずれていたのを、2/28（うるう年は2/29）に丸めて
+                      翌月は31日へ戻すように変更。29〜31日の請求日は「anchorDay」として保存（データベースルールの更新が必要）
 */
-const APP_VERSION = 'v1.4.0';
+const APP_VERSION = 'v1.4.1';
 document.getElementById('versionBadge').textContent = APP_VERSION;
 
 // ---------- 定数・検証ユーティリティ ----------
@@ -717,7 +719,7 @@ function sanitizeItem(raw){
   if(typeof raw.amount === 'number') amount = raw.amount;
   else if(typeof raw.amount === 'string' && raw.amount.trim() !== '') amount = Number(raw.amount);
   if(!Number.isFinite(amount) || amount < 0 || amount > LIMIT.amountMax) return null;
-  return {
+  const out = {
     name,
     category: (typeof raw.category === 'string' && ID_RE.test(raw.category)) ? raw.category : 'other',
     amount,
@@ -725,6 +727,9 @@ function sanitizeItem(raw){
     nextDate: parseYMD(raw.nextDate) ? raw.nextDate : '',
     memo: typeof raw.memo === 'string' ? raw.memo.trim().slice(0, LIMIT.memo) : ''
   };
+  // 本来の請求日（29〜31日のみ保存）。月末に丸めた後も元の日に戻すために使う
+  if(Number.isInteger(raw.anchorDay) && raw.anchorDay >= 29 && raw.anchorDay <= 31) out.anchorDay = raw.anchorDay;
+  return out;
 }
 
 function sanitizeItems(raw){
@@ -920,19 +925,36 @@ function yearlyEquivalent(item){
   return item.cycle === 'year' ? item.amount : item.amount * 12;
 }
 
-function nextOccurrence(dateStr, cycle){
-  // 表示上、過去日付なら次の周期に繰り上げて見せる（日付は 2000〜2100 年のみ受け付けるため上限は有限）
+function daysInMonth(y, m){
+  return new Date(y, m + 1, 0).getDate(); // m は 0 始まり
+}
+
+// base から k 周期後の日付。請求日 anchor が存在しない日（2/31 など）ならその月の末日に丸める
+function addCycles(base, anchor, cycle, k){
+  const total = base.getFullYear() * 12 + base.getMonth() + (cycle === 'year' ? 12 : 1) * k;
+  const y = Math.floor(total / 12);
+  const m = total % 12;
+  return new Date(y, m, Math.min(anchor, daysInMonth(y, m)));
+}
+
+function anchorOf(dateStr, anchorDay){
   const d = parseYMD(dateStr);
   if(!d) return null;
+  return Math.max(d.getDate(), Number.isInteger(anchorDay) ? anchorDay : 0);
+}
+
+function nextOccurrence(dateStr, cycle, anchorDay){
+  // 表示上、過去日付なら次の周期に繰り上げて見せる（日付は 2000〜2100 年のみ受け付けるため上限は有限）
+  const base = parseYMD(dateStr);
+  if(!base) return null;
+  const anchor = anchorOf(dateStr, anchorDay);
   const today = new Date();
   today.setHours(0,0,0,0);
-  let guard = 0;
-  while(d < today && guard++ < 2000){
-    if(cycle === 'year'){
-      d.setFullYear(d.getFullYear() + 1);
-    }else{
-      d.setMonth(d.getMonth() + 1);
-    }
+  let d = base;
+  let k = 0;
+  while(d < today && k < 2400){
+    k++;
+    d = addCycles(base, anchor, cycle, k); // 毎回 base から数えるので誤差が積み重ならない
   }
   return d;
 }
@@ -995,7 +1017,7 @@ function render(){
 
   const sortMode = document.getElementById('sortSelect').value;
   const todayMid = new Date(); todayMid.setHours(0,0,0,0);
-  let sorted = ids.map(id => ({ id, ...items[id], next: nextOccurrence(items[id].nextDate, items[id].cycle) }));
+  let sorted = ids.map(id => ({ id, ...items[id], next: nextOccurrence(items[id].nextDate, items[id].cycle, items[id].anchorDay) }));
   if(sortMode === 'date'){
     sorted.sort((a,b) => {
       if(!a.next && !b.next) return 0;
@@ -1106,15 +1128,20 @@ document.getElementById('sortSelect').addEventListener('change', render);
 function renewItem(id){
   const it = items[id];
   if(!it) return;
-  const base = nextOccurrence(it.nextDate, it.cycle) || (() => { const t = new Date(); t.setHours(0,0,0,0); return t; })();
-  const d = new Date(base);
-  if(it.cycle === 'year'){
-    d.setFullYear(d.getFullYear() + 1);
+  const current = nextOccurrence(it.nextDate, it.cycle, it.anchorDay);
+  let d, anchor;
+  if(current){
+    anchor = anchorOf(it.nextDate, it.anchorDay);
+    d = addCycles(current, anchor, it.cycle, 1);
   }else{
-    d.setMonth(d.getMonth() + 1);
+    // 次回課金日が未設定のときは今日を起点にする
+    const t = new Date(); t.setHours(0,0,0,0);
+    anchor = t.getDate();
+    d = addCycles(t, anchor, it.cycle, 1);
   }
   if(!confirm(`「${it.name}」の次回課金日を ${formatDateJP(d)} に更新しますか？`)) return;
   const data = { name: it.name, category: it.category, amount: it.amount, cycle: it.cycle, nextDate: toYMD(d), memo: it.memo || '' };
+  if(anchor >= 29) data.anchorDay = anchor;
   Promise.resolve(set(ref(db, 'subscriptions/' + id), data)).catch(handleWriteError);
 }
 
@@ -1223,7 +1250,17 @@ saveBtn.addEventListener('click', () => {
   if(memo.length > LIMIT.memo){ alert('メモは' + LIMIT.memo + '文字以内で入力してください'); return; }
   if(editId && !ID_RE.test(editId)){ alert('編集対象が正しくありません'); return; }
 
-  const data = sanitizeItem({ name, category, amount, cycle: currentCycle, nextDate, memo });
+  // 請求日(29〜31日)の記憶：日付を変えていなければ既存の値を保持し、変えたら新しい日付の日にする
+  let anchorDay;
+  const old = editId ? items[editId] : null;
+  if(old && old.nextDate === nextDate){
+    anchorDay = old.anchorDay;
+  }else{
+    const nd = parseYMD(nextDate);
+    anchorDay = nd ? nd.getDate() : undefined;
+  }
+
+  const data = sanitizeItem({ name, category, amount, cycle: currentCycle, nextDate, memo, anchorDay });
   if(!data){ alert('入力内容を確認してください'); return; }
 
   const p = editId ? set(ref(db, 'subscriptions/' + editId), data) : push(subsRef, data);
