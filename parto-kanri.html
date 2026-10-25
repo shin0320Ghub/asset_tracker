@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-OnbBU8b6V4xCzPXVCtdEzCgMkiCQ0zDDQKxNSjR5MM4='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <title>パート管理</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -548,7 +548,7 @@
 
   <header class="topbar">
     <p>PART-TIME PAYROLL</p>
-    <h1>パート管理 <span class="version-badge">v1.2.1</span></h1>
+    <h1>パート管理 <span class="version-badge">v1.2.2</span></h1>
   </header>
 
   <main>
@@ -559,7 +559,7 @@
 
       <div id="noJobsNotice" class="notice" style="display:none;">
         まず「設定」タブからバイト先を登録してください。会社名・時給・交通費を登録すると、ここから日々の勤務を記録できます。
-        <a class="link-btn" onclick="switchTab('settings')">設定タブへ移動</a>
+        <a class="link-btn" id="goSettingsLink" role="button" tabindex="0">設定タブへ移動</a>
       </div>
 
       <div id="jobPicker"></div>
@@ -791,8 +791,12 @@ function cleanId(v) {
   return /^[A-Za-z0-9_-]{1,40}$/.test(s) ? s : '';
 }
 
+// 数値は「数値型」か「10進数だけの文字列」のみ受け付ける（true・配列・空白付き文字列などは不可）
 function cleanNum(v, min, max, fallback) {
-  const n = Number(v);
+  let n;
+  if (typeof v === 'number') n = v;
+  else if (typeof v === 'string' && /^\d+(\.\d+)?$/.test(v)) n = Number(v);
+  else return fallback;
   if (!isFinite(n) || n < min || n > max) return fallback;
   return n;
 }
@@ -886,7 +890,8 @@ function toMinutes(hhmm) {
 function netMinutes(start, end, breakMin) {
   let s = toMinutes(start);
   let e = toMinutes(end);
-  if (e <= s) e += 24 * 60; // 日をまたぐ勤務に対応
+  if (e === s) return 0; // 開始＝終了は勤務なし（24時間勤務とは扱わない）
+  if (e < s) e += 24 * 60; // 日をまたぐ勤務に対応
   return e - s - Number(breakMin || 0);
 }
 
@@ -1045,7 +1050,7 @@ function updateEntryPreview() {
   }
   const r = entryWage({ jobId, start, end, breakMin: brk });
   if (r.hours <= 0) {
-    preview.textContent = '終了時刻が開始時刻より前です';
+    preview.textContent = '勤務時間が0以下です。開始・終了時刻と休憩時間を確認してください';
     preview.classList.remove('ready');
     return;
   }
@@ -1086,7 +1091,7 @@ function submitEntry(ev) {
   }
   const r = entryWage({ jobId, start, end, breakMin });
   if (r.hours <= 0) {
-    alert('終了時刻を開始時刻より後にしてください');
+    alert('勤務時間が0以下です。開始・終了時刻と休憩時間を確認してください');
     return;
   }
 
@@ -1460,6 +1465,11 @@ function populateBreakOptions() {
 
 function init() {
   populateBreakOptions();
+  const goSettings = document.getElementById('goSettingsLink');
+  goSettings.addEventListener('click', () => switchTab('settings'));
+  goSettings.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); switchTab('settings'); }
+  });
   document.getElementById('entryDate').value = todayStr();
   document.getElementById('entryForm').addEventListener('submit', submitEntry);
   document.getElementById('entryCancelBtn').addEventListener('click', resetEntryForm);
