@@ -1246,6 +1246,32 @@ function rpStats(from,to){
   // 体重
   const wk=wKeys().filter(k=>k>=from&&k<=to);
   const wt=wk.length?{first:S.weights[wk[0]],last:S.weights[wk[wk.length-1]],firstD:wk[0],lastD:wk[wk.length-1],n:wk.length}:null;
+  // 体重グラフ用（1日のレポートは、その日までの30日間を表示）
+  const wDays=single?rpDays(addDays(from,-29),from):days;
+  const wkeys=wKeys().filter(k=>k>=wDays[0]&&k<=wDays[wDays.length-1]);
+  const W_={days:wDays,keys:wkeys,comments:[],grade:'none',ctx:single};
+  if(wkeys.length){
+    const vals=wkeys.map(k=>S.weights[k]);
+    W_.first=vals[0];W_.last=vals[vals.length-1];W_.firstD=wkeys[0];W_.lastD=wkeys[wkeys.length-1];
+    W_.min=Math.min(...vals);W_.minD=wkeys[vals.indexOf(W_.min)];W_.max=Math.max(...vals);W_.n=vals.length;
+    W_.diff=W_.last-W_.first;
+    const span=Math.max(1,Math.round((parse(W_.lastD)-parse(W_.firstD))/864e5));
+    W_.pace=wkeys.length>1?W_.diff/span*7:null;
+    const h=+S.profile.height/100;W_.bmi=h?W_.last/(h*h):null;
+    const ym=W_.lastD.slice(0,7);W_.goal=S.goals[ym]!=null?+S.goals[ym]:null;
+    if(W_.pace==null){W_.comments.push('体重の記録が1日分のため、変化は評価できません。続けて記録しましょう。')}
+    else{
+      const pc=W_.pace;
+      W_.comments.push(`${fmtDate(W_.firstD)}の${W_.first.toFixed(1)}kgから${fmtDate(W_.lastD)}の${W_.last.toFixed(1)}kgへ、${W_.diff>0?'+':''}${W_.diff.toFixed(1)}kg（1週間あたり${pc>0?'+':''}${pc.toFixed(2)}kg）の変化です。`);
+      if(pc<=-0.2&&pc>=-1.0){W_.grade='good';W_.comments.push('無理のない、理想的なペースで減っています。この調子を続けましょう。')}
+      else if(pc<-1.0){W_.grade='fair';W_.comments.push('1週間に1kgを超えるペースです。急な減量は筋肉が落ちてリバウンドしやすくなります。たんぱく質をしっかりとり、食事を減らしすぎないようにしましょう。')}
+      else if(pc<=0.2){W_.grade='fair';W_.comments.push('ほぼ横ばいです。食事の量を少し見直すか、歩数を1日1,000〜2,000歩増やしてみましょう。')}
+      else{W_.grade='poor';W_.comments.push('増加傾向です。食事の記録で、カロリーが目標を超えている日や間食が多い日がないか確認しましょう。')}
+    }
+    if(W_.goal!=null){const g=W_.last-W_.goal;W_.comments.push(g<=0?`${+ym.slice(5)}月の目標（${W_.goal.toFixed(1)}kg）を達成しています。`:`${+ym.slice(5)}月の目標（${W_.goal.toFixed(1)}kg）まで、あと${g.toFixed(1)}kgです。`)}
+    if(W_.bmi)W_.comments.push(`BMIは${W_.bmi.toFixed(1)}です（目安：18.5〜25未満が普通体重）。`);
+    if(!single&&W_.n<days.length*0.5)W_.comments.push(`体重の記録は${W_.n}日分でした。毎朝同じ条件で量ると、変化がわかりやすくなります。`);
+  }
   // 総合
   const overall=[];
   if(meal.grade==='poor'||meal.grade==='fair')overall.push(meal.comments.find(c=>!c.includes('近い良い')&&!c.includes('範囲内'))||meal.comments[0]);
@@ -1253,7 +1279,7 @@ function rpStats(from,to){
   if(st.grade==='poor'||st.grade==='fair')overall.push(`歩数を増やしましょう。まずは今より1日1,000〜2,000歩多く歩くことを目標にします。`);
   if(!overall.length&&(nM||reads.length||have.length))overall.push('食事・血圧・歩数のいずれも良好です。今の生活習慣を続けましょう。');
   if(!nM&&!reads.length&&!have.length)overall.push('この期間には記録がありません。');
-  return {from,to,days,single,meal,bp,st,wt,overall:overall.filter(Boolean).slice(0,3)};
+  return {from,to,days,single,meal,bp,st,wt,W:W_,overall:overall.filter(Boolean).slice(0,3)};
 }
 
 /* ---- グラフ（canvas） ---- */
@@ -1300,6 +1326,32 @@ function rpBars(vals,labels,opt){
   if(opt.line){const y=Y(opt.line);x.strokeStyle='#D64545';x.setLineDash([5,4]);x.lineWidth=1.5;x.beginPath();x.moveTo(L,y);x.lineTo(W-R,y);x.stroke();x.setLineDash([]);
     x.font=`bold 10px ${RPF}`;const lt=opt.lineLabel||'',tw=x.measureText(lt).width;x.fillStyle='rgba(255,255,255,.92)';x.fillRect(W-R-tw-6,y-16,tw+6,13);x.fillStyle='#D64545';x.textAlign='right';x.textBaseline='bottom';x.fillText(lt,W-R-3,y-4)}
   if(opt.days)rpXDays(x,opt.days,W,L,R,H,B);else rpXLabels(x,labels,W,L,R,H,B);
+  return c;
+}
+function rpWChart(s,W=698,H=290){
+  const WD_=s.W,days=WD_.days,L=44,R=10,T=14,B=36,[c,x]=rpCanvas(W,H),ks=WD_.keys,vals=ks.map(k=>S.weights[k]);
+  const goals=[];const months=[...new Set(days.map(d=>d.slice(0,7)))];
+  months.forEach(ym=>{if(S.goals[ym]==null)return;const ds=days.filter(d=>d.startsWith(ym));goals.push({a:ds[0],b:ds[ds.length-1],v:+S.goals[ym]})});
+  let lo=Math.min(...vals,...goals.map(g=>g.v)),hi=Math.max(...vals,...goals.map(g=>g.v));
+  const st=hi-lo>4?1:0.5;lo=Math.floor((lo-0.3)/st)*st;hi=Math.ceil((hi+0.3)/st)*st;if(hi-lo<2*st){hi+=st;lo-=st}
+  const nt=Math.round((hi-lo)/st),step=nt>8?Math.ceil(nt/6):1;
+  rpAxes(x,W,H,L,R,T,B,lo,hi,Math.round(nt/step),v=>v.toFixed(1));
+  const n=days.length,bw=(W-L-R)/n,X=d=>L+days.indexOf(d)*bw+bw/2,Y=v=>T+(hi-v)/(hi-lo)*(H-T-B);
+  rpWeekend(x,days,W,L,R,T,H,B);
+  goals.forEach(g=>{x.strokeStyle='#D64545';x.setLineDash([5,4]);x.lineWidth=1.5;x.beginPath();x.moveTo(X(g.a)-bw/2,Y(g.v));x.lineTo(X(g.b)+bw/2,Y(g.v));x.stroke();x.setLineDash([]);
+    x.font=`bold 10px ${RPF}`;const t=`目標 ${g.v.toFixed(1)}`,tw=x.measureText(t).width,lx=X(g.a)-bw/2+2;x.fillStyle='rgba(255,255,255,.92)';x.fillRect(lx,Y(g.v)+3,tw+6,13);x.fillStyle='#D64545';x.textAlign='left';x.textBaseline='top';x.fillText(t,lx+3,Y(g.v)+4)});
+  // 面グラフ＋折れ線
+  if(ks.length>1){const g=x.createLinearGradient(0,T,0,H-B);g.addColorStop(0,'rgba(30,158,128,.22)');g.addColorStop(1,'rgba(30,158,128,0)');
+    x.beginPath();ks.forEach((k,i)=>{i?x.lineTo(X(k),Y(vals[i])):x.moveTo(X(k),Y(vals[i]))});x.lineTo(X(ks[ks.length-1]),H-B);x.lineTo(X(ks[0]),H-B);x.closePath();x.fillStyle=g;x.fill();
+    x.beginPath();ks.forEach((k,i)=>{i?x.lineTo(X(k),Y(vals[i])):x.moveTo(X(k),Y(vals[i]))});x.strokeStyle='#1E9E80';x.lineWidth=2.2;x.lineJoin='round';x.stroke()}
+  // 7日移動平均（14日以上）
+  if(days.length>=14&&ks.length>=7){const ma=ks.map((k,i)=>{const a=ks.filter(j=>j<=k&&j>addDays(k,-7)).map(j=>S.weights[j]);return a.reduce((p,q)=>p+q,0)/a.length});
+    x.beginPath();ks.forEach((k,i)=>{i?x.lineTo(X(k),Y(ma[i])):x.moveTo(X(k),Y(ma[i]))});x.strokeStyle='#0B5D4B';x.lineWidth=1.6;x.setLineDash([2,3]);x.stroke();x.setLineDash([])}
+  ks.forEach((k,i)=>{x.beginPath();x.arc(X(k),Y(vals[i]),ks.length>40?2:3,0,7);x.fillStyle='#fff';x.fill();x.strokeStyle='#1E9E80';x.lineWidth=1.8;x.stroke()});
+  // 最新値ラベル
+  const lk=ks[ks.length-1],lv=vals[vals.length-1],t=lv.toFixed(1)+' kg';x.font=`bold 11px ${RPF}`;const tw=x.measureText(t).width+12,bx=Math.min(Math.max(X(lk)-tw/2,L),W-R-tw),by=Math.max(Y(lv)-26,T);
+  x.fillStyle='#1E9E80';x.beginPath();x.roundRect?x.roundRect(bx,by,tw,18,9):x.rect(bx,by,tw,18);x.fill();x.fillStyle='#fff';x.textAlign='center';x.textBaseline='middle';x.fillText(t,bx+tw/2,by+9.5);
+  rpXDays(x,days,W,L,R,H,B);
   return c;
 }
 function rpBPChart(s,W=698,H=185){
@@ -1440,6 +1492,19 @@ function rpBuildPages(s){
     ${s.days.length>1?`<div class="rp-cap">日別の歩数　<span class="rp-dot" style="background:#1E9E80"></span>目標達成　<span class="rp-dot" style="background:#7FA9F0"></span>未達　点線＝目標</div><div id="rpc-st"></div>`:''}
     <div class="rp-cap" style="margin-top:10px;font-weight:700;color:#1F2A37">評価</div><ul class="rp-cm">${T.comments.map(c=>`<li>${esc(c)}</li>`).join('')}</ul>`;
   pages.push(`${head}<div class="rp-sub" style="--a:#E0605E;margin-top:0">血圧の評価 ${gBadge(B.grade,1)}</div>${bpHtml}<div class="rp-sub" style="--a:#3D7BEA;margin-top:18px">歩数の評価 ${gBadge(T.grade)}</div>${stHtml}`);
+  /* --- 体重 --- */
+  {const Wt=s.W;let wHtml;
+    if(!Wt.keys.length)wHtml=`<div class="rp-cap">${Wt.ctx?'この日までの30日間':'この期間'}の体重の記録はありません。</div>`;
+    else wHtml=`<div class="rp-kpi">
+      <div><div class="l">${Wt.ctx?'この日まで':'期間'}の最初</div><div class="v rp-n">${Wt.first.toFixed(1)}<small> kg</small></div><div class="l">${fmtDate(Wt.firstD)}</div></div>
+      <div><div class="l">最新</div><div class="v rp-n">${Wt.last.toFixed(1)}<small> kg</small></div><div class="l">${fmtDate(Wt.lastD)}</div></div>
+      <div><div class="l">増減</div><div class="v rp-n" style="color:${Wt.diff<0?'#1E9E6A':Wt.diff>0?'#D64545':'#1F2A37'}">${Wt.n>1?(Wt.diff>0?'+':'')+Wt.diff.toFixed(1):'—'}<small> kg</small></div>${Wt.pace!=null?`<div class="l">週あたり ${Wt.pace>0?'+':''}${Wt.pace.toFixed(2)}kg</div>`:''}</div>
+      <div><div class="l">${Wt.bmi?'BMI':'最低'}</div><div class="v rp-n">${Wt.bmi?Wt.bmi.toFixed(1):Wt.min.toFixed(1)+'<small> kg</small>'}</div>${Wt.bmi?`<div class="l">最低 ${Wt.min.toFixed(1)}kg（${+Wt.minD.slice(5,7)}/${+Wt.minD.slice(8)}）</div>`:''}</div></div>
+      <div class="rp-cap">体重の推移（kg）${Wt.ctx?'・この日までの30日間':''}　<span class="rp-dot" style="background:#1E9E80"></span>体重${Wt.days.length>=14&&Wt.keys.length>=7?'　<span style="color:#0B5D4B;font-weight:700">┈┈</span> 7日間の平均':''}　<span style="color:#D64545;font-weight:700">┅</span> 月の目標　<span style="color:#2F6FE0;font-weight:700">土</span>・<span style="color:#D64545;font-weight:700">日</span></div><div id="rpc-wt"></div>
+      <div class="rp-cap" style="margin-top:12px;font-weight:700;color:#1F2A37">評価</div><ul class="rp-cm">${Wt.comments.map(c=>`<li>${esc(c)}</li>`).join('')}</ul>
+      <div class="rp-box" style="margin-top:14px"><b>体重の見方</b><ul><li>体重は水分や食事で1日に1kg前後動きます。日々の上下より、週単位の流れ（7日間の平均）を見ましょう。</li><li>1か月の減量は、今の体重の5%以内（1週間に0.5〜1kg程度）が無理のない目安です。</li><li>毎朝、トイレの後・朝食の前など、同じ条件で量ると比べやすくなります。</li></ul></div>`;
+    pages.push(`${head}<div class="rp-sub" style="--a:#1E9E80;margin-top:0">体重の評価 ${gBadge(Wt.grade)}</div>${wHtml}`);
+  }
   /* --- ランキング --- */
   if(M.nM){
     const RK=[['kcal','エネルギー','kcal','#6B7785'],['p','たんぱく質','g','#1E9E80'],['f','脂質','g','#D9A21B'],['c','炭水化物','g','#3D7BEA']];
@@ -1502,6 +1567,7 @@ async function makeReport(){
       else put('rpc-meal',rpBars(s.meal.daily.map(t=>t?t.kcal:null),labels,{h:190,line:s.meal.target,days:s.days,lineLabel:`目標 ${s.meal.target.toLocaleString()}`,color:v=>v>s.meal.target*1.1?'#E0605E':'#1E9E80',valLabel:v=>Math.round(v).toLocaleString()}));
     }
     if(s.bp.reads.length&&s.days.length>1)put('rpc-bp',rpBPChart(s));
+    if(s.W.keys.length)put('rpc-wt',rpWChart(s));
     if(s.st.n&&s.days.length>1)put('rpc-st',rpBars(s.st.vals,labels,{h:160,days:s.days,line:s.st.goal,lineLabel:`目標 ${s.st.goal.toLocaleString()}`,color:v=>v>=s.st.goal?'#1E9E80':'#7FA9F0',fmt:v=>Math.round(v).toLocaleString(),valLabel:v=>v.toLocaleString()}));
     if(document.fonts&&document.fonts.ready)await document.fonts.ready;
     const {jsPDF}=window.jspdf,pdf=new jsPDF({unit:'mm',format:'a4',orientation:'portrait'});
@@ -1578,7 +1644,7 @@ function viewSettings(){
     <label class="btn sub" style="position:relative">バックアップから復元<input type="file" accept="application/json,.json" onchange="importData(this)" style="position:absolute;inset:0;opacity:0"></label></div>
     <button class="btn warn" style="margin-top:10px" onclick="if(confirm('すべての記録を削除します。よろしいですか？')){S=def();save();render();toast('すべて削除しました')}">すべてのデータを削除</button>
   </section>
-  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.9　食品の値は目安です</p>`;
+  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.10　食品の値は目安です</p>`;
 }
 async function testAI(){
   const gem=S.provider!=='claude';
