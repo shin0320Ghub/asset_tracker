@@ -852,12 +852,23 @@ document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='visible'&&hkWaiting){hkWaiting=false;
     openSheet(`<h3>歩数を取り込みます</h3><div class="muted">ショートカットがコピーした歩数を、アプリに貼り付けます。</div>
     <button class="btn" style="margin-top:16px" onclick="hkPaste()">貼り付けて取り込む</button>
+    <button class="btn sub" style="margin-top:8px" onclick="hkManual('')">手で貼り付ける</button>
     <button class="btn sub" style="margin-top:8px" onclick="closeSheet()">あとで</button>`);}
 });
 async function hkPaste(){
   let t='';
-  try{t=await navigator.clipboard.readText()}catch(e){t=prompt('コピーした歩数を貼り付けてください')||''}
-  closeSheet();hkImport(t);
+  try{if(navigator.clipboard&&navigator.clipboard.readText)t=await navigator.clipboard.readText()}catch(e){t=''}
+  // 自動で読めなかった（iOSの制限など）・歩数の形でない場合は、手で貼り付ける画面へ
+  if(!/\d/.test(String(t||''))){hkManual(t?'コピーされていた内容に歩数が見つかりませんでした。':'');return}
+  closeSheet();if(!hkImport(t))hkManual('');
+}
+function hkManual(note){
+  openSheet(`<h3>歩数を貼り付け</h3>
+  <div class="muted">${note?esc(note)+'<br>':''}下の枠を<b>長押し</b>して「<b>ペースト</b>」を選び、「取り込む」を押してください。</div>
+  <textarea class="field" id="hkt" rows="6" style="margin-top:12px;font-family:var(--num);min-height:150px" placeholder="2026-10-30=6512&#10;2026-10-29=9024&#10;…"></textarea>
+  <button class="btn" style="margin-top:12px" onclick="const v=$('#hkt').value;if(!v.trim()){toast('先に枠へ貼り付けてください');return}closeSheet();if(!hkImport(v))hkManual('貼り付けた内容に歩数が見つかりませんでした。')">取り込む</button>
+  <div class="tip"><div class="face">${IC.note}</div><div><b>「ペースト」が出ない・空のとき</b>ショートカットが歩数をコピーできていません。iOSの更新後は、ヘルスケアへのアクセス許可が外れることがあります。「ショートカット」アプリで「${SC_NAME}」を一度手動で実行し、許可を求められたら「許可」してください。</div></div>
+  <button class="btn sub" style="margin-top:12px" onclick="closeSheet()">閉じる</button>`);
 }
 function hkImport(t){
   t=String(t||'').trim();if(!t){toast('貼り付ける内容がありません');return 0}
@@ -1644,7 +1655,7 @@ function viewSettings(){
     <label class="btn sub" style="position:relative">バックアップから復元<input type="file" accept="application/json,.json" onchange="importData(this)" style="position:absolute;inset:0;opacity:0"></label></div>
     <button class="btn warn" style="margin-top:10px" onclick="if(confirm('すべての記録を削除します。よろしいですか？')){S=def();save();render();toast('すべて削除しました')}">すべてのデータを削除</button>
   </section>
-  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.10　食品の値は目安です</p>`;
+  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.10.1　食品の値は目安です</p>`;
 }
 async function testAI(){
   const gem=S.provider!=='claude';
