@@ -98,6 +98,30 @@ svg.i{width:22px;height:22px;flex:none}
 .items li.new{box-shadow:inset 0 0 0 1.5px var(--c);background:color-mix(in srgb,var(--c) 12%,transparent);transition:background .6s,box-shadow .6s}
 .seg button small{font-family:var(--num);font-size:11px;margin-left:3px}
 .btn:disabled{cursor:default;opacity:.45}
+.cp-grid{margin-top:10px;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.cp-row{display:grid;grid-template-columns:70px repeat(4,1fr);gap:4px;align-items:center;padding:4px 6px;border-top:1px solid var(--line)}
+.cp-row:first-child{border-top:0}
+.cp-hd{font-size:11.5px;font-weight:700;text-align:center;background:rgba(255,255,255,.03)}
+.cp-d{font-size:12.5px;color:var(--sub);font-family:var(--num);white-space:nowrap}
+.cp-d.sat{color:#7AA7FF}.cp-d.sun{color:#FF8A8A}
+.cp-m{height:40px;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;line-height:1.15;font-weight:700;color:var(--c);background:color-mix(in srgb,var(--c) 13%,transparent)}
+.cp-m small{font-size:12px;color:var(--ink)}
+.cp-m.on{background:var(--c);color:#0B121B;box-shadow:0 0 0 2px #fff inset}
+.cp-m.on small{color:#0B121B}
+.cp-m.off{color:var(--dim);background:transparent}
+.cp-m.off small{color:var(--dim)}
+.chk{margin-bottom:12px;padding:12px 14px}
+.chk .hd{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700}
+.chk .hd .cnt{margin-left:auto;font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px;background:rgba(255,138,107,.15);color:var(--s)}
+.chk .hd .cnt.ok{background:rgba(62,207,142,.14);color:var(--pos)}
+.chk-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.chk-i{display:inline-flex;align-items:center;gap:5px;height:32px;padding:0 11px 0 9px;border-radius:999px;font-size:12.5px;font-weight:700}
+.chk-i svg{width:15px;height:15px}
+.chk-i.todo{background:rgba(255,138,107,.14);color:var(--s);border:1px dashed rgba(255,138,107,.55)}
+.chk-i.done{background:rgba(62,207,142,.10);color:var(--pos);opacity:.75}
+.chk-past{margin-top:10px;font-size:12px;color:var(--sub);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chk-past button{font-size:12px;padding:3px 9px;border-radius:999px;background:rgba(255,255,255,.06);color:var(--ink);font-family:var(--num)}
+.chk-past button b{color:var(--s);margin-left:3px}
 .empty-line{position:relative;color:var(--dim);font-size:13px;padding:0 16px 14px}
 
 .minis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
@@ -238,6 +262,7 @@ const IC={
  moon:SV('<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>'),
  cup:SV('<path d="M4 8h13v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V8z"/><path d="M17 10h1.5a2.5 2.5 0 0 1 0 5H17"/><path d="M8 2v3M12 2v3"/>'),
  plus:SV('<path d="M12 5v14M5 12h14"/>'),
+ check:SV('<path d="M20 6L9 17l-5-5"/>'),
  scale:SV('<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 9a5 5 0 0 1 8 0"/><path d="M12 9l1.5-2"/>'),
  steps:SV('<path d="M7 16c-1.5 0-3-1.2-3-4s1-6 3-6 3 2.5 3 5-1.5 5-3 5z"/><path d="M4.5 18.5h5"/><path d="M17 12c-1.5 0-3-1.2-3-4s1-5 3-5 3 2.5 3 5-1.5 4-3 4z"/><path d="M14.5 14.5h5"/>'),
  heart:SV('<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z"/><path d="M3 12h4l2-3 3 6 2-3h7"/>'),
@@ -408,6 +433,30 @@ function dayTotals(day){
   return t;
 }
 
+
+/* ========== 未登録チェック ========== */
+const CHK_ITEMS=[
+  {k:'breakfast',n:'朝食',ok:d=>(S.meals[d]||[]).some(i=>i.meal==='breakfast'),go:"openAdd('breakfast')"},
+  {k:'lunch',n:'昼食',ok:d=>(S.meals[d]||[]).some(i=>i.meal==='lunch'),go:"openAdd('lunch')"},
+  {k:'dinner',n:'夕食',ok:d=>(S.meals[d]||[]).some(i=>i.meal==='dinner'),go:"openAdd('dinner')"},
+  {k:'weight',n:'体重',ok:d=>S.weights[d]!=null,go:"openBody('weight')"},
+  {k:'bpam',n:'血圧（朝）',ok:d=>!!(S.bp[d]&&S.bp[d].am),go:"bpSlot='am';openBody('bp')"},
+  {k:'bppm',n:'血圧（夜）',ok:d=>!!(S.bp[d]&&S.bp[d].pm),go:"bpSlot='pm';openBody('bp')"},
+  {k:'steps',n:'歩数',ok:d=>S.steps[d]!=null,go:"openBody('steps')"}];
+function chkMissing(d){return CHK_ITEMS.filter(x=>!x.ok(d))}
+function chkStart(){ // 記録を始めた日（それより前の日は未登録として数えない）
+  const ks=[...Object.keys(S.meals),...Object.keys(S.weights),...Object.keys(S.steps),...Object.keys(S.bp)].sort();return ks[0]||TODAY()}
+function chkCard(){
+  const miss=chkMissing(cur),st=chkStart();
+  const list=CHK_ITEMS.map(x=>{const ok=x.ok(cur);
+    return ok?`<span class="chk-i done">${IC.check}${x.n}</span>`:`<button class="chk-i todo" onclick="${x.go}">${IC.plus}${x.n}</button>`}).join('');
+  const past=[];for(let i=1;i<=7;i++){const d=addDays(TODAY(),-i);if(d<st)break;const m=chkMissing(d).length;if(m)past.push([d,m])}
+  const pastHtml=past.length?`<div class="chk-past">過去7日の未登録：${past.map(([d,m])=>{const t=parse(d);return `<button onclick="cur='${d}';render();scrollTo(0,0)">${t.getMonth()+1}/${t.getDate()}(${WD[t.getDay()]})<b>${m}</b></button>`}).join('')}</div>`:'';
+  return `<section class="card chk" style="--c:${miss.length?'var(--s)':'var(--pos)'}">
+    <div class="hd">${IC.note}${cur===TODAY()?'今日':fmtDate(cur)}の記録チェック<span class="cnt ${miss.length?'':'ok'}">${miss.length?`未登録 ${miss.length}件`:'すべて記録済み'}</span></div>
+    <div class="chk-list">${list}</div>${pastHtml}</section>`;
+}
+
 /* ========== 今日 ========== */
 function plateSVG(t,target){
   const r=64,C=2*Math.PI*r,max=Math.max(target,t.kcal);
@@ -452,6 +501,7 @@ function viewToday(){
       <button onclick="go(1)" aria-label="次の日">›</button>
     </div>
   </div>
+  ${chkCard()}
   <section class="plate">
     ${plateSVG(t,c.target)}
     <div class="center"><div class="big num">${Math.round(t.kcal)}</div><div class="unit">kcal 摂取</div></div>
@@ -566,8 +616,9 @@ function addManual(){
 
 
 /* ========== 食事のコピー ========== */
-let cpDate=null,cpMeal=null,cpSel={},lastCopied=new Set();
+let cpDate=null,cpMeal=null,cpSel={},lastCopied=new Set(),cpSpan=7;
 function cpInit(){
+  cpSpan=7;
   // 既定：コピー先と同じ区分で、直近に記録がある日（なければ前日）
   const ks=Object.keys(S.meals).filter(k=>k<cur&&(S.meals[k]||[]).some(i=>i.meal===addMeal)).sort();
   cpDate=ks.length?ks[ks.length-1]:addDays(cur,-1);cpMeal=addMeal;cpReset();
@@ -591,24 +642,29 @@ function cpBody(){
   const dest=MEALS.find(x=>x.k===addMeal),items=cpItems();
   const cnt=MEALS.map(m=>(S.meals[cpDate]||[]).filter(i=>i.meal===m.k).length);
   const selN=items.filter(i=>cpSel[i.id]).length,selK=items.filter(i=>cpSel[i.id]).reduce((a,i)=>a+i.kcal,0);
-  const rec=cpRecent();
-  return `<p class="muted" style="margin:10px 0 0">コピー元の日と食事を選ぶと、${fmtDate(cur)}の<b style="color:${dest.hex}">${dest.n}</b>に追加します。</p>
-  <label class="f">コピー元の日付
-    <input class="field" type="date" max="${TODAY()}" value="${cpDate}" onchange="cpPick(this.value||cpDate,cpMeal)"></label>
-  <div class="chips" style="margin-top:8px">${[[-1,'前日'],[-2,'2日前'],[-7,'1週間前']].map(([d,l])=>{const k=addDays(cur,d);return `<button class="chip ${cpDate===k?'on':''}" onclick="cpPick('${k}',cpMeal)">${l}</button>`}).join('')}</div>
-  <label class="f">コピー元の食事</label>
-  <div class="seg">${MEALS.map((m,i)=>`<button class="${cpMeal===m.k?'on':''}" onclick="cpPick(cpDate,'${m.k}')">${m.n}${cnt[i]?`<small style="opacity:.7">${cnt[i]}</small>`:''}</button>`).join('')}</div>
+  const short=k=>{const d=parse(k);return `${d.getMonth()+1}/${d.getDate()}(${WD[d.getDay()]})`};
+  const dayCls=k=>{const w=parse(k).getDay();return w===6?'sat':w===0?'sun':''};
+  const rows=[...Array(cpSpan)].map((_,i)=>addDays(cur,-i)).filter(k=>k<=TODAY());
+  const grid=rows.map(k=>{const all=S.meals[k]||[];
+    return `<div class="cp-row"><span class="cp-d ${dayCls(k)}">${k===cur?'この日':short(k)}</span>${MEALS.map(m=>{
+      const l=all.filter(i=>i.meal===m.k),kc=l.reduce((a,i)=>a+i.kcal,0),self=k===cur&&m.k===addMeal,on=k===cpDate&&m.k===cpMeal;
+      return l.length&&!self?`<button class="cp-m ${on?'on':''}" style="--c:${m.hex}" onclick="cpPick('${k}','${m.k}')">${m.n.slice(0,1)}<small class="num">${Math.round(kc)}</small></button>`
+        :`<span class="cp-m off">${m.n.slice(0,1)}<small>—</small></span>`}).join('')}</div>`}).join('');
+  return `<p class="muted" style="margin:10px 0 0">コピー元の日と食事をタップすると、${fmtDate(cur)}の<b style="color:${dest.hex}">${dest.n}</b>に追加します。数字はカロリーです。</p>
+  <div class="cp-grid"><div class="cp-row cp-hd"><span class="cp-d"></span>${MEALS.map(m=>`<span style="color:${m.hex}">${m.n}</span>`).join('')}</div>${grid}</div>
+  <div class="grid2" style="margin-top:8px">
+    ${cpSpan<60?`<button class="btn sub" style="height:40px;font-size:13.5px" onclick="cpSpan=${cpSpan<14?14:cpSpan<30?30:60};drawAdd()">さらに前の日を表示</button>`:'<span></span>'}
+    <label class="btn sub" style="height:40px;font-size:13.5px;position:relative">日付を指定<input type="date" max="${TODAY()}" value="${cpDate}" onchange="if(this.value)cpPick(this.value,cpMeal)" style="position:absolute;inset:0;opacity:0"></label>
+  </div>
+  <div class="h2" style="margin:16px 2px 6px">${fmtDate(cpDate)}の${MEALS.find(x=>x.k===cpMeal).n}</div>
   ${items.length?`<div style="margin-top:10px">${items.map(i=>`<label class="ai-item" style="grid-template-columns:auto 1fr auto;cursor:pointer">
       <input type="checkbox" ${cpSel[i.id]?'checked':''} onchange="cpSel['${i.id}']=this.checked;drawAdd()">
       <div><div>${esc(i.name)}</div><small class="muted">${i.grams?i.grams+'g ・ ':''}P${r1(i.p)} F${r1(i.f)} C${r1(i.c)}</small></div>
       <b class="num">${Math.round(i.kcal)}</b></label>`).join('')}</div>
     <button class="btn" style="margin-top:14px" ${selN?'':'disabled'} onclick="cpDo()">${selN?`${selN}品（${Math.round(selK)} kcal）を${dest.n}にコピー`:'コピーする料理を選んでください'}</button>
     <p class="muted" style="margin:8px 0 0;text-align:center">コピー後は、各料理をタップして量や内容を訂正できます</p>`
-  :`<div class="list" style="margin-top:10px"><div class="muted" style="padding:14px;border-radius:12px;background:rgba(255,255,255,.035)">${fmtDate(cpDate)}の${MEALS.find(x=>x.k===cpMeal).n}は記録がありません。日付か食事を変えるか、下の「最近の記録」から選んでください。</div></div>`}
-  ${rec.length?`<div class="h2" style="margin:20px 2px 6px">最近の記録から選ぶ</div>
-  <ul class="results" style="margin-top:0">${rec.map(r=>`<li onclick="cpPick('${r.k}','${r.m.k}')" style="${r.k===cpDate&&r.m.k===cpMeal?'box-shadow:inset 3px 0 0 '+r.m.hex:''}">
-    <div class="n"><div><span style="color:${r.m.hex};font-weight:700">${r.m.n}</span>　${fmtDate(r.k)}</div><small>${esc(r.l.map(i=>i.name).join('、'))}</small></div>
-    <b class="num">${Math.round(r.kcal)}</b><small>kcal</small></li>`).join('')}</ul>`:''}`;
+  :`<div class="list" style="margin-top:10px"><div class="muted" style="padding:14px;border-radius:12px;background:rgba(255,255,255,.035)">${fmtDate(cpDate)}の${MEALS.find(x=>x.k===cpMeal).n}は記録がありません。上の一覧から、数字の出ている日と食事を選んでください。</div></div>`}
+`;
 }
 function cpDo(){
   const sel=cpItems().filter(i=>cpSel[i.id]);if(!sel.length){toast('コピーする料理を選んでください');return}
@@ -1657,7 +1713,7 @@ function viewSettings(){
     <label class="btn sub" style="position:relative">バックアップから復元<input type="file" accept="application/json,.json" onchange="importData(this)" style="position:absolute;inset:0;opacity:0"></label></div>
     <button class="btn warn" style="margin-top:10px" onclick="if(confirm('すべての記録を削除します。よろしいですか？')){S=def();save();render();toast('すべて削除しました')}">すべてのデータを削除</button>
   </section>
-  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.10.2　食品の値は目安です</p>`;
+  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.11　食品の値は目安です</p>`;
 }
 async function testAI(){
   const gem=S.provider!=='claude';
