@@ -122,6 +122,28 @@ svg.i{width:22px;height:22px;flex:none}
 .chk-past{margin-top:10px;font-size:12px;color:var(--sub);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .chk-past button{font-size:12px;padding:3px 9px;border-radius:999px;background:rgba(255,255,255,.06);color:var(--ink);font-family:var(--num)}
 .chk-past button b{color:var(--s);margin-left:3px}
+.adv-btn{display:inline-flex;align-items:center;gap:6px;margin-top:10px;height:34px;padding:0 14px 0 10px;border-radius:999px;background:color-mix(in srgb,var(--leaf) 18%,transparent);color:var(--leaf);font-weight:700;font-size:13px}
+.adv-btn svg{width:17px;height:17px}
+.adv{margin-top:14px}
+.adv-meta{font-size:11.5px;color:var(--dim)}
+.adv-sum{margin-top:8px;padding:12px 14px;border-radius:14px;background:rgba(60,201,166,.09);border:1px solid rgba(60,201,166,.22);font-size:14px;line-height:1.7}
+.adv-h{margin:16px 2px 6px;font-size:13px;font-weight:700;color:var(--sub)}
+.adv-good{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.adv-good li{display:flex;gap:8px;font-size:13.5px;line-height:1.6}
+.adv-good svg{width:18px;height:18px;flex:none;color:var(--pos);margin-top:2px}
+.adv-card{border:1px solid var(--line);border-left:4px solid var(--c);border-radius:14px;padding:12px 14px;margin-top:8px;background:linear-gradient(180deg,#16212F,#121B26)}
+.adv-t{display:flex;gap:10px;align-items:center}
+.adv-t small{display:block;font-size:11px;color:var(--c);font-weight:700}
+.adv-t b{font-size:15px}
+.adv-i{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;flex:none;background:color-mix(in srgb,var(--c) 18%,transparent);color:var(--c)}
+.adv-i svg{width:18px;height:18px}
+.adv-card p{margin:8px 0 0;font-size:13.5px;color:var(--sub);line-height:1.65}
+.adv-act{margin-top:8px;font-size:13.5px;line-height:1.6;padding:8px 10px;border-radius:10px;background:color-mix(in srgb,var(--c) 10%,transparent)}
+.adv-act span{display:inline-block;font-size:11px;font-weight:700;color:#0B121B;background:var(--c);border-radius:999px;padding:0 8px;margin-right:6px}
+.adv-q{font-size:13px;color:var(--sub);margin:0 2px}
+.adv-goal{display:flex;gap:10px;align-items:center;margin-top:14px;padding:12px 14px;border-radius:14px;background:color-mix(in srgb,var(--b) 12%,transparent);border:1px solid color-mix(in srgb,var(--b) 35%,transparent);font-size:14px;font-weight:700}
+.adv-goal svg{width:22px;height:22px;color:var(--b);flex:none}
+.adv-goal small{display:block;font-size:11px;color:var(--b)}
 .empty-line{position:relative;color:var(--dim);font-size:13px;padding:0 16px 14px}
 
 .minis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
@@ -391,6 +413,15 @@ function sanitizeState(d){
   o.model=RE_MODEL.test(d.model)?d.model:'claude-sonnet-5-5';
   o.geminiKey=vStr(d.geminiKey,300).trim();o.apiKey=vStr(d.apiKey,300).trim();
   if(typeof d.hkLast==='string'&&/^[0-9/:（）日分 ]{1,40}$/.test(d.hkLast))o.hkLast=d.hkLast;
+  if(d.adviceOk===1)o.adviceOk=1;
+  const la=d.lastAdvice;
+  if(isObj(la)&&RE_DAY.test(la.from)&&RE_DAY.test(la.to)&&/^[0-9/: ]{1,20}$/.test(la.at||'')){
+    const AR=['食事','運動','血圧','体重','睡眠・生活'];
+    o.lastAdvice={src:la.src==='ai'?'ai':'rule',from:la.from,to:la.to,at:la.at,q:vStr(la.q,200),summary:vStr(la.summary,400),
+      good:(Array.isArray(la.good)?la.good:[]).slice(0,4).map(x=>vStr(x,160)).filter(Boolean),
+      advice:(Array.isArray(la.advice)?la.advice:[]).slice(0,6).filter(isObj).map(a=>({area:AR.includes(a.area)?a.area:'睡眠・生活',title:vStr(a.title,60),detail:vStr(a.detail,300),action:vStr(a.action,200)})),
+      answer:vStr(la.answer,500),goal:vStr(la.goal,160),caution:vStr(la.caution,300)};
+  }
   return o;
 }
 function load(){let raw=null;try{raw=localStorage.getItem(KEY);const d=JSON.parse(raw);if(d)return sanitizeState(d)}catch(e){try{if(raw)localStorage.setItem(KEY+'-rescue',raw)}catch(_){}}return def()}
@@ -514,7 +545,7 @@ function viewToday(){
   <section class="pfc">
     ${pfc('たんぱく質',t.p,pT,'var(--leaf)')}${pfc('脂質',t.f,fT,'var(--b)')}${pfc('炭水化物',t.c,cT,'var(--l)')}
   </section>
-  <div class="tip"><div class="face">${IC.doctor}</div><div><b>管理栄養士より</b>${advice(t,c)}</div></div>
+  <div class="tip"><div class="face">${IC.doctor}</div><div><b>管理栄養士より</b>${advice(t,c)}<button class="adv-btn" onclick="openAdvice()">${IC.doctor}生活アドバイスをもらう</button></div></div>
   ${profileHint}
   ${MEALS.map(m=>{
     const list=(S.meals[cur]||[]).filter(i=>i.meal===m.k);
@@ -679,23 +710,23 @@ function cpDo(){
 const SYS=`あなたは日本の管理栄養士です。食事の写真または説明から、料理・食品ごとに推定量(g)、エネルギー(kcal)、たんぱく質p・脂質f・炭水化物c(g)を、日本食品標準成分表や一般的な外食・市販品の値を参考に推定してください。量が書かれていなければ一般的な1人前とします。必ず次のJSONのみを出力し、前後に文章やコードブロックを付けないでください。
 {"items":[{"name":"ごはん","grams":150,"kcal":234,"p":3.8,"f":0.5,"c":55.7}],"comment":"栄養バランスについて管理栄養士としての一言（60字以内）"}
 食べ物が写っていない場合は {"items":[],"comment":"食べ物が見つかりませんでした"} を返してください。`;
-async function geminiOnce(model,text,img){
+async function geminiOnce(model,text,img,sys,gen){
   const parts=[{text}];if(img)parts.push({inline_data:{mime_type:'image/jpeg',data:img}});
   const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{method:'POST',
     headers:{'content-type':'application/json','x-goog-api-key':S.geminiKey},
-    body:JSON.stringify({systemInstruction:{parts:[{text:SYS}]},contents:[{role:'user',parts}],generationConfig:{temperature:0.2,responseMimeType:'application/json'}})});
+    body:JSON.stringify({systemInstruction:{parts:[{text:sys||SYS}]},contents:[{role:'user',parts}],generationConfig:Object.assign({temperature:0.2,responseMimeType:'application/json'},gen||{})})});
   const d=await r.json().catch(()=>({}));
   return {ok:r.ok,status:r.status,d};
 }
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
-async function callGemini(text,img){
+async function callGemini(text,img,sys,gen){
   const main=(S.geminiModel||'gemini-flash-latest').trim();
   // 混雑時は少し待って再試行し、それでもだめなら軽量モデルに切り替える
   const plan=[[main,0],[main,2500],['gemini-flash-lite-latest',0],['gemini-flash-lite-latest',3000]];
   let last=null;
   for(const [model,delay] of plan){
     if(delay)await wait(delay);
-    const res=await geminiOnce(model,text,img);
+    const res=await geminiOnce(model,text,img,sys,gen);
     if(res.ok)return (res.d.candidates?.[0]?.content?.parts||[]).map(x=>x.text||'').join('');
     last=res;
     if(![500,503,504].includes(res.status)&&!(res.status===404&&model!==main))break;
@@ -707,10 +738,10 @@ async function callGemini(text,img){
   if(r.status===404)throw new Error('モデル名が見つかりません。設定のモデル名を「gemini-flash-latest」に戻してください。（'+(d.error?.message||'')+'）');
   throw new Error(d.error?.message||('HTTP '+r.status));
 }
-async function callClaude(text,img){
+async function callClaude(text,img,sys,maxTok){
   const content=img?[{type:'image',source:{type:'base64',media_type:'image/jpeg',data:img}},{type:'text',text}]:text;
   const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':S.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-    body:JSON.stringify({model:S.model||'claude-sonnet-5-5',max_tokens:1500,system:SYS,messages:[{role:'user',content}]})});
+    body:JSON.stringify({model:S.model||'claude-sonnet-5-5',max_tokens:maxTok||1500,system:sys||SYS,messages:[{role:'user',content}]})});
   const d=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(d.error?.message||('HTTP '+r.status));
   return d.content.filter(x=>x.type==='text').map(x=>x.text).join('');
@@ -1160,6 +1191,9 @@ function viewGoal(){
   return `<div class="top"><div class="brand"><span class="bi">${IC.target}</span>目標とレポート</div></div>
   ${hero}
   <button class="wchip" onclick="openGoal('${nym}')"><div><div class="lbl">${nx.getMonth()+1}月の目標</div><div class="val num">${S.goals[nym]!=null?(+S.goals[nym]).toFixed(1)+' kg':'未設定'}</div></div><span class="chip on">${S.goals[nym]!=null?'変更':'設定する'}</span></button>
+  <div class="h2">生活アドバイス</div>
+  <button class="wchip" style="--c:var(--leaf);margin-top:0" onclick="openAdvice()"><div><div class="lbl">記録から管理栄養士がアドバイス</div><div class="val" style="font-size:18px;font-weight:700">アドバイスをもらう</div></div><span class="chip on">開く</span></button>
+  ${S.lastAdvice?`<button class="chk-past" style="margin:6px 4px 0;background:none;padding:0" onclick="showAdvice(S.lastAdvice,true)"><span>前回のアドバイス（${esc(S.lastAdvice.at)}）を見る ›</span></button>`:''}
   <div class="h2">健康レポート</div>
   <button class="wchip" style="--c:var(--l);margin-top:0" onclick="openReport()"><div><div class="lbl">食事・血圧・歩数を評価</div><div class="val" style="font-size:18px;font-weight:700">PDFレポートを作成</div></div><span class="chip on">作成</span></button>
   <div class="h2">これまでの結果</div>
@@ -1187,6 +1221,131 @@ function checkMonthEnd(){
   <p>${r.end==null?'この月の体重記録がなかったため、判定できませんでした。':r.ok?`目標 ${r.goal.toFixed(1)}kg に対して月末 ${r.end.toFixed(1)}kg。<br><b>目標達成です！</b>`:`目標 ${r.goal.toFixed(1)}kg に対して月末 ${r.end.toFixed(1)}kg。<br>あと ${(r.end-r.goal).toFixed(1)}kg でした。`}</p>
   <p class="muted">${r.ok?'よく頑張りました。次の月も無理のないペースで続けましょう。':'結果より続けたことに価値があります。今月の目標を見直して、また一歩ずつ進みましょう。'}</p></div>
   <button class="btn" onclick="closeSheet();tab='goal';render()">今月の目標を見る</button>`);
+}
+
+
+/* ========== 生活アドバイス（ボタンで起動） ========== */
+let advSpan=14,advFocus='all',advBusy=false;
+const ADV_FOCUS=[['all','全体'],['meal','食事'],['move','運動'],['bp','血圧'],['weight','体重']];
+const ADV_SYS=`あなたは日本の管理栄養士で、健康運動指導士の知識も持つ生活指導の専門家です。
+利用者の記録の集計（JSON）を読み、その人に合わせた具体的で実行しやすい生活指導を日本語で行ってください。
+・記録の数値を根拠として必ず引用し、一般論だけで終わらせないでください。
+・利用者の年齢・性別・体格・現在の減量ペースを考慮し、無理のない提案にしてください。
+・良い点も具体的にほめてください。
+・提案は「明日からできる行動」に落とし込み、量や回数を示してください（例：夕食のごはんを150gにする）。
+・医学的な診断や薬に関する指示はしないでください。家庭血圧の平均が135/85mmHg以上、または急な体重減少（1週間に1kg超）がある場合は、医師への相談をすすめてください。
+・「重点」が指定されていれば、その分野を中心に助言してください。「質問」があれば必ず答えてください。
+必ず次のJSONだけを出力し、前後に文章やコードブロックを付けないでください。
+{"summary":"全体の評価（2〜3文）","good":["良い点（1文）",...最大3つ],"advice":[{"area":"食事|運動|血圧|体重|睡眠・生活","title":"短い見出し","detail":"理由（記録の数値を引用、2文以内）","action":"明日からの具体的な行動（1文）"},...3〜5つ],"answer":"質問への回答（質問がなければ空文字）","goal":"来週の目標（1文）","caution":"注意点（なければ空文字）"}`;
+
+function advSummary(from,to){
+  const s=rpStats(from,to),M=s.meal,B=s.bp,T=s.st,W=s.W,p=S.profile,r=n=>n==null?null:Math.round(n*10)/10;
+  const mealDays=M.daily.filter(Boolean).length;
+  return {
+    期間:`${from}〜${to}（${s.days.length}日間）`,
+    プロフィール:{年齢:p.age||null,性別:p.sex==='male'?'男性':p.sex==='female'?'女性':null,身長cm:p.height||null},
+    食事:mealDays?{
+      記録した日数:M.nM,'1日の目標kcal':M.target,'1日平均kcal':Math.round(M.avg),目標の110パーセント超えの日数:M.overDays,
+      PFCエネルギー比率パーセント:{たんぱく質:r(M.pfc.p),脂質:r(M.pfc.f),炭水化物:r(M.pfc.c)},
+      '1日平均g':{たんぱく質:r(M.tot.p/M.nM),脂質:r(M.tot.f/M.nM),炭水化物:r(M.tot.c/M.nM)},
+      食事別1日平均kcal:Object.fromEntries(MEALS.map(m=>[m.n,Math.round(M.tot.by[m.k]/M.nM)])),
+      朝食を記録していない日数:M.skipB,
+      よく食べたもの:M.top.slice(0,6).map(([n,v])=>`${n}（${v.n}回）`),
+      エネルギーが多い食べ物:M.rank.kcal.slice(0,5).map(a=>`${a.name}（計${Math.round(a.v)}kcal）`),
+      脂質が多い食べ物:M.rank.f.slice(0,3).map(a=>`${a.name}（計${r(a.v)}g）`),
+      日別kcal:Object.fromEntries(s.days.map((d,i)=>[d.slice(5),M.daily[i]?Math.round(M.daily[i].kcal):null]))
+    }:'記録なし',
+    歩数:T.n?{記録した日数:T.n,目標歩数:T.goal,'1日平均':Math.round(T.avg),目標達成日数:T.hit,最多:T.max,最少:T.min}:'記録なし',
+    血圧:B.reads.length?{測定回数:B.reads.length,朝の平均:B.am?`${Math.round(B.am.s)}/${Math.round(B.am.d)}`:null,夜の平均:B.pm?`${Math.round(B.pm.s)}/${Math.round(B.pm.d)}`:null,
+      最高:`${B.maxS.s}/${B.maxS.d}`,基準135_85以上の回数:B.over,脈拍平均:B.pulse?Math.round(B.pulse):null}:'記録なし',
+    体重:W.keys.length?{最初:`${W.firstD} ${W.first}kg`,最新:`${W.lastD} ${W.last}kg`,増減kg:r(W.diff),週あたりkg:W.pace!=null?Math.round(W.pace*100)/100:null,
+      BMI:W.bmi?r(W.bmi):null,今月の目標体重kg:W.goal}:'記録なし'
+  };
+}
+
+function openAdvice(){
+  const has=!!(S.provider==='claude'?S.apiKey:S.geminiKey);
+  const last=S.lastAdvice;
+  openSheet(`<h3 style="display:flex;align-items:center;gap:8px"><span style="color:var(--leaf)">${IC.doctor}</span>生活アドバイス</h3>
+  <div class="muted">記録した食事・体重・血圧・歩数をもとに、管理栄養士の視点で生活のアドバイスをします。</div>
+  <label class="f">どの期間の記録から？</label>
+  <div class="seg">${[[7,'7日'],[14,'14日'],[30,'30日']].map(([d,l])=>`<button class="${advSpan===d?'on':''}" onclick="advSpan=${d};openAdvice()">直近${l}</button>`).join('')}</div>
+  <label class="f">特に相談したいこと</label>
+  <div class="chips" style="display:flex;flex-wrap:wrap;border-radius:18px;margin-top:4px">${ADV_FOCUS.map(([k,l])=>`<button class="chip ${advFocus===k?'on':''}" onclick="advFocus='${k}';openAdvice()">${l}</button>`).join('')}</div>
+  <label class="f">質問（任意）<textarea class="field" id="advq" rows="2" maxlength="200" placeholder="例：夜に甘いものが食べたくなる。外食が多い日はどうすればいい？"></textarea></label>
+  <div id="advout"></div>
+  <button class="btn" id="advgo" style="margin-top:12px" onclick="runAdvice()">${has?'AIにアドバイスをもらう':'アドバイスを見る'}</button>
+  ${has?'':`<p class="muted" style="margin:8px 0 0;text-align:center">AIのキーが未設定のため、アプリの評価基準によるアドバイスを表示します。設定でGeminiのキーを登録すると、より具体的なアドバイスになります。</p>`}
+  ${last?`<button class="btn sub" style="margin-top:8px" onclick="showAdvice(S.lastAdvice,true)">前回のアドバイスを見る（${esc(last.at)}）</button>`:''}`);
+}
+
+async function runAdvice(){
+  if(advBusy)return;
+  const to=TODAY(),from=addDays(to,-(advSpan-1)),sum=advSummary(from,to);
+  if(sum.食事==='記録なし'&&sum.歩数==='記録なし'&&sum.血圧==='記録なし'&&sum.体重==='記録なし'){toast('この期間の記録がありません');return}
+  const q=vStr(($('#advq')||{}).value||'',200).trim(),focus=ADV_FOCUS.find(x=>x[0]===advFocus)[1];
+  const has=!!(S.provider==='claude'?S.apiKey:S.geminiKey);
+  if(!has){showAdvice(ruleAdvice(from,to,q),false);return}
+  if(!S.adviceOk){
+    if(!confirm(`記録の集計（食事の内容・カロリー、体重、血圧、歩数、年齢・身長）を${S.provider==='claude'?'Anthropic（Claude）':'Google（Gemini）'}に送って、アドバイスを作ります。\n名前やメールアドレスは送りません。\n${S.provider==='claude'?'':'無料枠では、送った内容がGoogleのAI改善に使われる場合があります。\n'}よろしいですか？`))return;
+    S.adviceOk=1;save();
+  }
+  advBusy=true;const btn=$('#advgo');if(btn)btn.disabled=true;
+  $('#advout').innerHTML=`<div class="loading"><div class="spin"></div>記録を読んで、アドバイスを考えています…（10〜20秒ほど）</div>`;
+  try{
+    const text=`重点：${focus}\n質問：${q||'なし'}\n記録の集計：\n${JSON.stringify(sum)}`;
+    const raw=S.provider==='claude'?await callClaude(text,null,ADV_SYS,2500):await callGemini(text,null,ADV_SYS,{temperature:0.5,maxOutputTokens:3000});
+    const txt=raw.replace(/```json|```/g,'');const j=JSON.parse(txt.slice(txt.indexOf('{'),txt.lastIndexOf('}')+1));
+    const a=cleanAdvice(j,from,to,q,'ai');
+    if(!a.advice.length&&!a.summary)throw new Error('アドバイスを読み取れませんでした');
+    S.lastAdvice=a;save();showAdvice(a,false);
+  }catch(e){
+    $('#advout').innerHTML=`<div class="warnbox">AIのアドバイスを作れませんでした：${esc(e.message||e)}<br>代わりに、アプリの評価基準によるアドバイスを表示します。</div>`;
+    setTimeout(()=>showAdvice(ruleAdvice(from,to,q),false,true),1200);
+  }finally{advBusy=false;if(btn)btn.disabled=false}
+}
+
+function cleanAdvice(j,from,to,q,src){
+  const d=new Date(),AREAS=['食事','運動','血圧','体重','睡眠・生活'];
+  return {src,from,to,q:vStr(q,200),at:`${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`,
+    summary:vStr(j&&j.summary,400),
+    good:(Array.isArray(j&&j.good)?j.good:[]).slice(0,4).map(x=>vStr(x,160)).filter(Boolean),
+    advice:(Array.isArray(j&&j.advice)?j.advice:[]).slice(0,6).filter(isObj).map(a=>({area:AREAS.includes(a.area)?a.area:'睡眠・生活',title:vStr(a.title,60),detail:vStr(a.detail,300),action:vStr(a.action,200)})).filter(a=>a.title||a.detail),
+    answer:vStr(j&&j.answer,500),goal:vStr(j&&j.goal,160),caution:vStr(j&&j.caution,300)};
+}
+
+function ruleAdvice(from,to,q){
+  const s=rpStats(from,to),adv=[],good=[];
+  const add=(area,title,list,action)=>{if(list&&list.length)adv.push({area,title,detail:list.slice(0,2).join(''),action})};
+  if(s.meal.nM){
+    if(s.meal.grade==='good')good.push(s.meal.comments[0]);else add('食事','食事の量とバランス',s.meal.comments.filter(c=>!c.includes('範囲内')),s.meal.avg>s.meal.target*1.1?'夕食のごはんを少なめ（茶碗軽く1杯・150g）にし、揚げ物は週2回までにしましょう。':s.meal.pfc.p<13?'毎食、卵・納豆・魚・鶏むね肉のどれか1品を加えましょう。':'今の食事内容を続け、毎食の記録を忘れずに。');
+  }
+  if(s.st.n){if(s.st.grade==='good')good.push(s.st.comments[0]);else add('運動','歩く量を増やす',s.st.comments,'昼休みか夕食後に10分（約1,000歩）の散歩を加えましょう。')}
+  if(s.bp.reads.length){if(s.bp.grade==='good')good.push(s.bp.comments[0]);else add('血圧','血圧を下げる生活',s.bp.comments,'みそ汁は1日1杯、麺類の汁は残すなど、減塩から始めましょう。')}
+  if(s.W.keys.length){if(s.W.grade==='good')good.push(s.W.comments[1]||s.W.comments[0]);else add('体重','体重の変化',s.W.comments,'毎朝同じ条件で体重を量り、週単位の変化を確認しましょう。')}
+  if(!adv.length)adv.push({area:'睡眠・生活',title:'今の習慣を続けましょう',detail:'記録からは大きな問題は見つかりませんでした。',action:'毎日の記録を続け、週に一度アドバイスを確認しましょう。'});
+  return cleanAdvice({summary:s.overall.join(''),good:good.filter(Boolean),advice:adv,answer:q?'質問への回答には、AIの設定（Geminiのキー）が必要です。':'',goal:s.st.n&&s.st.avg<s.st.goal?`1日平均${Math.round(Math.min(s.st.goal,s.st.avg+1000)).toLocaleString()}歩を目指しましょう。`:'今の良い習慣を1週間続けましょう。',caution:s.bp.grade==='poor'?'血圧が高めの状態が続く場合は、医師に相談してください。':''},from,to,q,'rule');
+}
+
+const ADV_COL={'食事':'#3CC9A6','運動':'#7AA7FF','血圧':'#FF6B6B','体重':'#F2C14E','睡眠・生活':'#B48CFF'};
+const ADV_IC={'食事':'meal','運動':'steps','血圧':'heart','体重':'scale','睡眠・生活':'moon'};
+function showAdvice(a,isPast,keepMsg){
+  if(!a)return;
+  const html=`<div class="adv">
+    <div class="adv-meta">${a.src==='ai'?'AIによるアドバイス':'アプリの評価基準によるアドバイス'}・${esc(a.from.slice(5).replace('-','/'))}〜${esc(a.to.slice(5).replace('-','/'))}の記録${isPast?`・${esc(a.at)}作成`:''}</div>
+    ${a.summary?`<div class="adv-sum">${esc(a.summary)}</div>`:''}
+    ${a.good.length?`<div class="adv-h">良いところ</div><ul class="adv-good">${a.good.map(g=>`<li>${IC.check}<span>${esc(g)}</span></li>`).join('')}</ul>`:''}
+    <div class="adv-h">アドバイス</div>
+    ${a.advice.map(x=>`<div class="adv-card" style="--c:${ADV_COL[x.area]}"><div class="adv-t"><span class="adv-i">${IC[ADV_IC[x.area]]}</span><div><small>${esc(x.area)}</small><b>${esc(x.title)}</b></div></div>
+      ${x.detail?`<p>${esc(x.detail)}</p>`:''}${x.action?`<div class="adv-act"><span>明日から</span>${esc(x.action)}</div>`:''}</div>`).join('')}
+    ${a.q&&a.answer?`<div class="adv-h">ご質問への回答</div><div class="adv-q">Q. ${esc(a.q)}</div><div class="adv-sum">${esc(a.answer)}</div>`:''}
+    ${a.goal?`<div class="adv-goal">${IC.target}<div><small>来週の目標</small>${esc(a.goal)}</div></div>`:''}
+    ${a.caution?`<div class="warnbox">${esc(a.caution)}</div>`:''}
+    <p class="muted" style="font-size:11.5px;margin-top:12px">記録にもとづく一般的な生活アドバイスです。医学的な診断ではありません。治療中の病気がある場合は、主治医の指示を優先してください。</p>
+  </div>`;
+  const out=$('#advout');
+  if(out&&!isPast){out.innerHTML=(keepMsg?out.innerHTML:'')+html;setTimeout(()=>out.scrollIntoView({behavior:'smooth',block:'start'}),50)}
+  else openSheet(`<h3 style="display:flex;align-items:center;gap:8px"><span style="color:var(--leaf)">${IC.doctor}</span>生活アドバイス</h3>${html}<button class="btn sub" style="margin-top:12px" onclick="openAdvice()">新しくアドバイスをもらう</button>`);
 }
 
 /* ========== 健康レポート（PDF） ========== */
@@ -1280,6 +1439,7 @@ function rpStats(from,to){
     if(!single&&nM<days.length*0.7)meal.comments.push(`期間${days.length}日のうち、食事の記録は${nM}日でした。記録のない日があると評価の精度が下がります。`);
   }
   meal.grade=rpGrade(meal.pts);
+  if(meal.pts.length&&meal.pts[0]===0&&meal.grade==='good')meal.grade='fair';   // カロリーが目標から大きく外れていたら「良好」にしない
   // 血圧
   const reads=[];days.forEach(d=>{const r=S.bp[d];if(!r)return;['am','pm'].forEach(sl=>{if(r[sl])reads.push({...r[sl],day:d,sl})})});
   const avgOf=a=>a.length?{s:a.reduce((x,y)=>x+y.s,0)/a.length,d:a.reduce((x,y)=>x+y.d,0)/a.length}:null;
@@ -1713,7 +1873,7 @@ function viewSettings(){
     <label class="btn sub" style="position:relative">バックアップから復元<input type="file" accept="application/json,.json" onchange="importData(this)" style="position:absolute;inset:0;opacity:0"></label></div>
     <button class="btn warn" style="margin-top:10px" onclick="if(confirm('すべての記録を削除します。よろしいですか？')){S=def();save();render();toast('すべて削除しました')}">すべてのデータを削除</button>
   </section>
-  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.11　食品の値は目安です</p>`;
+  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.12　食品の値は目安です</p>`;
 }
 async function testAI(){
   const gem=S.provider!=='claude';
@@ -1733,7 +1893,7 @@ function importData(inp){
   r.onload=()=>{try{const d=JSON.parse(r.result);if(!isObj(d)||!isObj(d.meals)||!isObj(d.weights))throw 0;
     const n=sanitizeState(d);
     if(!confirm(`バックアップを復元します。\n食事${Object.keys(n.meals).length}日分・体重${Object.keys(n.weights).length}日分\n今のデータは上書きされます。よろしいですか？`)){inp.value='';return}
-    n.apiKey=S.apiKey;n.geminiKey=S.geminiKey;n.provider=S.provider;n.model=S.model;n.geminiModel=S.geminiModel;   // APIの設定はファイルから読み込まない
+    n.apiKey=S.apiKey;n.geminiKey=S.geminiKey;n.adviceOk=S.adviceOk;n.provider=S.provider;n.model=S.model;n.geminiModel=S.geminiModel;   // APIの設定はファイルから読み込まない
     S=n;save();render();toast('復元しました')}catch(e){toast('バックアップファイルを読み込めませんでした')}inp.value=''};
   r.readAsText(f);
 }
