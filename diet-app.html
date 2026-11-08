@@ -144,6 +144,9 @@ svg.i{width:22px;height:22px;flex:none}
 .adv-goal{display:flex;gap:10px;align-items:center;margin-top:14px;padding:12px 14px;border-radius:14px;background:color-mix(in srgb,var(--b) 12%,transparent);border:1px solid color-mix(in srgb,var(--b) 35%,transparent);font-size:14px;font-weight:700}
 .adv-goal svg{width:22px;height:22px;color:var(--b);flex:none}
 .adv-goal small{display:block;font-size:11px;color:var(--b)}
+.bpt .bpr{display:flex;align-items:baseline;gap:8px;margin-top:2px}
+.bpt .bpr span{font-size:12px;color:var(--sub);width:16px}
+.bpt .bpr b{font-size:19px}
 .empty-line{position:relative;color:var(--dim);font-size:13px;padding:0 16px 14px}
 
 .minis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
@@ -436,6 +439,28 @@ const TODAY=()=>ymd(new Date());
 const parse=s=>{const[a,b,c]=s.split('-').map(Number);return new Date(a,b-1,c)};
 const addDays=(s,n)=>{const d=parse(s);d.setDate(d.getDate()+n);return ymd(d)};
 const WD='日月火水木金土';
+/* ========== 日本の祝日（2022年以降の祝日法にもとづく計算） ========== */
+const _holCache={};
+function jpHolidays(y){
+  if(_holCache[y])return _holCache[y];
+  const H={},key=(m,d)=>`${y}-${pad(m)}-${pad(d)}`;
+  const nthMon=(m,n)=>{const w=new Date(y,m-1,1).getDay();return 1+((8-w)%7)+(n-1)*7};
+  const add=(m,d,name)=>{H[key(m,d)]=name};
+  add(1,1,'元日');add(1,nthMon(1,2),'成人の日');add(2,11,'建国記念の日');add(2,23,'天皇誕生日');
+  add(3,Math.floor(20.8431+0.242194*(y-1980)-Math.floor((y-1980)/4)),'春分の日');
+  add(4,29,'昭和の日');add(5,3,'憲法記念日');add(5,4,'みどりの日');add(5,5,'こどもの日');
+  add(7,nthMon(7,3),'海の日');add(8,11,'山の日');add(9,nthMon(9,3),'敬老の日');
+  add(9,Math.floor(23.2488+0.242194*(y-1980)-Math.floor((y-1980)/4)),'秋分の日');
+  add(10,nthMon(10,2),'スポーツの日');add(11,3,'文化の日');add(11,23,'勤労感謝の日');
+  // 国民の休日（祝日にはさまれた平日）
+  Object.keys(H).forEach(k=>{const n=addDays(k,2),mid=addDays(k,1);if(H[n]&&!H[mid]&&parse(mid).getDay()!==0)H[mid]='国民の休日'});
+  // 振替休日（祝日が日曜なら、次の祝日でない日）
+  Object.keys(H).sort().forEach(k=>{if(parse(k).getDay()===0&&H[k]!=='振替休日'){let d=addDays(k,1);while(H[d])d=addDays(d,1);if(d.startsWith(String(y)))H[d]='振替休日'}});
+  return _holCache[y]=H;
+}
+function holidayName(d){return jpHolidays(+d.slice(0,4))[d]||null}
+function isOffDay(d){const w=parse(d).getDay();return w===0||w===6||!!holidayName(d)}
+
 const fmtDate=s=>{const d=parse(s);return `${d.getMonth()+1}月${d.getDate()}日(${WD[d.getDay()]})`};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const r1=n=>Math.round(n*10)/10;
@@ -1031,6 +1056,20 @@ function viewBP(){
   const ks=Object.keys(S.bp).sort();
   const avg=slot=>{const a=[...Array(7)].map((_,i)=>(S.bp[addDays(TODAY(),-i)]||{})[slot]).filter(Boolean);return a.length?{s:Math.round(a.reduce((x,y)=>x+y.s,0)/a.length),d:Math.round(a.reduce((x,y)=>x+y.d,0)/a.length)}:null};
   const am=avg('am'),pm=avg('pm');
+  // 平日・休日（土日祝）別：それぞれ直近7日分（測定した日）を、最大90日さかのぼって集計
+  const byType=off=>{const days=[];for(let i=0;i<90&&days.length<7;i++){const d=addDays(TODAY(),-i);if(S.bp[d]&&isOffDay(d)===off)days.push(d)}
+    const one=slot=>{const a=days.map(d=>S.bp[d][slot]).filter(Boolean);return a.length?{s:Math.round(a.reduce((x,y)=>x+y.s,0)/a.length),d:Math.round(a.reduce((x,y)=>x+y.d,0)/a.length),n:a.length}:null};
+    return {am:one('am'),pm:one('pm'),n:days.length,from:days[days.length-1],to:days[0]}};
+  const wd=byType(false),hd=byType(true);
+  const md=d=>d?`${+d.slice(5,7)}/${+d.slice(8)}`:'';
+  const tl=(t,lab,col)=>`<div class="stat bpt"><div class="l" style="color:${col};font-weight:700">${lab}</div>
+    <div class="bpr"><span>朝</span><b class="num">${t.am?t.am.s+'/'+t.am.d:'—'}</b></div><div class="bpr"><span>夜</span><b class="num">${t.pm?t.pm.s+'/'+t.pm.d:'—'}</b></div>
+    <div class="l" style="font-size:11px">${t.n?`${t.n}日分（${md(t.from)}〜${md(t.to)}）`:'記録なし'}</div></div>`;
+  let cmp='';
+  if(wd.am&&hd.am&&wd.n>=3&&hd.n>=3){const dlt=wd.am.s-hd.am.s;
+    if(dlt>=5)cmp=`平日の朝は、休日の朝より最高血圧が平均${dlt}mmHg高めです。仕事の日の朝の過ごし方（睡眠時間・朝の慌ただしさ）を見直すと良いかもしれません。`;
+    else if(dlt<=-5)cmp=`休日の朝は、平日の朝より最高血圧が平均${-dlt}mmHg高めです。休日の前夜の食事（塩分・お酒）や睡眠のリズムを確認してみましょう。`;
+    else cmp='平日と休日で、朝の血圧に大きな差はありません。';}
   const high=(am&&(am.s>=135||am.d>=85))||(pm&&(pm.s>=135||pm.d>=85));
   const fmt=r=>r?`${r.s}/${r.d}`:'—';
   return `<section class="card">${dateInput()}
@@ -1046,6 +1085,10 @@ function viewBP(){
     <div class="stat"><div class="l">朝の7日平均</div><div class="v num">${fmt(am)}</div></div>
     <div class="stat"><div class="l">夜の7日平均</div><div class="v num">${fmt(pm)}</div></div>
   </div>
+  <div class="stats" style="grid-template-columns:1fr 1fr">
+    ${tl(wd,'平日の7日平均','var(--ink)')}${tl(hd,'休日の7日平均（土日祝）','#FF8A8A')}
+  </div>
+  ${cmp?`<div class="muted" style="margin:8px 4px 0;font-size:12.5px;line-height:1.6">${cmp}</div>`:''}
   ${high?`<div class="warnbox">7日平均が家庭血圧の基準（135/85mmHg）以上です。この状態が続く場合は、かかりつけ医に相談してください。</div>`:''}
   <div class="h2">推移</div>
   <section class="card">
@@ -1090,6 +1133,12 @@ function viewWeight(){
   const wk=latest!=null?latestWeight(addDays(ks[ks.length-1],-7)):null;
   const diff=latest!=null&&wk!=null&&ks.filter(k=>k<=addDays(ks[ks.length-1],-7)).length?latest-wk:null;
   const h=+S.profile.height/100,bmi=latest&&h?latest/(h*h):null;
+  // 1か月前比（最新の記録日の1か月前、その日以前で一番新しい記録と比べる）
+  let mdiff=null,mref=null;
+  if(latest!=null){const ld=parse(ks[ks.length-1]),md=new Date(ld.getFullYear(),ld.getMonth()-1,1);
+    md.setDate(Math.min(ld.getDate(),new Date(md.getFullYear(),md.getMonth()+1,0).getDate()));
+    const mk=ymd(md),prev=ks.filter(k=>k<=mk);if(prev.length){mref=prev[prev.length-1];mdiff=latest-S.weights[mref]}}
+  const dcls=v=>v>0?'up':v<0?'down':'',dtxt=v=>v!=null?(v>0?'+':'')+v.toFixed(1):'—';
   return `<section class="card">
     ${dateInput()}
     <div class="winput">
@@ -1100,14 +1149,15 @@ function viewWeight(){
     </div>
     <button class="btn" onclick="saveWeight()">${S.weights[wDate]!=null?'体重を更新':'体重を記録'}</button>
   </section>
-  <div class="stats">
+  <div class="stats" style="grid-template-columns:1fr 1fr">
     <div class="stat"><div class="l">最新</div><div class="v num">${latest!=null?latest.toFixed(1):'—'}<small style="font-size:11px"> kg</small></div></div>
-    <div class="stat"><div class="l">1週間前比</div><div class="v num ${diff>0?'up':diff<0?'down':''}">${diff!=null?(diff>0?'+':'')+diff.toFixed(1):'—'}</div></div>
     <div class="stat"><div class="l">BMI</div><div class="v num">${bmi?bmi.toFixed(1):'—'}</div></div>
+    <div class="stat"><div class="l">1週間前比</div><div class="v num ${dcls(diff)}">${dtxt(diff)}<small style="font-size:11px"> kg</small></div></div>
+    <div class="stat"><div class="l">1か月前比</div><div class="v num ${dcls(mdiff)}">${dtxt(mdiff)}<small style="font-size:11px"> kg</small></div>${mref?`<div class="l" style="font-size:11px">${+mref.slice(5,7)}/${+mref.slice(8)}の記録と比較</div>`:''}</div>
   </div>
   <div class="h2">推移</div>
   <section class="card">
-    <div class="chips">${[[30,'1か月'],[90,'3か月'],[365,'1年'],[0,'全期間']].map(([d,l])=>`<button class="chip ${wRange===d?'on':''}" onclick="wRange=${d};render()">${l}</button>`).join('')}</div>
+    <div class="chips">${[[7,'1週間'],[30,'1か月'],[90,'3か月'],[365,'1年'],[0,'全期間']].map(([d,l])=>`<button class="chip ${wRange===d?'on':''}" onclick="wRange=${d};render()">${l}</button>`).join('')}</div>
     ${chart()}
     <div class="muted" style="display:flex;gap:14px;margin-top:4px"><span><span style="color:var(--leaf)">●</span> 体重</span><span><span style="color:var(--warn)">┅</span> 月の目標</span></div>
   </section>
@@ -1121,10 +1171,12 @@ function saveWeight(){
 function delWeight(k){delRec('weights',k)}
 function chart(){
   let ks=wKeys();
-  if(wRange){const from=addDays(TODAY(),-wRange);ks=ks.filter(k=>k>=from)}
-  if(ks.length<2)return `<div class="muted" style="padding:40px 0;text-align:center">2日分以上記録するとグラフが表示されます</div>`;
-  const W=340,H=200,L=34,R=10,T=14,B=26;
-  const t0=parse(ks[0]).getTime(),t1=parse(ks[ks.length-1]).getTime(),span=Math.max(t1-t0,864e5);
+  const wk=wRange===7,wFrom=wk?addDays(TODAY(),-6):null;
+  if(wRange){const from=wk?wFrom:addDays(TODAY(),-wRange);ks=ks.filter(k=>k>=from)}
+  if(ks.length<(wk?1:2))return `<div class="muted" style="padding:40px 0;text-align:center">${wk?'この1週間の記録がありません':'2日分以上記録するとグラフが表示されます'}</div>`;
+  const W=340,H=wk?210:200,L=34,R=wk?16:10,T=wk?24:14,B=wk?38:26;
+  // 1週間表示は、記録のない日も含めて7日分の目盛りにする
+  const t0=parse(wk?wFrom:ks[0]).getTime(),t1=parse(wk?TODAY():ks[ks.length-1]).getTime(),span=Math.max(t1-t0,864e5);
   const vals=ks.map(k=>S.weights[k]);
   const goals=[];
   Object.keys(S.goals).forEach(ym=>{
@@ -1139,14 +1191,19 @@ function chart(){
   const line=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
   const area=line+` L${pts[pts.length-1][0].toFixed(1)} ${H-B} L${pts[0][0].toFixed(1)} ${H-B} Z`;
   let grid='';for(let i=0;i<=3;i++){const v=lo+(hi-lo)*i/3,y=Y(v);grid+=`<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="rgba(255,255,255,.06)"/><text x="${L-6}" y="${y+4}" text-anchor="end" font-size="10" font-family="DM Sans,sans-serif" fill="var(--dim)">${v.toFixed(1)}</text>`}
-  let xl='';for(let i=0;i<=3;i++){const t=t0+span*i/3,d=new Date(t);xl+=`<text x="${X(t)}" y="${H-8}" text-anchor="${i===0?'start':i===3?'end':'middle'}" font-size="10" font-family="DM Sans,sans-serif" fill="var(--dim)">${d.getMonth()+1}/${d.getDate()}</text>`}
+  let xl='';
+  if(wk){for(let i=0;i<7;i++){const k=addDays(wFrom,i),d=parse(k),w=d.getDay(),hol=holidayName(k),col=w===6&&!hol?'#7AA7FF':(w===0||hol)?'#FF8A8A':'var(--dim)',x=X(d.getTime());
+      if(w===0||w===6||hol)xl+=`<rect x="${x-(W-L-R)/12}" y="${T}" width="${(W-L-R)/6}" height="${H-T-B}" fill="${w===6&&!hol?'rgba(122,167,255,.07)':'rgba(255,138,138,.07)'}"/>`;
+      xl+=`<text x="${x}" y="${H-21}" text-anchor="middle" font-size="10" font-family="DM Sans,sans-serif" fill="${col}">${d.getMonth()+1}/${d.getDate()}</text><text x="${x}" y="${H-8}" text-anchor="middle" font-size="10" font-weight="${w===0||w===6||hol?700:400}" fill="${col}">${hol?'祝':WD[w]}</text>`}}
+  else for(let i=0;i<=3;i++){const t=t0+span*i/3,d=new Date(t);xl+=`<text x="${X(t)}" y="${H-8}" text-anchor="${i===0?'start':i===3?'end':'middle'}" font-size="10" font-family="DM Sans,sans-serif" fill="var(--dim)">${d.getMonth()+1}/${d.getDate()}</text>`}
   const gl=goals.map(g=>`<line x1="${X(g.a)}" x2="${X(g.b)}" y1="${Y(g.v)}" y2="${Y(g.v)}" stroke="var(--warn)" stroke-width="1.6" stroke-dasharray="4 4"/>`).join('');
   const lp=pts[pts.length-1],lv=vals[vals.length-1];
   const dots=pts.length<=40?pts.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="2.4" fill="var(--leaf)"/>`).join(''):'';
+  const lpx=pts[pts.length-1][0];const vlab=wk?pts.slice(0,-1).map((p,i)=>Math.abs(p[0]-lpx)<60?'':`<text x="${p[0]}" y="${p[1]-8}" text-anchor="middle" font-size="10" font-family="DM Sans,sans-serif" fill="var(--sub)">${vals[i].toFixed(1)}</text>`).join(''):'';
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="体重の推移グラフ">
     <defs><linearGradient id="wa" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3CC9A6" stop-opacity=".30"/><stop offset="1" stop-color="#3CC9A6" stop-opacity="0"/></linearGradient></defs>
     ${grid}${xl}<path d="${area}" fill="url(#wa)"/>${gl}
-    <path d="${line}" fill="none" stroke="var(--leaf)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>${dots}
+    <path d="${line}" fill="none" stroke="var(--leaf)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>${dots}${vlab}
     <circle cx="${lp[0]}" cy="${lp[1]}" r="5" fill="var(--card)" stroke="var(--leaf)" stroke-width="2.5"/>
     <rect x="${Math.min(lp[0]-26,W-R-52)}" y="${Math.max(lp[1]-30,0)}" width="52" height="19" rx="9" fill="var(--leaf)"/>
     <text x="${Math.min(lp[0],W-R-26)}" y="${Math.max(lp[1]-30,0)+13.5}" text-anchor="middle" font-size="11" font-weight="700" font-family="DM Sans,sans-serif" fill="#0B121B">${lv.toFixed(1)}</text>
@@ -1873,7 +1930,7 @@ function viewSettings(){
     <label class="btn sub" style="position:relative">バックアップから復元<input type="file" accept="application/json,.json" onchange="importData(this)" style="position:absolute;inset:0;opacity:0"></label></div>
     <button class="btn warn" style="margin-top:10px" onclick="if(confirm('すべての記録を削除します。よろしいですか？')){S=def();save();render();toast('すべて削除しました')}">すべてのデータを削除</button>
   </section>
-  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.12　食品の値は目安です</p>`;
+  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.13　食品の値は目安です</p>`;
 }
 async function testAI(){
   const gem=S.provider!=='claude';
