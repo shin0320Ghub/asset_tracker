@@ -110,6 +110,15 @@ svg.i{width:22px;height:22px;flex:none}
 .cp-m.on small{color:#0B121B}
 .cp-m.off{color:var(--dim);background:transparent}
 .cp-m.off small{color:var(--dim)}
+.cp-q{position:relative;margin-top:10px}
+.cp-q .field{margin-top:0;padding-right:44px}
+.cp-q button{position:absolute;right:4px;top:4px;width:40px;height:40px;border-radius:10px;color:var(--sub);font-size:20px;line-height:1}
+.cp-hits li{align-items:flex-start;border:1px solid transparent}
+.cp-hits li.on{border-color:var(--leaf);background:rgba(60,201,166,.1)}
+.cp-hits .d{font-family:var(--num);font-size:12.5px;color:var(--sub)}
+.cp-hits .m{font-size:12px;font-weight:700;margin-left:6px}
+.cp-hits .nm{margin-top:2px;line-height:1.45}
+.cp-hits .kc{text-align:right;white-space:nowrap;padding-top:2px}
 .chk{margin-bottom:12px;padding:12px 14px}
 .chk .hd{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700}
 .chk .hd .cnt{margin-left:auto;font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px;background:rgba(255,138,107,.15);color:var(--s)}
@@ -672,9 +681,9 @@ function addManual(){
 
 
 /* ========== 食事のコピー ========== */
-let cpDate=null,cpMeal=null,cpSel={},lastCopied=new Set(),cpSpan=7;
+let cpDate=null,cpMeal=null,cpSel={},lastCopied=new Set(),cpSpan=7,cpQ='',cpMax=30;
 function cpInit(){
-  cpSpan=7;
+  cpSpan=7;cpQ='';cpMax=30;
   // 既定：コピー先と同じ区分で、直近に記録がある日（なければ前日）
   const ks=Object.keys(S.meals).filter(k=>k<cur&&(S.meals[k]||[]).some(i=>i.meal===addMeal)).sort();
   cpDate=ks.length?ks[ks.length-1]:addDays(cur,-1);cpMeal=addMeal;cpReset();
@@ -694,10 +703,43 @@ function cpRecent(){
   }
   return out;
 }
-function cpBody(){
-  const dest=MEALS.find(x=>x.k===addMeal),items=cpItems();
-  const cnt=MEALS.map(m=>(S.meals[cpDate]||[]).filter(i=>i.meal===m.k).length);
-  const selN=items.filter(i=>cpSel[i.id]).length,selK=items.filter(i=>cpSel[i.id]).reduce((a,i)=>a+i.kcal,0);
+/* キーワード検索：全期間の記録から料理名で探す（ひらがな/カタカナ・全角/半角・大文字/小文字は区別しない） */
+const cpNorm=s=>String(s||'').normalize('NFKC').toLowerCase().replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x60));
+function cpWords(){return cpNorm(cpQ).split(/\s+/).filter(Boolean)}
+function cpMatch(name,ws){const n=cpNorm(name);return ws.every(w=>n.includes(w))}
+function cpSearch(){
+  const ws=cpWords(),out=[];if(!ws.length)return out;
+  for(const k of Object.keys(S.meals).sort().reverse()){
+    for(const m of MEALS){
+      if(k===cur&&m.k===addMeal)continue;
+      const l=(S.meals[k]||[]).filter(i=>i.meal===m.k),hit=l.filter(i=>cpMatch(i.name,ws));
+      if(hit.length)out.push({k,m,l,hit});
+    }
+  }
+  return out;
+}
+function cpPickHit(d,m){
+  cpDate=d;cpMeal=m;cpSel={};const ws=cpWords();
+  cpItems().forEach(i=>cpSel[i.id]=cpMatch(i.name,ws));   // 検索に合った料理だけ選択した状態にする
+  drawAdd();
+  setTimeout(()=>{const e=$('#cpdet');if(e)e.scrollIntoView({behavior:'smooth',block:'start'})},60);
+}
+function cpInput(v){cpQ=v;cpMax=30;cpDrawRes()}
+function cpDrawRes(){const e=$('#cpres');if(e)e.innerHTML=cpResHtml()}
+function cpHitsHtml(){
+  const res=cpSearch();
+  if(!res.length)return `<div class="muted" style="margin-top:10px;padding:14px;border-radius:12px;background:rgba(255,255,255,.035)">「${esc(cpQ.trim())}」を含む記録は見つかりませんでした。言葉を短くするか、別の書き方（例：カレー／咖喱）でお試しください。</div>`;
+  const full=k=>{const d=parse(k);return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}(${WD[d.getDay()]})`};
+  return `<div class="muted" style="margin:10px 2px 0">${res.length}件見つかりました（新しい順）。タップするとコピー元になります。</div>
+  <ul class="results cp-hits" style="margin-top:4px">${res.slice(0,cpMax).map(r=>{
+    const rest=r.l.length-r.hit.length,on=r.k===cpDate&&r.m.k===cpMeal;
+    return `<li class="${on?'on':''}" onclick="cpPickHit('${r.k}','${r.m.k}')"><div class="n"><span class="d">${full(r.k)}</span><span class="m" style="color:${r.m.hex}">${r.m.n}</span>
+      <div class="nm">${r.hit.map(i=>esc(i.name)).join('、')}${rest?`<small> ほか${rest}品</small>`:''}</div></div>
+      <div class="kc"><b class="num">${Math.round(r.hit.reduce((a,i)=>a+i.kcal,0))}</b><small> kcal</small></div></li>`}).join('')}</ul>
+  ${res.length>cpMax?`<button class="btn sub" style="height:40px;font-size:13.5px;margin-top:8px" onclick="cpMax+=30;cpDrawRes()">さらに表示（残り${res.length-cpMax}件）</button>`:''}`;
+}
+function cpResHtml(){
+  if(cpWords().length)return cpHitsHtml();
   const short=k=>{const d=parse(k);return `${d.getMonth()+1}/${d.getDate()}(${WD[d.getDay()]})`};
   const dayCls=k=>{const w=parse(k).getDay();return w===6?'sat':w===0?'sun':''};
   const rows=[...Array(cpSpan)].map((_,i)=>addDays(cur,-i)).filter(k=>k<=TODAY());
@@ -706,13 +748,19 @@ function cpBody(){
       const l=all.filter(i=>i.meal===m.k),kc=l.reduce((a,i)=>a+i.kcal,0),self=k===cur&&m.k===addMeal,on=k===cpDate&&m.k===cpMeal;
       return l.length&&!self?`<button class="cp-m ${on?'on':''}" style="--c:${m.hex}" onclick="cpPick('${k}','${m.k}')">${m.n.slice(0,1)}<small class="num">${Math.round(kc)}</small></button>`
         :`<span class="cp-m off">${m.n.slice(0,1)}<small>—</small></span>`}).join('')}</div>`}).join('');
-  return `<p class="muted" style="margin:10px 0 0">コピー元の日と食事をタップすると、${fmtDate(cur)}の<b style="color:${dest.hex}">${dest.n}</b>に追加します。数字はカロリーです。</p>
-  <div class="cp-grid"><div class="cp-row cp-hd"><span class="cp-d"></span>${MEALS.map(m=>`<span style="color:${m.hex}">${m.n}</span>`).join('')}</div>${grid}</div>
+  return `<div class="cp-grid"><div class="cp-row cp-hd"><span class="cp-d"></span>${MEALS.map(m=>`<span style="color:${m.hex}">${m.n}</span>`).join('')}</div>${grid}</div>
   <div class="grid2" style="margin-top:8px">
     ${cpSpan<60?`<button class="btn sub" style="height:40px;font-size:13.5px" onclick="cpSpan=${cpSpan<14?14:cpSpan<30?30:60};drawAdd()">さらに前の日を表示</button>`:'<span></span>'}
     <label class="btn sub" style="height:40px;font-size:13.5px;position:relative">日付を指定<input type="date" max="${TODAY()}" value="${cpDate}" onchange="if(this.value)cpPick(this.value,cpMeal)" style="position:absolute;inset:0;opacity:0"></label>
-  </div>
-  <div class="h2" style="margin:16px 2px 6px">${fmtDate(cpDate)}の${MEALS.find(x=>x.k===cpMeal).n}</div>
+  </div>`;
+}
+function cpBody(){
+  const dest=MEALS.find(x=>x.k===addMeal),items=cpItems();
+  const selN=items.filter(i=>cpSel[i.id]).length,selK=items.filter(i=>cpSel[i.id]).reduce((a,i)=>a+i.kcal,0);
+  return `<p class="muted" style="margin:10px 0 0">コピー元の日と食事をタップすると、${fmtDate(cur)}の<b style="color:${dest.hex}">${dest.n}</b>に追加します。数字はカロリーです。料理名で探すこともできます。</p>
+  <div class="cp-q"><input class="field" id="cpq" type="text" enterkeyhint="search" autocomplete="off" placeholder="料理名で検索（例：カレー、サラダ）" value="${esc(cpQ)}" oninput="cpInput(this.value)" onkeydown="if(event.key==='Enter')this.blur()"><button aria-label="検索をクリア" onclick="cpQ='';drawAdd()">×</button></div>
+  <div id="cpres">${cpResHtml()}</div>
+  <div class="h2" id="cpdet" style="margin:16px 2px 6px;scroll-margin-top:8px">${fmtDate(cpDate)}の${MEALS.find(x=>x.k===cpMeal).n}</div>
   ${items.length?`<div style="margin-top:10px">${items.map(i=>`<label class="ai-item" style="grid-template-columns:auto 1fr auto;cursor:pointer">
       <input type="checkbox" ${cpSel[i.id]?'checked':''} onchange="cpSel['${i.id}']=this.checked;drawAdd()">
       <div><div>${esc(i.name)}</div><small class="muted">${i.grams?i.grams+'g ・ ':''}P${r1(i.p)} F${r1(i.f)} C${r1(i.c)}</small></div>
