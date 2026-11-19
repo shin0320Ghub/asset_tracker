@@ -156,6 +156,18 @@ svg.i{width:22px;height:22px;flex:none}
 .bpt .bpr{display:flex;align-items:baseline;gap:8px;margin-top:2px}
 .bpt .bpr span{font-size:12px;color:var(--sub);width:16px}
 .bpt .bpr b{font-size:19px}
+.low-banner{display:flex;align-items:center;gap:12px;margin-top:12px;padding:12px 14px;border-radius:16px;background:linear-gradient(90deg,rgba(242,193,78,.18),rgba(242,193,78,.04));border:1px solid rgba(242,193,78,.45)}
+.low-banner b{display:block;color:var(--b);font-size:14.5px}
+.low-banner small{display:block;font-size:12.5px;color:var(--sub);margin-top:2px}
+.low-ic{width:64px;height:64px;margin:0 auto;border-radius:50%;display:grid;place-items:center;background:rgba(242,193,78,.16);color:var(--b)}
+.low-ic svg{width:34px;height:34px}
+.low-ic.sm{width:40px;height:40px;margin:0;flex:none}.low-ic.sm svg{width:22px;height:22px}
+.low-line{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin:12px 4px 0;font-size:12.5px;color:var(--sub)}
+.low-line svg{width:16px;height:16px;color:var(--b)}
+.low-line b{color:var(--ink)}
+.low-line .gap{margin-left:auto}
+.low-tag{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:999px;background:rgba(242,193,78,.2);color:var(--b);vertical-align:1px}
+.low-tag.old{background:rgba(255,255,255,.06);color:var(--sub)}
 .empty-line{position:relative;color:var(--dim);font-size:13px;padding:0 16px 14px}
 
 .minis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
@@ -297,6 +309,7 @@ const IC={
  cup:SV('<path d="M4 8h13v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V8z"/><path d="M17 10h1.5a2.5 2.5 0 0 1 0 5H17"/><path d="M8 2v3M12 2v3"/>'),
  plus:SV('<path d="M12 5v14M5 12h14"/>'),
  check:SV('<path d="M20 6L9 17l-5-5"/>'),
+ trophy:SV('<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>'),
  scale:SV('<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 9a5 5 0 0 1 8 0"/><path d="M12 9l1.5-2"/>'),
  steps:SV('<path d="M7 16c-1.5 0-3-1.2-3-4s1-6 3-6 3 2.5 3 5-1.5 5-3 5z"/><path d="M4.5 18.5h5"/><path d="M17 12c-1.5 0-3-1.2-3-4s1-5 3-5 3 2.5 3 5-1.5 4-3 4z"/><path d="M14.5 14.5h5"/>'),
  heart:SV('<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z"/><path d="M3 12h4l2-3 3 6 2-3h7"/>'),
@@ -592,7 +605,7 @@ function viewToday(){
       ${list.length?`<ul class="items">${list.map(i=>`<li class="${lastCopied.has(i.id)?'new':''}" onclick="openEdit('${i.id}')"><div class="n"><div>${esc(i.name)}</div><small>${i.grams?i.grams+'g ・ ':''}P${r1(i.p)} F${r1(i.f)} C${r1(i.c)}</small></div><div class="kc">${Math.round(i.kcal)}</div><span class="ed">${IC.pen}</span></li>`).join('')}</ul>`:`<div class="empty-line">「追加」から${m.n}を記録</div>`}
     </section>`}).join('')}
   <div class="minis">
-    <button class="mini" style="--c:var(--leaf)" onclick="openBody('weight')"><div class="ic">${IC.scale}</div><div class="l">体重</div><div class="v num">${w?w.toFixed(1):'—'}<small> kg</small></div><div class="s">${w?'グラフを見る':'記録する'}</div></button>
+    <button class="mini" style="--c:var(--leaf)" onclick="openBody('weight')"><div class="ic">${IC.scale}</div><div class="l">体重</div><div class="v num">${w?w.toFixed(1):'—'}<small> kg</small></div><div class="s" ${w&&wLowState(cur)?'style="color:var(--b);font-weight:700"':''}>${w?(wLowState(cur)?'最低体重':'グラフを見る'):'記録する'}</div></button>
     <button class="mini" style="--c:var(--l)" onclick="openBody('steps')"><div class="ic">${IC.steps}</div><div class="l">歩数</div><div class="v num">${st!=null?st.toLocaleString():'—'}<small> 歩</small></div><div class="s">${st!=null?(st>=S.stepGoal?'目標達成 ✓':'目標まで'+(S.stepGoal-st).toLocaleString()):'記録する'}</div></button>
     <button class="mini" style="--c:var(--warn)" onclick="openBody('bp')"><div class="ic">${IC.heart}</div><div class="l">血圧</div><div class="v num">${bpv?bpv.s+'/'+bpv.d:'—'}</div><div class="s">${bpv?(bp.am?'朝':'夜')+(bpv.p?' 脈拍'+bpv.p:''):'記録する'}</div></button>
   </div>`;
@@ -1197,6 +1210,9 @@ function viewWeight(){
     </div>
     <button class="btn" onclick="saveWeight()">${S.weights[wDate]!=null?'体重を更新':'体重を記録'}</button>
   </section>
+  ${(()=>{const lo=wLow();if(!lo||ks.length<2)return '';const lk=ks[ks.length-1],st=wLowState(lk),md=d=>`${+d.slice(5,7)}/${+d.slice(8)}`;
+    if(st){const prev=wLowBefore(lk);return `<div class="low-banner"><span class="low-ic sm">${IC.trophy}</span><div><b>計測開始以来、いちばん低い体重です</b><small>${st==='new'?`これまでの最低 ${prev.toFixed(1)}kg より ${(latest-prev).toFixed(1)}kg`:`これまでの最低（${prev.toFixed(1)}kg）と同じです`}</small></div></div>`}
+    return `<div class="low-line">${IC.trophy}<span>これまでの最低：<b class="num">${lo.v.toFixed(1)}kg</b>（${md(lo.k)}）</span><span class="gap">あと <b class="num">${(latest-lo.v).toFixed(1)}kg</b> で更新</span></div>`})()}
   <div class="stats" style="grid-template-columns:1fr 1fr">
     <div class="stat"><div class="l">最新</div><div class="v num">${latest!=null?latest.toFixed(1):'—'}<small style="font-size:11px"> kg</small></div></div>
     <div class="stat"><div class="l">BMI</div><div class="v num">${bmi?bmi.toFixed(1):'—'}</div></div>
@@ -1210,11 +1226,33 @@ function viewWeight(){
     <div class="muted" style="display:flex;gap:14px;margin-top:4px"><span><span style="color:var(--leaf)">●</span> 体重</span><span><span style="color:var(--warn)">┅</span> 月の目標</span></div>
   </section>
   <div class="h2">記録一覧 <span style="font-size:12px;color:var(--dim)">（タップで訂正・削除）</span></div>
-  <section class="card">${ks.length?`<ul class="list">${ks.slice(-30).reverse().map(k=>`<li class="tap" onclick="openRec('weights','${k}')"><span style="flex:1">${fmtDate(k)}</span><b class="num">${S.weights[k].toFixed(1)} kg</b><span class="ed">${IC.pen}</span></li>`).join('')}</ul>`:'<div class="muted">まだ記録がありません。毎朝、トイレの後・朝食の前に量ると変化がわかりやすくなります。</div>'}</section>`;
+  <section class="card">${ks.length?`<ul class="list">${(()=>{const lo=wLow(),rd=wRecordDays();return ks.slice(-30).reverse().map(k=>`<li class="tap" onclick="openRec('weights','${k}')"><span style="flex:1">${fmtDate(k)}${lo&&S.weights[k]===lo.v&&ks.length>1?' <span class="low-tag">最低</span>':rd.has(k)?' <span class="low-tag old">更新</span>':''}</span><b class="num">${S.weights[k].toFixed(1)} kg</b><span class="ed">${IC.pen}</span></li>`).join('')})()}</ul>`:'<div class="muted">まだ記録がありません。毎朝、トイレの後・朝食の前に量ると変化がわかりやすくなります。</div>'}</section>`;
+}
+/* ---- 最低体重（計測開始以来） ---- */
+function wLow(){ // 全期間の最低値と、その値を記録した一番新しい日
+  const ks=wKeys();if(!ks.length)return null;let v=Infinity,k=null;
+  ks.forEach(d=>{if(S.weights[d]<=v){v=S.weights[d];k=d}});return {v,k};
+}
+function wLowBefore(day){const a=wKeys().filter(d=>d!==day).map(d=>S.weights[d]);return a.length?Math.min(...a):null}
+function wLowState(day){ // その日の体重が全期間の最低か（'new'=更新, 'tie'=最低と同じ, null）
+  const w=S.weights[day];if(w==null)return null;const prev=wLowBefore(day);if(prev==null)return null;
+  return w<prev?'new':w===prev?'tie':null;
+}
+function wRecordDays(){ // その時点で最低を更新した日（記録一覧の目印用）
+  const out=new Set();let m=Infinity;wKeys().forEach((d,i)=>{if(i>0&&S.weights[d]<m)out.add(d);m=Math.min(m,S.weights[d])});return out;
 }
 function saveWeight(){
   const v=+$('#wv').value;if(!(v>20&&v<300)){toast('体重を正しく入力してください');return}
-  S.weights[wDate]=r1(v);save();render();toast(`${fmtDate(wDate)}　${v.toFixed(1)}kgを記録しました`);
+  const prev=wLowBefore(wDate);
+  S.weights[wDate]=r1(v);save();render();
+  if(prev!=null&&r1(v)<prev){
+    const first=wKeys()[0];
+    openSheet(`<div class="celebrate"><div class="low-ic">${IC.trophy}</div><h3 style="margin-top:8px">最低体重を更新しました！</h3>
+    <div class="num" style="font-size:40px;color:var(--b);line-height:1.2">${r1(v).toFixed(1)}<small style="font-size:16px"> kg</small></div>
+    <p>これまでの最低 ${prev.toFixed(1)}kg より <b style="color:var(--pos)">${(r1(v)-prev).toFixed(1)}kg</b><br><span class="muted">計測を始めた${fmtDate(first)}の${S.weights[first].toFixed(1)}kgから、${(r1(v)-S.weights[first]).toFixed(1)}kg</span></p>
+    <p class="muted">体重は日々上下します。週単位で下がる流れを続けていきましょう。</p></div>
+    <button class="btn" onclick="closeSheet()">閉じる</button>`);
+  }else toast(`${fmtDate(wDate)}　${v.toFixed(1)}kgを記録しました`);
 }
 function delWeight(k){delRec('weights',k)}
 function chart(){
@@ -1247,13 +1285,15 @@ function chart(){
   const gl=goals.map(g=>`<line x1="${X(g.a)}" x2="${X(g.b)}" y1="${Y(g.v)}" y2="${Y(g.v)}" stroke="var(--warn)" stroke-width="1.6" stroke-dasharray="4 4"/>`).join('');
   const lp=pts[pts.length-1],lv=vals[vals.length-1];
   const dots=pts.length<=40?pts.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="2.4" fill="var(--leaf)"/>`).join(''):'';
+  const wlo=wLow(),loI=wlo&&wKeys().length>1?ks.lastIndexOf(wlo.k):-1,lastIsLow=loI===ks.length-1;
+  const lowMark=loI>=0&&!lastIsLow?`<circle cx="${pts[loI][0]}" cy="${pts[loI][1]}" r="5" fill="#F2C14E" stroke="var(--card)" stroke-width="1.5"/><text x="${pts[loI][0]}" y="${pts[loI][1]+17}" text-anchor="middle" font-size="10" font-weight="700" fill="#F2C14E">最低 ${vals[loI].toFixed(1)}</text>`:'';
   const lpx=pts[pts.length-1][0];const vlab=wk?pts.slice(0,-1).map((p,i)=>Math.abs(p[0]-lpx)<60?'':`<text x="${p[0]}" y="${p[1]-8}" text-anchor="middle" font-size="10" font-family="DM Sans,sans-serif" fill="var(--sub)">${vals[i].toFixed(1)}</text>`).join(''):'';
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="体重の推移グラフ">
     <defs><linearGradient id="wa" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3CC9A6" stop-opacity=".30"/><stop offset="1" stop-color="#3CC9A6" stop-opacity="0"/></linearGradient></defs>
     ${grid}${xl}<path d="${area}" fill="url(#wa)"/>${gl}
-    <path d="${line}" fill="none" stroke="var(--leaf)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>${dots}${vlab}
-    <circle cx="${lp[0]}" cy="${lp[1]}" r="5" fill="var(--card)" stroke="var(--leaf)" stroke-width="2.5"/>
-    <rect x="${Math.min(lp[0]-26,W-R-52)}" y="${Math.max(lp[1]-30,0)}" width="52" height="19" rx="9" fill="var(--leaf)"/>
+    <path d="${line}" fill="none" stroke="var(--leaf)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>${dots}${vlab}${lowMark}
+    <circle cx="${lp[0]}" cy="${lp[1]}" r="5" fill="var(--card)" stroke="${lastIsLow?'#F2C14E':'var(--leaf)'}" stroke-width="2.5"/>
+    <rect x="${Math.min(lp[0]-26,W-R-52)}" y="${Math.max(lp[1]-30,0)}" width="52" height="19" rx="9" fill="${lastIsLow?'#F2C14E':'var(--leaf)'}"/>
     <text x="${Math.min(lp[0],W-R-26)}" y="${Math.max(lp[1]-30,0)+13.5}" text-anchor="middle" font-size="11" font-weight="700" font-family="DM Sans,sans-serif" fill="#0B121B">${lv.toFixed(1)}</text>
   </svg>`;
 }
@@ -1978,7 +2018,7 @@ function viewSettings(){
     <label class="btn sub" style="position:relative">バックアップから復元<input type="file" accept="application/json,.json" onchange="importData(this)" style="position:absolute;inset:0;opacity:0"></label></div>
     <button class="btn warn" style="margin-top:10px" onclick="if(confirm('すべての記録を削除します。よろしいですか？')){S=def();save();render();toast('すべて削除しました')}">すべてのデータを削除</button>
   </section>
-  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.13　食品の値は目安です</p>`;
+  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.14　食品の値は目安です</p>`;
 }
 async function testAI(){
   const gem=S.provider!=='claude';
