@@ -168,6 +168,22 @@ svg.i{width:22px;height:22px;flex:none}
 .low-line .gap{margin-left:auto}
 .low-tag{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:999px;background:rgba(242,193,78,.2);color:var(--b);vertical-align:1px}
 .low-tag.old{background:rgba(255,255,255,.06);color:var(--sub)}
+.lbl-card{margin-top:12px;padding:12px;border-radius:16px;border:1px solid var(--line);background:linear-gradient(180deg,#16212F,#121B26)}
+.lbl-h{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--sub)}
+.lbl-h svg{width:16px;height:16px;color:var(--leaf)}
+.lbl-base{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;color:var(--sub)}
+.lbl-base input{width:72px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--card2);text-align:center;font-family:var(--num);font-size:18px;font-weight:700}
+.lbl-u{display:flex;gap:2px;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:999px;padding:2px}
+.lbl-u button{min-width:32px;height:32px;padding:0 6px;border-radius:999px;font-size:13px;color:var(--sub)}
+.lbl-u button.on{background:var(--leaf);color:#0B121B;font-weight:700}
+.lbl-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
+.lbl-f{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;color:var(--sub)}
+.lbl-f input{width:100%;height:44px;border-radius:10px;border:1px solid var(--line);background:var(--card2);text-align:center;font-family:var(--num);font-size:17px;font-weight:700}
+.lbl-f small{font-size:10.5px;color:var(--dim)}
+.lbl-q{display:flex;justify-content:center;margin:0 auto;width:fit-content}
+.lbl-res{margin-top:12px}
+.lbl-rh{display:flex;align-items:baseline;gap:8px;font-weight:700;font-size:14px}
+.lbl-rh span{margin-left:auto;font-size:12px;color:var(--sub);font-weight:500}
 .empty-line{position:relative;color:var(--dim);font-size:13px;padding:0 16px 14px}
 
 .minis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
@@ -439,6 +455,7 @@ function sanitizeState(d){
   o.geminiKey=vStr(d.geminiKey,300).trim();o.apiKey=vStr(d.apiKey,300).trim();
   if(typeof d.hkLast==='string'&&/^[0-9/:（）日分 ]{1,40}$/.test(d.hkLast))o.hkLast=d.hkLast;
   if(d.adviceOk===1)o.adviceOk=1;
+  if(d.mMode==='direct')o.mMode='direct';
   const la=d.lastAdvice;
   if(isObj(la)&&RE_DAY.test(la.from)&&RE_DAY.test(la.to)&&/^[0-9/: ]{1,20}$/.test(la.at||'')){
     const AR=['食事','運動','血圧','体重','睡眠・生活'];
@@ -633,7 +650,7 @@ if(window.visualViewport){
 window.addEventListener('pageshow',()=>setTimeout(fixViewport,50));
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(fixViewport,50)});
 $('#back').onclick=closeSheet;
-function openAdd(m){addMeal=m;addMode='search';q='';cat='すべて';aiItems=null;aiImg=null;drawAdd()}
+function openAdd(m){addMeal=m;addMode='search';q='';cat='すべて';aiItems=null;aiImg=null;mName='';lState=null;drawAdd()}
 function drawAdd(){
   const m=MEALS.find(x=>x.k===addMeal);
   const seg=`<div class="seg">${[['search',IC.search+'食品'],['copy',IC.copy+'コピー'],['ai',IC.camera+'AI'],['manual',IC.pen+'手入力']].map(([k,l])=>`<button class="${addMode===k?'on':''}" onclick="addMode='${k}';if(addMode==='copy')cpInit();drawAdd()">${l}</button>`).join('')}</div>`;
@@ -654,13 +671,11 @@ function drawAdd(){
     <button class="btn sub" style="margin-top:8px" onclick="onText()">文章からカロリーを計算</button>
     <div id="aiout">${aiImg?`<img class="preview" src="${aiImg}" alt="">`:''}${aiItems?aiList():''}</div>`;
   }else{
-    body=`<label class="f">食品名<input class="field" id="mn" placeholder="例：手作り弁当"></label>
-    <div class="grid2"><label class="f">カロリー（kcal）<input class="field" id="mk" type="number" inputmode="decimal"></label><label class="f">量（g・任意）<input class="field" id="mg" type="number" inputmode="decimal"></label></div>
-    <div class="grid3"><label class="f">P（g）<input class="field" id="mp" type="number" inputmode="decimal"></label><label class="f">F（g）<input class="field" id="mf" type="number" inputmode="decimal"></label><label class="f">C（g）<input class="field" id="mc" type="number" inputmode="decimal"></label></div>
-    <button class="btn" style="margin-top:16px" onclick="addManual()">${m.n}に追加</button>`;
+    body=manualBody(m);
   }
   openSheet(`<h3 style="display:flex;align-items:center;gap:8px;color:${m.hex}">${m.e}<span style="color:var(--ink)">${m.n}を記録</span></h3>${seg}${body}`);
   if(addMode==='search')drawResults();
+  if(addMode==='manual'&&S.mMode!=='direct')lCalc();
 }
 function drawResults(){
   const el=$('#res');if(!el)return;
@@ -683,13 +698,78 @@ function pickFood(i){
 }
 function stepG(d){const s=pick.base>=100?10:5;pick.g=Math.max(0,(+pick.g||0)+d*s);$('#pg').value=pick.g;drawCalc()}
 function drawCalc(){const k=pick.g/pick.base;$('#pc').innerHTML=[['kcal',pick.kcal],['P',pick.p],['F',pick.f],['C',pick.c]].map(([l,v])=>`<div><div class="v num">${l==='kcal'?Math.round(v*k):r1(v*k)}</div><div class="l">${l==='kcal'?'エネルギー':l==='P'?'たんぱく質':l==='F'?'脂質':'炭水化物'}</div></div>`).join('')}
+
+/* ---- 手入力：栄養成分表示から計算 ---- */
+let mName='',lState=null;
+const L_UNITS=['g','ml','個','袋','本'];
+function lInit(){lState={base:100,unit:'g',eat:100,eatTouched:false,k:'',p:'',f:'',c:''}}
+function manualBody(m){
+  if(!lState)lInit();
+  const mode=S.mMode==='direct'?'direct':'label';
+  const seg=`<div class="seg" style="margin-top:12px">${[['label','栄養成分表示から計算'],['direct','そのまま入力']].map(([k,l])=>`<button class="${mode===k?'on':''}" onclick="mSwitch('${k}')">${l}</button>`).join('')}</div>`;
+  const name=`<label class="f">食品名<input class="field" id="mn" placeholder="${mode==='label'?'例：ポテトチップス うすしお':'例：手作り弁当'}" value="${esc(mName)}" oninput="mName=this.value"></label>`;
+  if(mode==='direct')return `${seg}${name}
+    <div class="grid2"><label class="f">カロリー（kcal）<input class="field" id="mk" type="number" inputmode="decimal"></label><label class="f">量（g・任意）<input class="field" id="mg" type="number" inputmode="decimal"></label></div>
+    <div class="grid3"><label class="f">P（g）<input class="field" id="mp" type="number" inputmode="decimal"></label><label class="f">F（g）<input class="field" id="mf" type="number" inputmode="decimal"></label><label class="f">C（g）<input class="field" id="mc" type="number" inputmode="decimal"></label></div>
+    <button class="btn" style="margin-top:16px" onclick="addManual()">${m.n}に追加</button>`;
+  const L=lState,cnt=!['g','ml'].includes(L.unit);
+  const nf=(id,lab,u,v)=>`<label class="lbl-f"><span>${lab}</span><input id="${id}" type="number" inputmode="decimal" min="0" value="${esc(v)}" placeholder="0" oninput="lState.${id.slice(1)}=this.value;lCalc()"><small>${u}</small></label>`;
+  return `${seg}${name}
+  <div class="lbl-card">
+    <div class="lbl-h">${IC.note}パッケージの栄養成分表示を、そのまま入力</div>
+    <div class="lbl-base"><input id="lbase" type="number" inputmode="decimal" min="0" value="${esc(L.base)}" oninput="lBase(this.value)">
+      <div class="lbl-u">${L_UNITS.map(u=>`<button class="${L.unit===u?'on':''}" onclick="lUnit('${u}')">${u}</button>`).join('')}</div><span>あたり</span></div>
+    <div class="lbl-grid">${nf('lk','エネルギー','kcal',L.k)}${nf('lp','たんぱく質','g',L.p)}${nf('lf','脂質','g',L.f)}${nf('lc','炭水化物','g',L.c)}</div>
+  </div>
+  <label class="f">食べた量</label>
+  <div class="stepper" style="margin-top:4px"><button onclick="lStep(-1)" aria-label="減らす">−</button><input id="leat" type="number" inputmode="decimal" min="0" value="${esc(L.eat)}" oninput="lEat(this.value)"><span class="muted" id="leu">${esc(L.unit)}</span><button onclick="lStep(1)" aria-label="増やす">＋</button></div>
+  <div class="chips lbl-q">${[[0.25,'¼'],[1/3,'⅓'],[0.5,'½'],[1,'全部'],[2,'2倍']].map(([r,l])=>`<button class="chip" onclick="lRatio(${r})">${l}</button>`).join('')}</div>
+  <div id="lcalc"></div>
+  <button class="btn" style="margin-top:12px" onclick="addManual()">${m.n}に追加</button>
+  <p class="muted" style="margin:8px 0 0;text-align:center">${cnt?'個・袋・本で記録した場合、量（g）は記録されません。':'記録した量（g）は、あとで訂正画面から変えることもできます。'}</p>`;
+}
+function mSwitch(k){const e=$('#mn');if(e)mName=e.value;S.mMode=k==='direct'?'direct':undefined;if(k!=='direct')delete S.mMode;save();drawAdd()}
+function lBase(v){lState.base=v;if(!lState.eatTouched){lState.eat=v;const e=$('#leat');if(e)e.value=v}lCalc()}
+function lEat(v){lState.eat=v;lState.eatTouched=true;lCalc()}
+function lUnit(u){
+  const L=lState,wasCnt=!['g','ml'].includes(L.unit),isCnt=!['g','ml'].includes(u);
+  L.unit=u;
+  if(isCnt&&!wasCnt&&+L.base===100){L.base=1;if(!L.eatTouched)L.eat=1}
+  if(!isCnt&&wasCnt&&+L.base===1){L.base=100;if(!L.eatTouched)L.eat=100}
+  const e=$('#mn');if(e)mName=e.value;drawAdd();
+}
+function lStep(d){const L=lState,cnt=!['g','ml'].includes(L.unit),st=cnt?0.5:(+L.base>=100?10:5);
+  L.eat=Math.max(0,Math.round(((+L.eat||0)+d*st)*100)/100);L.eatTouched=true;$('#leat').value=L.eat;lCalc()}
+function lRatio(r){const L=lState,v=Math.round((+L.base||0)*r*100)/100;L.eat=v;L.eatTouched=true;$('#leat').value=v;lCalc()}
+function lValues(){
+  const L=lState,b=+L.base,e=+L.eat;if(!(b>0)||!(e>=0))return null;
+  const r=e/b,n=x=>{const v=+x;return Number.isFinite(v)&&v>=0?v:0};
+  return {r,kcal:n(L.k)*r,p:n(L.p)*r,f:n(L.f)*r,c:n(L.c)*r};
+}
+function lCalc(){
+  const el=$('#lcalc');if(!el)return;const L=lState,v=lValues();
+  if(!v){el.innerHTML=`<div class="warnbox" style="margin-top:10px">「何gあたり」の数字を入れてください。</div>`;return}
+  const pct=v.r*100,amt=`${+(+L.eat).toFixed(2)}${L.unit}`;
+  el.innerHTML=`<div class="lbl-res"><div class="lbl-rh">${esc(amt)} ぶん<span>表示の ${pct>=10||pct===0?Math.round(pct):pct.toFixed(1)}%</span></div>
+    <div class="calc" style="margin:6px 0 0">${[['kcal','エネルギー',Math.round(v.kcal)],['P','たんぱく質',r1(v.p)],['F','脂質',r1(v.f)],['C','炭水化物',r1(v.c)]].map(([u,l,x])=>`<div><div class="v num">${x}</div><div class="l">${l}${u==='kcal'?'':'（g）'}</div></div>`).join('')}</div></div>`;
+}
+
 function pushItem(it){(S.meals[cur]=S.meals[cur]||[]).push(Object.assign({id:uid(),meal:addMeal},it))}
 function addPicked(){const k=pick.g/pick.base;pushItem({name:pick.name,grams:Math.round(pick.g),kcal:pick.kcal*k,p:pick.p*k,f:pick.f*k,c:pick.c*k});save();closeSheet();render();toast(`${pick.name}を追加しました`)}
 function addManual(){
+  if(S.mMode!=='direct'){
+    const n=$('#mn').value.trim(),L=lState,v=lValues();
+    if(!n){toast('食品名を入力してください');return}
+    if(!v){toast('「何gあたり」の数字を入れてください');return}
+    if(String(L.k).trim()===''){toast('表示のエネルギー（kcal）を入力してください（0kcalもOK）');return}
+    if(!(+L.eat>0)){toast('食べた量を入力してください');return}
+    pushItem({name:n,grams:['g','ml'].includes(L.unit)?Math.round(+L.eat):0,kcal:v.kcal,p:v.p,f:v.f,c:v.c});
+    mName='';lState=null;save();closeSheet();render();toast(`${n}（${Math.round(v.kcal)}kcal）を追加しました`);return;
+  }
   const n=$('#mn').value.trim(),kv=$('#mk').value.trim(),k=+kv;
   if(!n||kv===''||!(k>=0)){toast('食品名とカロリーを入力してください（0kcalもOK）');return}
   pushItem({name:n,grams:+$('#mg').value||0,kcal:k,p:+$('#mp').value||0,f:+$('#mf').value||0,c:+$('#mc').value||0});
-  save();closeSheet();render();toast(`${n}を追加しました`);
+  mName='';save();closeSheet();render();toast(`${n}を追加しました`);
 }
 
 
@@ -2018,7 +2098,7 @@ function viewSettings(){
     <label class="btn sub" style="position:relative">バックアップから復元<input type="file" accept="application/json,.json" onchange="importData(this)" style="position:absolute;inset:0;opacity:0"></label></div>
     <button class="btn warn" style="margin-top:10px" onclick="if(confirm('すべての記録を削除します。よろしいですか？')){S=def();save();render();toast('すべて削除しました')}">すべてのデータを削除</button>
   </section>
-  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.14　食品の値は目安です</p>`;
+  <p class="muted" style="text-align:center;margin-top:18px">からだノート v1.15　食品の値は目安です</p>`;
 }
 async function testAI(){
   const gem=S.provider!=='claude';
